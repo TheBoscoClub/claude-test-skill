@@ -1,0 +1,26 @@
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# Test artifacts
+__pycache__/
+.pytest_cache/
+.coverage
+coverage.json
+node_modules/
+.npm/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*~
+.idea/
+.vscode/
+
+# Sandbox directories (created during testing)
+/sandbox/
+/tmp/
