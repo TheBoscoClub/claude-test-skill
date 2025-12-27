@@ -55,11 +55,37 @@ The original skill was 3,652 lines (130KB) that loaded entirely into context. Th
 
 ## Installation (Current - Local)
 
+### Development Mode (Symlinks) - Recommended
+
+Symlinks allow edits in this project to be immediately live in Claude Code:
+
+```bash
+# Remove existing files
+rm ~/.claude/commands/test.md
+rm -rf ~/.claude/skills/test-phases
+
+# Create symlinks to project
+ln -s /path/to/projects/claude-test-skill/commands/test.md ~/.claude/commands/test.md
+ln -s /path/to/projects/claude-test-skill/skills/test-phases ~/.claude/skills/test-phases
+```
+
+**Current setup** (as of 2025-12-27):
+```
+~/.claude/commands/test.md → this project's commands/test.md
+~/.claude/skills/test-phases → this project's skills/test-phases/
+```
+
+### Copy Mode (Standalone)
+
+If you prefer separate copies:
+
 ```bash
 # Copy to your Claude Code config
 cp commands/test.md ~/.claude/commands/
 cp -r skills/test-phases ~/.claude/skills/
 ```
+
+Note: Changes in the project won't affect the live skill until re-copied.
 
 ## Usage
 
@@ -189,3 +215,4 @@ Since this is a testing tool, validate changes by:
 - Added Phase A: Deployable Application Testing
 - Added GitHub security integration (Dependabot, secret scanning, code scanning)
 - Graceful handling for projects without GitHub remotes
+- Set up symlinks from `~/.claude/` to this project for live development
