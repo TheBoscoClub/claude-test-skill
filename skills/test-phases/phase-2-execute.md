@@ -1,0 +1,83 @@
+# Phase 2: Execute Tests
+
+Run the project's test suite and capture results.
+
+## Execution Steps
+
+### 1. Run Tests Based on Project Type
+
+**Python:**
+```bash
+# Prefer pytest
+if command -v pytest &>/dev/null; then
+  pytest -v --tb=short 2>&1 | tee test-output.log
+else
+  python -m unittest discover -v 2>&1 | tee test-output.log
+fi
+```
+
+**Node.js:**
+```bash
+# Check package.json for test script
+if grep -q '"test"' package.json; then
+  npm test 2>&1 | tee test-output.log
+fi
+```
+
+**Go:**
+```bash
+go test -v ./... 2>&1 | tee test-output.log
+```
+
+**Rust:**
+```bash
+cargo test 2>&1 | tee test-output.log
+```
+
+**Make-based:**
+```bash
+make test 2>&1 | tee test-output.log
+```
+
+### 2. Parse Results
+
+Extract from output:
+- Total tests run
+- Tests passed
+- Tests failed
+- Tests skipped
+- Execution time
+
+### 3. Capture Failures
+
+For each failed test, record:
+- Test name
+- File location
+- Error message
+- Stack trace (truncated)
+
+## Output Format
+
+```
+═══════════════════════════════════════════════════════════════════
+  TEST EXECUTION RESULTS
+═══════════════════════════════════════════════════════════════════
+
+Total:   42 tests
+Passed:  40 ✅
+Failed:   2 ❌
+Skipped:  0 ⏭️
+Time:    3.2s
+
+FAILURES:
+─────────────────────────────────────────────────────────────────
+test_user_login (tests/test_auth.py:45)
+  AssertionError: Expected 200, got 401
+─────────────────────────────────────────────────────────────────
+```
+
+## Exit Criteria
+
+- ✅ PASS: All tests pass
+- ⚠️ ISSUES: Some tests skipped
+- ❌ FAIL: Any test failures
