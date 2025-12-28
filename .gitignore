@@ -24,3 +24,6 @@ Thumbs.db
 # Sandbox directories (created during testing)
 /sandbox/
 /tmp/
+
+# Session exit timestamps
+exit.*
