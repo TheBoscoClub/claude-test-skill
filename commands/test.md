@@ -1,7 +1,7 @@
 ---
 description: Modular project audit - testing, security, debugging, fixing (phase-based loading for context efficiency) (user)
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task
-argument-hint: "[help] [--phase=X] [--list-phases] [--skip-snapshot]"
+argument-hint: "[help] [prodapp] [--phase=X] [--list-phases] [--skip-snapshot]"
 ---
 
 # Modular Project Audit (/test)
@@ -12,6 +12,7 @@ A context-efficient project audit that loads phase instructions on-demand using 
 
 ```
 /test                    # Full audit (runs all phases)
+/test prodapp            # Validate installed production app (Phase P)
 /test --phase=A          # Run single phase
 /test --phase=0-3        # Run phase range
 /test --list-phases      # Show available phases
@@ -29,7 +30,8 @@ A context-efficient project audit that loads phase instructions on-demand using 
 | 2 | Execute | Run tests |
 | 2a | Runtime | Service health checks |
 | 3 | Report | Test results |
-| **A** | **App Test** | **Deployable application testing** |
+| **A** | **App Test** | **Deployable application testing (sandbox)** |
+| **P** | **Production** | **Validate installed production app** |
 | 4 | Cleanup | Deprecation, dead code |
 | 5 | Security | Vulnerability scan |
 | 6 | Dependencies | Package health |
@@ -95,7 +97,7 @@ fi
 - Run: `pytest` / `npm test` / `go test` / `cargo test`
 - Check actual output, not just exit codes
 
-**Phase A (App Testing)** - NEW:
+**Phase A (App Testing)** - Sandbox Installation:
 ```
 Read ~/.claude/skills/test-phases/phase-A-app-testing.md for full instructions.
 Key steps:
@@ -105,6 +107,21 @@ Key steps:
 4. Test functionality, performance, race conditions
 5. Record issues to app-test-issues.log
 6. Repeat until clean
+```
+
+**Phase P (Production Validation)** - Live System:
+```
+Read ~/.claude/skills/test-phases/phase-P-production.md for full instructions.
+Key steps:
+1. Load install-manifest.json (or infer from install.sh)
+2. Validate installed binaries exist and respond
+3. Check systemd services are running/healthy
+4. Validate config files exist and are valid
+5. Check data directories and permissions
+6. Verify ports are listening
+7. Run custom health checks from manifest
+8. Check service logs for recent errors
+9. Generate production-issues.log
 ```
 
 **Phase 5 (Security)**:
@@ -187,8 +204,10 @@ When `/test` is invoked:
 
 1. Parse arguments
 2. If `help` or `--list-phases`: show help and exit
-3. Determine which phases to run
-4. For each phase:
+3. **Handle shortcuts:**
+   - `prodapp` → `--phase=P` (production validation)
+4. Determine which phases to run
+5. For each phase:
    - Check if `~/.claude/skills/test-phases/phase-{X}.md` exists
    - Spawn Task subagent with prompt:
      ```
@@ -229,3 +248,9 @@ For security-focused audit:
 ```
 /test --phase=5,6
 ```
+
+For production validation (installed app):
+```
+/test prodapp
+```
+This validates the live production installation against the project's `install-manifest.json`.

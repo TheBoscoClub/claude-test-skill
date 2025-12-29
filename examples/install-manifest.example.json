@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Example install manifest for Phase P production validation",
+
+  "name": "my-exampleapp-app",
+  "version": "1.0.0",
+  "description": "exampleapp management application",
+  "install_type": "user",
+
+  "binaries": [
+    {
+      "name": "exampleapp-cli",
+      "paths": [
+        "~/.local/bin/exampleapp-cli",
+        "/usr/local/bin/exampleapp-cli"
+      ],
+      "version_flag": "--version",
+      "health_check": "exampleapp-cli --health"
+    },
+    {
+      "name": "exampleapp-convert",
+      "paths": ["~/.local/bin/exampleapp-convert"],
+      "version_flag": "-V"
+    }
+  ],
+
+  "services": [
+    {
+      "name": "exampleapp-api.service",
+      "type": "user",
+      "expected_state": "active",
+      "health_endpoint": "http://localhost:8585/health"
+    },
+    {
+      "name": "exampleapp-worker.service",
+      "type": "user",
+      "expected_state": "active"
+    },
+    {
+      "name": "exampleapp-scheduler.timer",
+      "type": "user",
+      "expected_state": "active"
+    }
+  ],
+
+  "config_files": [
+    {
+      "path": "~/.config/exampleapp/config.env",
+      "required": true,
+      "validate_command": "bash -n ~/.config/exampleapp/config.env"
+    },
+    {
+      "path": "~/.config/exampleapp/library.json",
+      "required": false
+    }
+  ],
+
+  "data_directories": [
+    {
+      "path": "~/.local/share/exampleapp",
+      "required": true,
+      "min_permissions": "700"
+    },
+    {
+      "path": "~/.local/share/exampleapp/cache",
+      "required": false,
+      "min_permissions": "700"
+    }
+  ],
+
+  "environment": {
+    "required_vars": ["EXAMPLEAPP_HOME", "EXAMPLEAPP_LIBRARY"],
+    "optional_vars": ["EXAMPLEAPP_DEBUG", "EXAMPLEAPP_LOG_LEVEL"]
+  },
+
+  "ports": [
+    {
+      "port": 8585,
+      "protocol": "tcp",
+      "service": "exampleapp-api.service",
+      "description": "REST API"
+    },
+    {
+      "port": 8586,
+      "protocol": "tcp",
+      "service": "exampleapp-api.service",
+      "description": "WebSocket for live updates"
+    }
+  ],
+
+  "health_checks": [
+    {
+      "name": "API responding",
+      "command": "curl -sf http://localhost:8585/health",
+      "timeout": 5
+    },
+    {
+      "name": "Database accessible",
+      "command": "exampleapp-cli db ping",
+      "timeout": 10
+    },
+    {
+      "name": "Library readable",
+      "command": "exampleapp-cli library check",
+      "timeout": 30
+    }
+  ]
+}
