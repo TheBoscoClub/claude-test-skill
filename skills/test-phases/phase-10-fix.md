@@ -1,10 +1,23 @@
-# Phase 10: Fix ALL Issues
+# Phase 10: Fix Issues
+
+## Execution Mode
+
+This phase behaves differently based on execution mode:
+
+| Mode | Behavior |
+|------|----------|
+| **Autonomous** (default) | Fix ALL issues, loop until clean, no manual items |
+| **Interactive** (`--interactive`) | May skip complex fixes, may list "manual required" |
+
+---
+
+## Autonomous Mode (Default)
 
 **CRITICAL: This phase MUST fix ALL issues found by prior phases.**
 
 There is no "manual fix required" category. If an issue was identified, it gets fixed.
 
-## Core Directive
+### Core Directive
 
 Fix EVERY issue regardless of:
 - Priority (critical, high, medium, low, advisory)
@@ -16,6 +29,33 @@ The only exceptions requiring user input are:
 1. **SAFETY**: Destructive operations on production data
 2. **ARCHITECTURE**: Complete system rewrites (rare)
 3. **EXTERNAL**: Missing credentials or external service access
+
+---
+
+## Interactive Mode (`--interactive`)
+
+When running with `--interactive`, this phase MAY:
+- Skip complex fixes that require judgment
+- Output "manual required" items for user review
+- Output "recommendations" for optional improvements
+- Skip logic errors if intent is unclear
+- Skip security-related changes for user review
+
+### Safety Rules (Interactive Only)
+
+**Auto-fix if:**
+- Fix is deterministic (one correct solution)
+- Change is reversible (git tracked)
+- No business logic changes
+- Tests exist to verify fix
+
+**Skip and report if:**
+- Logic errors requiring judgment
+- Architecture changes
+- Security-related code
+- Code without tests
+
+---
 
 ## Fix Categories
 
@@ -120,6 +160,8 @@ REPEAT:
 
 ## Output Format
 
+### Autonomous Mode Output
+
 ```
 ═══════════════════════════════════════════════════════════════════
   PHASE 10: FIX ALL ISSUES
@@ -145,7 +187,44 @@ VERIFICATION:
 Status: ✅ PASS - All issues resolved
 ```
 
-## NO EXCEPTIONS
+### Interactive Mode Output
+
+```
+═══════════════════════════════════════════════════════════════════
+  PHASE 10: AUTO-FIX (Interactive)
+═══════════════════════════════════════════════════════════════════
+
+Issues Received: 47
+Auto-Fixed: 42
+Manual Required: 5
+
+By Category:
+  Formatting:        12 files fixed
+  Import Sorting:     8 files fixed
+  Lint Errors:       15 fixes
+  Type Errors:        3 fixed, 2 skipped
+  Test Failures:      2 fixed, 2 skipped
+  Security:           2 packages updated
+  Documentation:      1 skipped (unclear intent)
+
+VERIFICATION:
+  Tests: 234 passed, 2 failed
+  Lint:  0 errors ✅
+  Types: 2 errors remaining
+
+MANUAL REQUIRED:
+1. src/api/auth.py:45 - Logic error: unclear if null check intended
+2. src/utils/db.py:23 - Security: review SQL construction
+3. tests/test_api.py:89 - Test expects old behavior
+4. tests/test_api.py:112 - Test expects old behavior
+5. library/utils.py:34 - Missing type annotation for complex generic
+
+Status: ⚠️ ISSUES - 5 items require manual review
+```
+
+---
+
+## Autonomous Mode Rules
 
 If you find yourself wanting to write "requires manual fix" or "skipped" - STOP.
 
@@ -159,3 +238,12 @@ The only valid "skip" is when the issue requires:
 - Explicit user architectural decision
 
 Everything else gets fixed. Now.
+
+## Interactive Mode Rules
+
+In interactive mode, it's acceptable to:
+- List items for manual review
+- Skip complex judgment calls
+- Output recommendations
+
+But still prefer fixing over skipping when possible.
