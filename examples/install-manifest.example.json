@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Example install manifest for Phase P production validation",
+
+  "name": "my-audiobook-app",
+  "version": "1.0.0",
+  "description": "Audiobook management application",
+  "install_type": "user",
+
+  "binaries": [
+    {
+      "name": "audiobook-cli",
+      "paths": [
+        "~/.local/bin/audiobook-cli",
+        "/usr/local/bin/audiobook-cli"
+      ],
+      "version_flag": "--version",
+      "health_check": "audiobook-cli --health"
+    },
+    {
+      "name": "audiobook-convert",
+      "paths": ["~/.local/bin/audiobook-convert"],
+      "version_flag": "-V"
+    }
+  ],
+
+  "services": [
+    {
+      "name": "audiobook-api.service",
+      "type": "user",
+      "expected_state": "active",
+      "health_endpoint": "http://localhost:8585/health"
+    },
+    {
+      "name": "audiobook-worker.service",
+      "type": "user",
+      "expected_state": "active"
+    },
+    {
+      "name": "audiobook-scheduler.timer",
+      "type": "user",
+      "expected_state": "active"
+    }
+  ],
+
+  "config_files": [
+    {
+      "path": "~/.config/audiobook/config.env",
+      "required": true,
+      "validate_command": "bash -n ~/.config/audiobook/config.env"
+    },
+    {
+      "path": "~/.config/audiobook/library.json",
+      "required": false
+    }
+  ],
+
+  "data_directories": [
+    {
+      "path": "~/.local/share/audiobook",
+      "required": true,
+      "min_permissions": "700"
+    },
+    {
+      "path": "~/.local/share/audiobook/cache",
+      "required": false,
+      "min_permissions": "700"
+    }
+  ],
+
+  "environment": {
+    "required_vars": ["AUDIOBOOK_HOME", "AUDIOBOOK_LIBRARY"],
+    "optional_vars": ["AUDIOBOOK_DEBUG", "AUDIOBOOK_LOG_LEVEL"]
+  },
+
+  "ports": [
+    {
+      "port": 8585,
+      "protocol": "tcp",
+      "service": "audiobook-api.service",
+      "description": "REST API"
+    },
+    {
+      "port": 8586,
+      "protocol": "tcp",
+      "service": "audiobook-api.service",
+      "description": "WebSocket for live updates"
+    }
+  ],
+
+  "health_checks": [
+    {
+      "name": "API responding",
+      "command": "curl -sf http://localhost:8585/health",
+      "timeout": 5
+    },
+    {
+      "name": "Database accessible",
+      "command": "audiobook-cli db ping",
+      "timeout": 10
+    },
+    {
+      "name": "Library readable",
+      "command": "audiobook-cli library check",
+      "timeout": 30
+    }
+  ]
+}
