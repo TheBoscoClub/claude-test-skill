@@ -8,6 +8,33 @@ argument-hint: "[help] [prodapp] [docker] [--phase=X] [--list-phases] [--skip-sn
 
 A context-efficient project audit that loads phase instructions on-demand using subagents.
 
+## CRITICAL: Autonomous Resolution Directive
+
+**The /test skill MUST fix and resolve ALL issues autonomously.**
+
+This skill operates **entirely non-interactively** except in extremely rare cases requiring major architectural changes affecting the entire codebase, production application, AND Docker deployment simultaneously.
+
+### Behavioral Requirements
+
+1. **Fix ALL Issues**: Every issue found - regardless of priority, severity, or complexity - MUST be fixed. No "advisory" or "low priority" issues left for manual resolution.
+
+2. **No Manual Lists**: Never return a list of "manual changes required" or "recommended fixes". If it can be identified, it can be fixed.
+
+3. **Documentation is Code**: Documentation MUST remain synchronized with:
+   - Current codebase state
+   - VERSION file
+   - Docker image versions
+   - All obsolete references removed
+
+4. **Autonomous Operation**: The only acceptable user prompts are:
+   - SAFETY: Confirming destructive operations on production systems
+   - ARCHITECTURE: Changes requiring complete rewrites of core systems
+   - EXTERNAL: Issues requiring credentials or external service access
+
+5. **Loop Until Clean**: Phase 10 (Fix) and Phase 12 (Verify) form a loop. If verification finds new issues introduced by fixes, fix those too. Continue until all tests pass and all issues are resolved.
+
+---
+
 ## Quick Reference
 
 ```
@@ -61,15 +88,15 @@ A context-efficient project audit that loads phase instructions on-demand using 
 | **P** | **5** | **10 + Discovery** | **No (validates live)** | **None (CONDITIONAL)** |
 | **D** | **5** | **10 + Discovery** | **No (validates registry)** | **P (CONDITIONAL)** |
 | 12 | 6 | P (or 10 if P skipped) | No (re-tests) | None |
-| **13** | **7** | **ALL phases pass** | **No (docs)** | **None (SUCCESS GATE)** |
+| **13** | **7** | **12** | **YES (fixes docs)** | **None (ALWAYS RUNS)** |
 | **C** | **8** | **ALL** | **Cleans up** | **None (LAST)** |
 | A | Special | 1 | Sandbox only | Tier 3 |
 
 **Legend:**
 - Bolded phases are **execution gates** - they block until complete
-- Phase P is **conditional** - may be skipped based on Discovery results
-- Phase D is **conditional** - may be skipped if no Docker/registry detected
-- Phase 13 is a **success gate** - only runs if ALL prior phases passed
+- Phase P is **conditional** - may be skipped based on Discovery results (no prompts)
+- Phase D is **conditional** - may be skipped if no Docker/registry detected (no prompts)
+- Phase 13 **ALWAYS runs** - documentation must stay synchronized with code
 
 ### Phase P Conditional Execution
 
@@ -80,7 +107,7 @@ Phase P (Production Validation) execution depends on Discovery (Phase 1) results
 | `none` | N/A | **SKIP** - No app to validate |
 | Any | `installed` | **RUN** - Validate production |
 | Any | `installed-not-running` | **RUN** - Check why not running |
-| Any | `not-installed` | **PROMPT** - Ask user to skip or run |
+| Any | `not-installed` | **SKIP** - App not installed on this system |
 
 When Phase P is skipped, Phase 12 (Verify) proceeds directly after Phase 10 (Fix).
 
@@ -91,9 +118,9 @@ Phase D (Docker Validation) execution depends on Discovery (Phase 1) results:
 | Discovery: Dockerfile | Discovery: Registry Package | Phase D Action |
 |-----------------------|----------------------------|----------------|
 | `none` | N/A | **SKIP** - No Docker to validate |
-| exists | `not-found` | **PROMPT** - Image exists but not in registry |
+| exists | `not-found` | **SKIP** - No registry package to validate |
 | exists | `found` | **RUN** - Validate image and registry package |
-| exists | `version-mismatch` | **RUN** - Flag version sync issue |
+| exists | `version-mismatch` | **RUN** - Flag and FIX version sync issue |
 
 When Phase D is skipped, Phase 12 (Verify) proceeds after Phase P (or 10 if P also skipped).
 
@@ -285,30 +312,23 @@ function executeAudit(requestedPhases):
 
     # Execute plan tier by tier
     for tier in executionPlan:
-        # Handle conditional execution (Phase P and D)
+        # Handle conditional execution (Phase P and D) - AUTONOMOUS, no prompts
         if tier.conditional:
             for phaseInfo in tier.phases:
                 if phaseInfo.phase == P:
                     if phasePRecommendation == "SKIP":
-                        log("Phase P skipped: No installable app detected")
+                        log("Phase P skipped: No installable app or not installed")
                         continue
-                    elif phasePRecommendation == "PROMPT":
-                        userChoice = askUser("Installable app exists but not installed. Run Phase P?")
-                        if userChoice == "skip":
-                            continue
+                    # Otherwise RUN - no prompts
                 elif phaseInfo.phase == D:
                     if phaseDRecommendation == "SKIP":
-                        log("Phase D skipped: No Dockerfile detected")
+                        log("Phase D skipped: No Dockerfile or registry package")
                         continue
-                    elif phaseDRecommendation == "PROMPT":
-                        userChoice = askUser("Dockerfile exists but no registry package found. Run Phase D?")
-                        if userChoice == "skip":
-                            continue
+                    # Otherwise RUN - no prompts
 
-        # Handle success gate (Phase 13)
-        if tier.successGate and not allPhasesSucceeded:
-            log("Phase 13 skipped: Prior phases had failures")
-            continue
+        # Handle success gate (Phase 13) - runs regardless, fixes docs
+        # Note: Phase 13 now ALWAYS runs to fix documentation issues
+        # It will update docs to match current state even after failures
 
         # Execute the tier
         if tier.parallel:
@@ -475,19 +495,22 @@ After all phases complete:
 ```markdown
 # Audit Summary
 
-| Phase | Status | Issues |
-|-------|--------|--------|
-| S | ✅ | 0 |
-| 0 | ✅ | 0 |
-| A | ⚠️ | 3 |
-| ... | ... | ... |
+| Phase | Status | Issues Found | Issues Fixed |
+|-------|--------|--------------|--------------|
+| S | ✅ | 0 | 0 |
+| 0 | ✅ | 0 | 0 |
+| 10 | ✅ | 15 | 15 |
+| 13 | ✅ | 3 | 3 |
+| ... | ... | ... | ... |
 
-Total Issues: X
-Auto-Fixed: Y
-Manual Required: Z
+Total Issues Found: X
+Total Issues Fixed: X  # MUST equal Found
+Verification: ✅ All tests passing
 
 Output Log: audit-YYYYMMDD-HHMMSS.log
 ```
+
+**Note**: The audit is NOT complete until `Issues Fixed == Issues Found` and all tests pass.
 
 ---
 
@@ -561,31 +584,26 @@ When `/test` is invoked:
    TIER 5: Production & Docker Validation [P, D] - CONDITIONAL
    ──────────────────────────────────────────────────────────────────
    **Phase P** - Check Phase P Recommendation from Discovery:
-     - SKIP: Log "No installable app" and proceed to Phase D
-     - RUN: Execute Phase P
-     - PROMPT: Use AskUserQuestion tool:
-         "Installable app detected but not installed on this system.
-          Skip Phase P (production validation)?"
-         Options: [Run anyway] [Skip]
+     - SKIP: Log "No installable app or not installed" and proceed to Phase D
+     - RUN: Execute Phase P, fix any issues found
+     (No prompts - fully autonomous)
 
    **Phase D** - Check Phase D Recommendation from Discovery:
-     - SKIP: Log "No Dockerfile" and proceed to Tier 6
-     - RUN: Execute Phase D
-     - PROMPT: Use AskUserQuestion tool:
-         "Dockerfile exists but no registry package found.
-          Skip Phase D (Docker validation)?"
-         Options: [Run anyway] [Skip]
+     - SKIP: Log "No Dockerfile or registry package" and proceed to Tier 6
+     - RUN: Execute Phase D, fix any version sync issues
+     (No prompts - fully autonomous)
    Wait for completion (or skip) → GATE 6: Production/Docker Validated
 
    TIER 6: Verification [12] - Run SEQUENTIALLY
    ──────────────────────────────────────────────────────────────────
    Wait for completion → GATE 7: Verified
+   If tests fail, loop back to TIER 4 (Fix) until clean
 
-   TIER 7: Documentation [13] - SUCCESS GATE
+   TIER 7: Documentation [13] - ALWAYS RUNS
    ──────────────────────────────────────────────────────────────────
-   ⛔ ONLY runs if ALL prior phases (0-12, P) PASSED
-   ⛔ If any prior phase FAILED, skip with log message
-   Wait for completion (or skip) → GATE 8: Docs Complete
+   ✅ ALWAYS runs - documentation must stay current
+   ✅ Fixes ALL doc issues: versions, paths, obsolete content
+   Wait for completion → GATE 8: Docs Complete
 
    TIER 8: Cleanup [C] - Run LAST (never parallel, always runs)
    ──────────────────────────────────────────────────────────────────
@@ -614,27 +632,26 @@ When `/test` is invoked:
 - Can run parallel with: Tier 3 analysis phases
 - Runs in sandbox - separate from production validation
 
-**Phase P (Production) - Now in Main Flow:**
+**Phase P (Production) - Autonomous:**
 - Position: Tier 5 (after Fixes, before Verify)
 - Conditional execution based on Discovery results
-- Three possible outcomes:
-  1. **SKIP**: No installable app detected → proceed to Phase D
-  2. **RUN**: Production app is installed → validate it
-  3. **PROMPT**: App exists but not installed → ask user
+- Two possible outcomes (no prompts):
+  1. **SKIP**: No installable app or not installed → proceed to Phase D
+  2. **RUN**: Production app is installed → validate and fix issues
 
-**Phase D (Docker) - Now in Main Flow:**
+**Phase D (Docker) - Autonomous:**
 - Position: Tier 5 (after Phase P, before Verify)
 - Conditional execution based on Discovery results
-- Three possible outcomes:
-  1. **SKIP**: No Dockerfile detected → proceed to Tier 6
-  2. **RUN**: Dockerfile + registry package found → validate sync
-  3. **PROMPT**: Dockerfile exists but no registry package → ask user
+- Two possible outcomes (no prompts):
+  1. **SKIP**: No Dockerfile or registry package → proceed to Tier 6
+  2. **RUN**: Dockerfile + registry package found → validate and fix version sync
 
-**Phase 13 (Docs) - Success Gate:**
+**Phase 13 (Docs) - ALWAYS Runs:**
 - Position: Tier 7 (after Verify, before Cleanup)
-- Only runs if ALL prior phases passed
-- If any phase failed, log skip message and proceed to Cleanup
-- Rationale: Don't update docs for a broken codebase
+- ALWAYS runs regardless of prior phase status
+- Fixes ALL documentation issues: version refs, obsolete paths, outdated content
+- Documentation MUST match current codebase state
+- Rationale: Docs should always be current, even if codebase has issues to track
 
 **Phase C (Cleanup) - Always Runs:**
 - Always executes regardless of prior failures

@@ -526,6 +526,158 @@ validate_data_dirs() {
 }
 ```
 
+## Step 5a: Validate Installation Permissions and Ownership
+
+```bash
+validate_permissions_and_ownership() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
+
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  Step 5a: Validating Permissions and Ownership"
+    echo "───────────────────────────────────────────────────────────────────"
+    echo ""
+
+    # Determine installation directory from manifest or common locations
+    local INSTALL_DIR=""
+    if [[ -n "$PROD_MANIFEST" ]]; then
+        INSTALL_DIR=$(jq -r '.install_dir // empty' "$PROD_MANIFEST" 2>/dev/null)
+    fi
+
+    # Try common locations if not in manifest
+    if [[ -z "$INSTALL_DIR" ]]; then
+        for loc in "/opt/$APP_NAME" "/opt/${APP_NAME,,}" "/usr/local/lib/$APP_NAME"; do
+            if [[ -d "$loc" ]]; then
+                INSTALL_DIR="$loc"
+                break
+            fi
+        done
+    fi
+
+    if [[ -z "$INSTALL_DIR" ]] || [[ ! -d "$INSTALL_DIR" ]]; then
+        echo "ℹ️ No installation directory found - skipping permissions check"
+        return 0
+    fi
+
+    echo "  Installation directory: $INSTALL_DIR"
+    echo ""
+
+    local issues=0
+
+    # Determine expected owner (system installs use service user, user installs use current user)
+    local EXPECTED_USER="$USER"
+    local EXPECTED_GROUP="$USER"
+    local is_system=false
+
+    [[ "$INSTALL_DIR" == /opt/* ]] || [[ "$INSTALL_DIR" == /usr/* ]] && is_system=true
+
+    if [[ "$is_system" == "true" ]]; then
+        # For system installs, check manifest for service user or infer from app name
+        if [[ -n "$PROD_MANIFEST" ]]; then
+            EXPECTED_USER=$(jq -r '.service_user // empty' "$PROD_MANIFEST" 2>/dev/null)
+            EXPECTED_GROUP=$(jq -r '.service_group // empty' "$PROD_MANIFEST" 2>/dev/null)
+        fi
+
+        # Default to app name if not specified
+        if [[ -z "$EXPECTED_USER" ]]; then
+            EXPECTED_USER="${APP_NAME,,}"  # lowercase app name
+            EXPECTED_USER="${EXPECTED_USER//-/}"  # remove hyphens
+        fi
+        [[ -z "$EXPECTED_GROUP" ]] && EXPECTED_GROUP="$EXPECTED_USER"
+
+        # Check if service user exists
+        if ! id "$EXPECTED_USER" &>/dev/null; then
+            echo "  ⚠️ Expected service user '$EXPECTED_USER' does not exist"
+            EXPECTED_USER="root"
+            EXPECTED_GROUP="root"
+        fi
+    fi
+
+    echo "  Expected owner: $EXPECTED_USER:$EXPECTED_GROUP"
+    echo ""
+
+    # Check ownership of key directories
+    echo "  Checking ownership..."
+    local key_dirs=("library" "converter" "backend" "web" "web-v2")
+    for subdir in "${key_dirs[@]}"; do
+        if [[ -d "$INSTALL_DIR/$subdir" ]]; then
+            local wrong_count=$(find "$INSTALL_DIR/$subdir" \( ! -user "$EXPECTED_USER" -o ! -group "$EXPECTED_GROUP" \) 2>/dev/null | wc -l)
+            if [[ "$wrong_count" -gt 0 ]]; then
+                echo "    ❌ $subdir/: $wrong_count files have wrong owner" | tee -a "$ISSUES_FILE"
+                # Show examples
+                find "$INSTALL_DIR/$subdir" \( ! -user "$EXPECTED_USER" -o ! -group "$EXPECTED_GROUP" \) 2>/dev/null | head -3 | while read -r f; do
+                    local owner=$(stat -c "%U:%G" "$f" 2>/dev/null)
+                    echo "       Example: $(basename "$f") is $owner (expected $EXPECTED_USER:$EXPECTED_GROUP)"
+                done
+                ((issues++))
+            else
+                echo "    ✅ $subdir/: ownership correct"
+            fi
+        fi
+    done
+    echo ""
+
+    # Check directory permissions (should be 755, not 700)
+    echo "  Checking directory permissions..."
+    local bad_dirs=$(find "$INSTALL_DIR" -type d -perm 700 2>/dev/null | wc -l)
+    if [[ "$bad_dirs" -gt 0 ]]; then
+        echo "    ❌ $bad_dirs directories have restrictive permissions (700)" | tee -a "$ISSUES_FILE"
+        find "$INSTALL_DIR" -type d -perm 700 2>/dev/null | head -3 | while read -r d; do
+            echo "       Example: $d"
+        done
+        ((issues++))
+    else
+        echo "    ✅ All directories have correct permissions"
+    fi
+    echo ""
+
+    # Check file permissions (should be 644 for .py, .html, etc., not 600)
+    echo "  Checking file permissions..."
+    local bad_files=$(find "$INSTALL_DIR" \( -name "*.py" -o -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.sql" \) \( -perm 600 -o -perm 700 \) 2>/dev/null | wc -l)
+    if [[ "$bad_files" -gt 0 ]]; then
+        echo "    ❌ $bad_files files have restrictive permissions (600/700)" | tee -a "$ISSUES_FILE"
+        find "$INSTALL_DIR" \( -name "*.py" -o -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.sql" \) \( -perm 600 -o -perm 700 \) 2>/dev/null | head -3 | while read -r f; do
+            local perms=$(stat -c "%a" "$f" 2>/dev/null)
+            echo "       Example: $(basename "$f") has $perms"
+        done
+        ((issues++))
+    else
+        echo "    ✅ All source files have readable permissions"
+    fi
+    echo ""
+
+    # Check that executable scripts are actually executable
+    echo "  Checking script executability..."
+    local non_exec=$(find "$INSTALL_DIR" -name "*.sh" ! -perm -u+x 2>/dev/null | wc -l)
+    if [[ "$non_exec" -gt 0 ]]; then
+        echo "    ❌ $non_exec shell scripts are not executable" | tee -a "$ISSUES_FILE"
+        ((issues++))
+    else
+        echo "    ✅ All shell scripts are executable"
+    fi
+    echo ""
+
+    # Summary
+    if [[ "$issues" -gt 0 ]]; then
+        echo "  ❌ Found $issues permission/ownership issues"
+        echo ""
+        echo "  To fix: Run the upgrade script which auto-corrects permissions:"
+        echo "    audiobooks-upgrade --from-project /path/to/project"
+        echo ""
+        echo "  Or manually fix with:"
+        if [[ "$is_system" == "true" ]]; then
+            echo "    sudo chown -R $EXPECTED_USER:$EXPECTED_GROUP $INSTALL_DIR/library $INSTALL_DIR/converter"
+            echo "    sudo chmod -R u+r,g+r,o+r $INSTALL_DIR/library $INSTALL_DIR/converter"
+        else
+            echo "    chmod -R u+r,g+r $INSTALL_DIR"
+        fi
+    else
+        echo "  ✅ All permissions and ownership correct"
+    fi
+    echo ""
+}
+```
+
 ## Step 6: Validate Ports and Network
 
 ```bash
@@ -736,6 +888,7 @@ run_phase_P() {
     validate_services
     validate_configs
     validate_data_dirs
+    validate_permissions_and_ownership  # Step 5a: Check perms/ownership
     validate_ports
     run_health_checks
     check_service_logs

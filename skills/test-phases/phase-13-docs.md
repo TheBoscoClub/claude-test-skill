@@ -1,125 +1,159 @@
-# Phase 13: Documentation Review
+# Phase 13: Fix ALL Documentation
 
-Audit documentation quality and completeness.
+**CRITICAL: This phase MUST fix ALL documentation issues, not just report them.**
 
-## Files to Check
+Documentation is code. If it's wrong, fix it. If it's missing, add it. If it's obsolete, remove it.
 
-| File | Required | Purpose |
-|------|----------|---------|
-| `README.md` | ✅ | Project overview |
-| `CHANGELOG.md` | Recommended | Version history |
-| `CONTRIBUTING.md` | For OSS | Contribution guide |
-| `LICENSE` | ✅ | Legal terms |
-| `docs/` | Optional | Detailed docs |
-| `API.md` | If API exists | API reference |
+## Core Directive
 
-## Execution Steps
+Documentation MUST remain synchronized with:
+- Current codebase state
+- VERSION file (single source of truth for version)
+- Docker image versions
+- install-manifest.json
+- Actual file paths and directories
+- Current API endpoints and behavior
 
-### 1. Check Required Files
+## Mandatory Checks and Fixes
+
+### 1. Version Synchronization
 
 ```bash
-for file in README.md LICENSE; do
-  if [ -f "$file" ]; then
-    echo "✅ $file exists ($(wc -l < $file) lines)"
-  else
-    echo "❌ $file MISSING"
-  fi
-done
+# Get canonical version
+VERSION=$(cat VERSION 2>/dev/null || echo "unknown")
+
+# Find and fix all version references
+grep -rn "version.*[0-9]\+\.[0-9]\+\.[0-9]\+" --include="*.md" --include="*.json" | \
+  while read match; do
+    # If version doesn't match VERSION file, fix it
+  done
 ```
 
-### 2. README Quality Check
+**Fix all version mismatches in:**
+- README.md changelog section
+- CLAUDE.md project instructions
+- package.json / pyproject.toml
+- Dockerfile labels
+- docker-compose.yml comments
+- Any other documentation
+
+### 2. Path References
 
 ```bash
-# Check for essential sections
-for section in "Installation" "Usage" "License"; do
-  if grep -qi "^#.*$section\|^##.*$section" README.md; then
-    echo "✅ $section section found"
-  else
-    echo "⚠️ Missing $section section"
-  fi
-done
+# Find hardcoded development paths
+grep -rn "/raid0/ClaudeCodeProjects" --include="*.md" --include="*.sh"
 
-# Check for code examples
-if grep -q '```' README.md; then
-  echo "✅ Contains code examples"
-else
-  echo "⚠️ No code examples"
+# Find obsolete paths (old repo names, deleted directories)
+# Compare documented paths against actual filesystem
+```
+
+**Fix by:**
+- Replacing dev paths with generic placeholders (`<project-root>`, `<install-dir>`)
+- Using production paths where appropriate (`/opt/audiobooks/`)
+- Removing references to deleted files/directories
+
+### 3. README Completeness
+
+Check and ADD missing sections:
+- Installation instructions
+- Usage examples with current syntax
+- Configuration options (matching actual config)
+- API reference (matching actual endpoints)
+- Changelog with ALL recent versions
+
+### 4. CHANGELOG Currency
+
+```bash
+# Check if CHANGELOG matches VERSION
+CHANGELOG_VERSION=$(grep -m1 "## \[" CHANGELOG.md | grep -oP '\d+\.\d+\.\d+')
+if [ "$CHANGELOG_VERSION" != "$VERSION" ]; then
+  # Add missing version entry to CHANGELOG
 fi
-```
-
-### 3. Docstring Coverage (Python)
-
-```bash
-# Check for missing docstrings
-if command -v pydocstyle &>/dev/null; then
-  pydocstyle . --count 2>&1 | tail -5
-fi
-
-# Count functions without docstrings
-grep -rn "def " --include="*.py" | wc -l  # Total functions
-grep -rn '"""' --include="*.py" | wc -l   # Docstrings (rough)
-```
-
-### 4. JSDoc Coverage (JavaScript)
-
-```bash
-# Check for JSDoc comments
-grep -rn "/\*\*" --include="*.js" --include="*.ts" | wc -l
 ```
 
 ### 5. API Documentation
 
-```bash
-# Check if API is documented
-if [ -d "docs/api" ] || [ -f "API.md" ] || [ -f "openapi.yaml" ]; then
-  echo "✅ API documentation exists"
-else
-  # Check if project has API endpoints
-  if grep -rq "@app.route\|@router\|app.get\|app.post" --include="*.py" --include="*.ts"; then
-    echo "⚠️ API exists but no documentation"
-  fi
-fi
+For each endpoint in codebase:
+- Verify it's documented
+- Verify documentation matches implementation
+- Fix any discrepancies
+
+### 6. Docker Documentation
+
+Verify and fix:
+- Dockerfile version labels match VERSION
+- docker-compose.yml examples are current
+- Environment variables documented match actual
+- Port mappings are accurate
+- Volume mounts are accurate
+
+### 7. Obsolete Content Removal
+
+Remove references to:
+- Deleted files/directories
+- Deprecated features
+- Old API endpoints
+- Removed dependencies
+- Previous repository names (unless historical context)
+
+### 8. Docstring/Comment Updates
+
+For code that changed in this audit:
+- Update function docstrings
+- Update inline comments
+- Update type hints documentation
+
+## Execution Flow
+
 ```
-
-### 6. Changelog Check
-
-```bash
-if [ -f "CHANGELOG.md" ]; then
-  # Check format (Keep a Changelog)
-  if grep -q "## \[Unreleased\]\|## \[[0-9]" CHANGELOG.md; then
-    echo "✅ CHANGELOG follows standard format"
-  fi
-
-  # Check recent entry
-  latest=$(grep -m1 "## \[" CHANGELOG.md)
-  echo "Latest: $latest"
-fi
+1. Read VERSION file as source of truth
+2. Scan all documentation files
+3. For each issue found:
+   a. Identify the correct current value
+   b. Edit the file to fix it
+   c. Verify the fix is accurate
+4. Run documentation validation
+5. Report all fixes made
 ```
 
 ## Output Format
 
 ```
-DOCUMENTATION AUDIT
-───────────────────
+═══════════════════════════════════════════════════════════════════
+  PHASE 13: FIX ALL DOCUMENTATION
+═══════════════════════════════════════════════════════════════════
 
-Required Files:
-  ✅ README.md (145 lines)
-  ✅ LICENSE (MIT)
-  ⚠️ CHANGELOG.md missing
+Version Sync:
+  VERSION file: 3.2.0
+  Fixed CLAUDE.md: 3.0.5 → 3.2.0
+  Fixed README.md changelog: added v3.2.0, v3.1.x entries
 
-README Quality:
-  ✅ Installation section
-  ✅ Usage section
-  ✅ Code examples
-  ⚠️ Missing API section
-  ⚠️ Missing Contributing section
+Path Fixes:
+  Fixed 4 dev path references in MIGRATION.md
+  Fixed 2 obsolete paths in upgrade.sh
 
-Code Documentation:
-  Python docstrings: 67% coverage
-  Missing docstrings: 12 functions
+Content Updates:
+  Updated API documentation for 3 new endpoints
+  Removed reference to deleted web.legacy/ directory
+  Added missing configuration options section
 
-RECOMMENDATIONS:
-1. Add CHANGELOG.md
-2. Document 12 public functions
-3. Add API reference section to README
+Obsolete Removal:
+  Removed 2 references to audiobook-toolkit (old repo name)
+  Removed deprecated --legacy flag documentation
+
+Documentation Files Modified: 8
+Issues Found: 15
+Issues Fixed: 15
+
+Status: ✅ PASS - All documentation synchronized
 ```
+
+## NO RECOMMENDATIONS
+
+This phase does NOT output "recommendations" or "suggestions".
+
+If documentation is wrong → FIX IT
+If documentation is missing → ADD IT
+If documentation is obsolete → REMOVE IT
+
+The only output is a report of what was FIXED.
