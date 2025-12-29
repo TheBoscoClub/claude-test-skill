@@ -1,7 +1,7 @@
 ---
 description: Modular project audit - testing, security, debugging, fixing (phase-based loading for context efficiency) (user)
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task
-argument-hint: "[help] [prodapp] [docker] [--phase=X] [--list-phases] [--skip-snapshot]"
+argument-hint: "[help] [prodapp] [docker] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
 ---
 
 # Modular Project Audit (/test)
@@ -38,14 +38,35 @@ This skill operates **entirely non-interactively** except in extremely rare case
 ## Quick Reference
 
 ```
-/test                    # Full audit (runs all phases)
+/test                    # Full audit (autonomous - fixes everything)
 /test prodapp            # Validate installed production app (Phase P)
 /test docker             # Validate Docker image and registry (Phase D)
 /test --phase=A          # Run single phase
 /test --phase=0-3        # Run phase range
 /test --list-phases      # Show available phases
+/test --interactive      # Enable interactive mode (prompts, manual items allowed)
+/test --phase=5 --interactive  # Combine with other options
 /test help               # Show help
 ```
+
+### Execution Modes
+
+| Mode | Flag | Behavior |
+|------|------|----------|
+| **Autonomous** (default) | (none) | Fixes ALL issues, no prompts, loops until clean |
+| **Interactive** | `--interactive` | May prompt user, may list "manual required" items |
+
+**Autonomous mode** (default):
+- Fixes every issue regardless of priority/severity
+- No user prompts except for safety/architecture/external blocks
+- Loops until all tests pass and all issues resolved
+- Documentation automatically synchronized
+
+**Interactive mode** (`--interactive`):
+- May prompt for decisions (Phase P/D conditional execution)
+- May output "manual required" or "recommendation" lists
+- Single pass - does not loop until clean
+- Useful for exploration or when human judgment needed
 
 ## Available Phases
 
@@ -312,23 +333,33 @@ function executeAudit(requestedPhases):
 
     # Execute plan tier by tier
     for tier in executionPlan:
-        # Handle conditional execution (Phase P and D) - AUTONOMOUS, no prompts
+        # Handle conditional execution (Phase P and D)
         if tier.conditional:
             for phaseInfo in tier.phases:
                 if phaseInfo.phase == P:
                     if phasePRecommendation == "SKIP":
                         log("Phase P skipped: No installable app or not installed")
                         continue
-                    # Otherwise RUN - no prompts
+                    elif phasePRecommendation == "PROMPT" and INTERACTIVE_MODE:
+                        # Only prompt in interactive mode
+                        userChoice = askUser("Run Phase P?")
+                        if userChoice == "skip": continue
+                    # Otherwise RUN (autonomous mode never prompts)
                 elif phaseInfo.phase == D:
                     if phaseDRecommendation == "SKIP":
                         log("Phase D skipped: No Dockerfile or registry package")
                         continue
-                    # Otherwise RUN - no prompts
+                    elif phaseDRecommendation == "PROMPT" and INTERACTIVE_MODE:
+                        userChoice = askUser("Run Phase D?")
+                        if userChoice == "skip": continue
+                    # Otherwise RUN (autonomous mode never prompts)
 
-        # Handle success gate (Phase 13) - runs regardless, fixes docs
-        # Note: Phase 13 now ALWAYS runs to fix documentation issues
-        # It will update docs to match current state even after failures
+        # Handle Phase 13 based on mode
+        if tier.phase == 13:
+            if INTERACTIVE_MODE and not allPhasesSucceeded:
+                log("Phase 13 skipped: Prior phases had failures (interactive mode)")
+                continue
+            # Autonomous mode: ALWAYS run Phase 13 to fix docs
 
         # Execute the tier
         if tier.parallel:
@@ -542,11 +573,32 @@ Output Log: audit-YYYYMMDD-HHMMSS.log
 When `/test` is invoked:
 
 1. **Parse arguments**
+   - Check for `--interactive` flag → set `INTERACTIVE_MODE=true` (default: false)
+   - All other flags work the same in both modes
 2. If `help` or `--list-phases`: show help and exit
 3. **Handle shortcuts:**
    - `prodapp` → `--phase=P` (production validation)
    - `docker` → `--phase=D` (Docker validation)
 4. **Build execution plan from requested phases**
+
+### Mode-Specific Behavior
+
+```
+IF INTERACTIVE_MODE:
+    # Interactive behaviors allowed
+    - May use AskUserQuestion for Phase P/D decisions
+    - May output "manual required" items
+    - May output "recommendations"
+    - Single pass execution (no fix→verify loop)
+    - Phase 13 may skip if prior phases failed
+ELSE (Autonomous - DEFAULT):
+    # Fully autonomous behaviors enforced
+    - No user prompts (except SAFETY/ARCHITECTURE/EXTERNAL)
+    - Must fix ALL issues identified
+    - Must loop until all tests pass
+    - Phase 13 ALWAYS runs
+    - No "manual required" or "recommendations" output
+```
 
 5. **Execute by tier (respecting dependencies):**
 

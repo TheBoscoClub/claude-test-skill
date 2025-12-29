@@ -1,8 +1,35 @@
-# Phase 13: Fix ALL Documentation
+# Phase 13: Documentation
+
+## Execution Mode
+
+This phase behaves differently based on execution mode:
+
+| Mode | Behavior |
+|------|----------|
+| **Autonomous** (default) | Fix ALL doc issues, always runs, no recommendations |
+| **Interactive** (`--interactive`) | May output recommendations, may skip if prior phases failed |
+
+---
+
+## Autonomous Mode (Default)
 
 **CRITICAL: This phase MUST fix ALL documentation issues, not just report them.**
 
 Documentation is code. If it's wrong, fix it. If it's missing, add it. If it's obsolete, remove it.
+
+This phase ALWAYS runs in autonomous mode, even if prior phases had failures.
+Documentation must stay synchronized regardless of code state.
+
+---
+
+## Interactive Mode (`--interactive`)
+
+When running with `--interactive`, this phase:
+- May skip if prior phases failed (success gate behavior)
+- May output "recommendations" instead of fixing
+- May leave complex documentation decisions to user
+
+---
 
 ## Core Directive
 
@@ -148,7 +175,11 @@ Issues Fixed: 15
 Status: ✅ PASS - All documentation synchronized
 ```
 
-## NO RECOMMENDATIONS
+---
+
+## Mode-Specific Rules
+
+### Autonomous Mode (Default)
 
 This phase does NOT output "recommendations" or "suggestions".
 
@@ -157,3 +188,22 @@ If documentation is missing → ADD IT
 If documentation is obsolete → REMOVE IT
 
 The only output is a report of what was FIXED.
+
+### Interactive Mode (`--interactive`)
+
+In interactive mode, this phase MAY:
+- Output recommendations for complex documentation decisions
+- Skip if prior phases failed
+- Leave ambiguous documentation for user review
+
+Interactive mode output may include:
+
+```
+RECOMMENDATIONS:
+1. Consider adding API versioning documentation
+2. README could benefit from architecture diagram
+3. CONTRIBUTING.md mentions deprecated workflow
+
+SKIPPED (requires judgment):
+- src/api/README.md - unclear if internal or public API
+```
