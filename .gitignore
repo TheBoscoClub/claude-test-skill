@@ -27,3 +27,22 @@ Thumbs.db
 
 # Session exit timestamps
 exit.*
+
+# Database snapshots
+.snapshots/
+
+# Claude Code instructions (local only)
+CLAUDE.md
+
+# Environment variables
+.env
+.env.local
+
+# Credentials and secrets
+*.pem
+*.key
+*.crt
+credentials.json
+secrets/
+authcode.txt
+*.authcode
