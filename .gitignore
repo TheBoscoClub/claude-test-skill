@@ -46,3 +46,6 @@ credentials.json
 secrets/
 authcode.txt
 *.authcode
+
+# Claude Code
+.claudeignore
