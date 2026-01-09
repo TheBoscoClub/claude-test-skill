@@ -54,6 +54,89 @@ pip list 2>/dev/null | grep -iE "pytest|unittest|nose"
 npm ls 2>/dev/null | grep -iE "jest|mocha|vitest|playwright"
 ```
 
+### 4a. Detect Available Analysis Tools
+
+Detect which code analysis, security, and quality tools are installed locally:
+
+```bash
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  Available Analysis Tools"
+echo "───────────────────────────────────────────────────────────────────"
+
+declare -A TOOLS_AVAILABLE
+
+# Python Tools
+check_tool() {
+    local name="$1"
+    local cmd="$2"
+    if command -v "$cmd" &>/dev/null; then
+        echo "  ✅ $name ($cmd)"
+        TOOLS_AVAILABLE["$name"]=1
+        return 0
+    else
+        echo "  ⚪ $name (not installed)"
+        TOOLS_AVAILABLE["$name"]=0
+        return 1
+    fi
+}
+
+echo ""
+echo "Python:"
+check_tool "ruff" "ruff"
+check_tool "mypy" "mypy"
+check_tool "pylint" "pylint"
+check_tool "bandit" "bandit"
+check_tool "black" "black"
+check_tool "isort" "isort"
+check_tool "pip-audit" "pip-audit"
+check_tool "radon" "radon"
+check_tool "pydocstyle" "pydocstyle"
+
+echo ""
+echo "Shell:"
+check_tool "shellcheck" "shellcheck"
+check_tool "shfmt" "shfmt"
+
+echo ""
+echo "JavaScript/TypeScript:"
+check_tool "eslint" "eslint"
+check_tool "prettier" "prettier"
+check_tool "tsc" "tsc"
+
+echo ""
+echo "YAML/Config:"
+check_tool "yamllint" "yamllint"
+
+echo ""
+echo "Docker:"
+check_tool "hadolint" "hadolint"
+
+echo ""
+echo "Documentation:"
+check_tool "markdownlint" "markdownlint"
+check_tool "codespell" "codespell"
+
+echo ""
+echo "Security:"
+check_tool "codeql" "codeql"
+check_tool "trivy" "trivy"
+check_tool "grype" "grype"
+
+echo ""
+echo "Go:"
+check_tool "golangci-lint" "golangci-lint"
+check_tool "govulncheck" "govulncheck"
+
+echo ""
+echo "Rust:"
+check_tool "cargo-clippy" "cargo-clippy"
+check_tool "cargo-audit" "cargo-audit"
+
+# Export tools status for other phases
+export TOOLS_AVAILABLE
+```
+
 ### 5. Detect Installable Application
 
 Determine if this project produces an installable/deployable application:

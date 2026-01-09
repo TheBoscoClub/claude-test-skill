@@ -34,28 +34,51 @@ cargo outdated 2>/dev/null
 **Python:**
 ```bash
 if command -v pip-audit &>/dev/null; then
-  pip-audit 2>&1
+    echo "Running pip-audit with fix suggestions..."
+    # Show vulnerabilities with fix versions
+    pip-audit --progress-spinner=off --desc on 2>&1
+
+    # Check if auto-fix is available
+    echo ""
+    echo "Checking auto-fix availability..."
+    pip-audit --fix --dry-run 2>&1 | head -20
 elif command -v safety &>/dev/null; then
-  safety check 2>&1
+    safety check --full-report 2>&1
+fi
+
+# Also check for outdated packages with known issues
+if command -v pip &>/dev/null; then
+    echo ""
+    echo "Checking pip dependency tree for conflicts..."
+    pip check 2>&1
 fi
 ```
 
 **Node.js:**
 ```bash
-npm audit 2>&1
+if [[ -f package.json ]]; then
+    echo "Running npm audit..."
+    npm audit 2>&1
+
+    echo ""
+    echo "Checking for auto-fix availability..."
+    npm audit fix --dry-run 2>&1 | head -20
+fi
 ```
 
 **Go:**
 ```bash
-if command -v govulncheck &>/dev/null; then
-  govulncheck ./... 2>&1
+if command -v govulncheck &>/dev/null && [[ -f go.mod ]]; then
+    echo "Running govulncheck..."
+    govulncheck ./... 2>&1
 fi
 ```
 
 **Rust:**
 ```bash
-if command -v cargo-audit &>/dev/null; then
-  cargo audit 2>&1
+if command -v cargo-audit &>/dev/null && [[ -f Cargo.toml ]]; then
+    echo "Running cargo audit..."
+    cargo audit 2>&1
 fi
 ```
 

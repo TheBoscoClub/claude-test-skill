@@ -25,31 +25,96 @@ grep -rE "-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----" . 2>/dev/null | 
 grep -rE "eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*" . 2>/dev/null | head -5
 ```
 
-## Step 2: Dependency Vulnerability Scan (Local)
+## Step 2: Static Application Security Testing (SAST)
+
+Run language-specific security scanners to detect vulnerabilities in code:
 
 ```bash
 echo ""
-echo "Checking local dependency vulnerabilities..."
+echo "───────────────────────────────────────────────────────────────────"
+echo "  Step 2: Static Application Security Testing (SAST)"
+echo "───────────────────────────────────────────────────────────────────"
 
-# Python
+# Python Security with Bandit
+if command -v bandit &>/dev/null; then
+    PYTHON_FILES=$(find . -name "*.py" -not -path "./.venv/*" -not -path "./venv/*" -not -path "./.snapshots/*" 2>/dev/null | head -1)
+    if [[ -n "$PYTHON_FILES" ]]; then
+        echo ""
+        echo "Running Bandit (Python security scanner)..."
+        bandit -r . -x ./.venv,./.snapshots,./venv --format json 2>/dev/null | \
+            jq -r '.results[] | "  [\(.severity)] \(.issue_text) (\(.filename):\(.line_number))"' 2>/dev/null | head -20
+        echo ""
+        echo "Bandit Summary:"
+        bandit -r . -x ./.venv,./.snapshots,./venv --format json 2>/dev/null | \
+            jq -r '"  High: \([.results[] | select(.severity == "HIGH")] | length), Medium: \([.results[] | select(.severity == "MEDIUM")] | length), Low: \([.results[] | select(.severity == "LOW")] | length)"' 2>/dev/null
+    fi
+fi
+
+# Shell Script Security with ShellCheck
+if command -v shellcheck &>/dev/null; then
+    SHELL_FILES=$(find . -name "*.sh" -not -path "./.snapshots/*" 2>/dev/null | head -1)
+    if [[ -n "$SHELL_FILES" ]]; then
+        echo ""
+        echo "Running ShellCheck (Shell script security)..."
+        find . -name "*.sh" -not -path "./.snapshots/*" -exec shellcheck -f gcc {} \; 2>/dev/null | head -30
+    fi
+fi
+
+# CodeQL (if available and database exists)
+if command -v codeql &>/dev/null; then
+    echo ""
+    echo "CodeQL available for advanced security analysis"
+    echo "  Run manually: codeql database create --language=python codeql-db"
+    echo "  Then: codeql database analyze codeql-db --format=csv --output=results.csv"
+fi
+
+# Trivy for container/filesystem scanning
+if command -v trivy &>/dev/null; then
+    echo ""
+    echo "Running Trivy filesystem scan..."
+    trivy fs --security-checks vuln,secret,config . 2>&1 | head -40
+fi
+```
+
+## Step 2a: Dependency Vulnerability Scan (Local)
+
+```bash
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  Step 2a: Dependency Vulnerability Scan"
+echo "───────────────────────────────────────────────────────────────────"
+
+# Python - pip-audit with detailed output
 if command -v pip-audit &>/dev/null; then
-    pip-audit 2>&1 | head -20
+    if [[ -f requirements.txt ]] || [[ -f pyproject.toml ]] || [[ -f setup.py ]]; then
+        echo ""
+        echo "Running pip-audit..."
+        pip-audit --progress-spinner=off 2>&1 | head -30
+    fi
 elif command -v safety &>/dev/null; then
+    echo ""
+    echo "Running safety check..."
     safety check 2>&1 | head -20
 fi
 
 # Node.js
 if [[ -f package.json ]]; then
+    echo ""
+    echo "Running npm audit..."
     npm audit --json 2>/dev/null | jq '.vulnerabilities | to_entries[] | {name: .key, severity: .value.severity}' 2>/dev/null | head -20
 fi
 
 # Go
 if command -v govulncheck &>/dev/null && [[ -f go.mod ]]; then
+    echo ""
+    echo "Running govulncheck..."
     govulncheck ./... 2>&1 | head -20
 fi
 
 # Rust
 if command -v cargo-audit &>/dev/null && [[ -f Cargo.toml ]]; then
+    echo ""
+    echo "Running cargo audit..."
     cargo audit 2>&1 | head -20
 fi
 ```
