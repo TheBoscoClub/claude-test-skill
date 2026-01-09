@@ -41,6 +41,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 /test                    # Full audit (autonomous - fixes everything)
 /test prodapp            # Validate installed production app (Phase P)
 /test docker             # Validate Docker image and registry (Phase D)
+/test github             # Audit GitHub repository settings (Phase G)
 /test --phase=A          # Run single phase
 /test --phase=0-3        # Run phase range
 /test --list-phases      # Show available phases
@@ -82,6 +83,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **A** | **App Test** | **Deployable application testing (sandbox)** |
 | **P** | **Production** | **Validate installed production app** |
 | **D** | **Docker** | **Validate Docker image and registry package** |
+| **G** | **GitHub** | **Audit GitHub repository security and settings** |
 | 4 | Cleanup | Deprecation, dead code |
 | 5 | Security | Vulnerability scan |
 | 6 | Dependencies | Package health |
@@ -108,6 +110,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **10** | **4** | **ALL Tier 3** | **YES** | **None (BLOCKING)** |
 | **P** | **5** | **10 + Discovery** | **No (validates live)** | **None (CONDITIONAL)** |
 | **D** | **5** | **10 + Discovery** | **No (validates registry)** | **P (CONDITIONAL)** |
+| **G** | **5** | **10 + Discovery** | **No (audits GitHub)** | **P, D (CONDITIONAL)** |
 | 12 | 6 | P (or 10 if P skipped) | No (re-tests) | None |
 | **13** | **7** | **12** | **YES (fixes docs)** | **None (ALWAYS RUNS)** |
 | **C** | **8** | **ALL** | **Cleans up** | **None (LAST)** |
@@ -117,6 +120,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 - Bolded phases are **execution gates** - they block until complete
 - Phase P is **conditional** - may be skipped based on Discovery results (no prompts)
 - Phase D is **conditional** - may be skipped if no Docker/registry detected (no prompts)
+- Phase G is **conditional** - may be skipped if no GitHub remote detected (no prompts)
 - Phase 13 **ALWAYS runs** - documentation must stay synchronized with code
 
 ### Phase P Conditional Execution
@@ -144,6 +148,18 @@ Phase D (Docker Validation) execution depends on Discovery (Phase 1) results:
 | exists | `version-mismatch` | **RUN** - Flag and FIX version sync issue |
 
 When Phase D is skipped, Phase 12 (Verify) proceeds after Phase P (or 10 if P also skipped).
+
+### Phase G Conditional Execution
+
+Phase G (GitHub Audit) execution depends on Discovery (Phase 1) results:
+
+| Discovery: GitHub Remote | Discovery: gh CLI Auth | Phase G Action |
+|--------------------------|------------------------|----------------|
+| `none` | N/A | **SKIP** - No GitHub remote to audit |
+| exists | `not-authenticated` | **SKIP** - Cannot audit without gh CLI auth |
+| exists | `authenticated` | **RUN** - Full GitHub repository audit |
+
+When Phase G is skipped, Phase 12 (Verify) proceeds after Phase D (or P if D skipped, or 10 if both skipped).
 
 ## Phase Dependencies & Execution Order
 
@@ -216,7 +232,13 @@ invalidated rollback points.
 │  │      - No Dockerfile → SKIP                                         │   │
 │  │      - Dockerfile + registry package → RUN                          │   │
 │  │      - Dockerfile but no registry → PROMPT user                     │   │
-│  │                   └──> GATE 6: Production/Docker Validated          │   │
+│  │                                                                      │   │
+│  │ G (GitHub) ──> Audits GitHub repository security and settings       │   │
+│  │   📋 CONDITIONAL execution based on Discovery:                      │   │
+│  │      - No GitHub remote → SKIP                                      │   │
+│  │      - GitHub + gh authenticated → RUN                              │   │
+│  │      - GitHub but no gh auth → SKIP (cannot audit)                  │   │
+│  │                   └──> GATE 6: Production/Docker/GitHub Validated   │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              │                                              │
 │                              ▼                                              │
@@ -258,7 +280,7 @@ invalidated rollback points.
 | 2 | 2, 2a | ✅ Yes | Tests complete |
 | 3 | 3,4,5,6,7,8,9,11 | ✅ Yes | All analysis complete |
 | 4 | 10 | ❌ No | Fixes complete |
-| 5 | P, D | ❌ No (conditional) | Production/Docker validated OR skipped |
+| 5 | P, D, G | ❌ No (conditional) | Production/Docker/GitHub validated OR skipped |
 | 6 | 12 | ❌ No | Verification complete |
 | 7 | 13 | ❌ No (success gate) | Docs complete - ONLY if all prior passed |
 | 8 | C | ❌ No (always last) | Cleanup complete (always runs) |
@@ -300,17 +322,19 @@ function executeAudit(requestedPhases):
     if 10 in requestedPhases:
         executionPlan.append({phases: [10], parallel: false, gate: "FIXES"})
 
-    # TIER 5: Production & Docker Validation (CONDITIONAL)
+    # TIER 5: Production, Docker & GitHub Validation (CONDITIONAL)
     tier5Phases = []
     if P in requestedPhases:
         tier5Phases.append({phase: P, condition: "phasePRecommendation"})
     if D in requestedPhases:
         tier5Phases.append({phase: D, condition: "phaseDRecommendation"})
+    if G in requestedPhases:
+        tier5Phases.append({phase: G, condition: "phaseGRecommendation"})
     if tier5Phases:
         executionPlan.append({
             phases: tier5Phases,
-            parallel: false,  # Run P then D sequentially
-            gate: "PRODUCTION_DOCKER",
+            parallel: false,  # Run P then D then G sequentially
+            gate: "PRODUCTION_DOCKER_GITHUB",
             conditional: true
         })
 
@@ -353,6 +377,11 @@ function executeAudit(requestedPhases):
                         userChoice = askUser("Run Phase D?")
                         if userChoice == "skip": continue
                     # Otherwise RUN (autonomous mode never prompts)
+                elif phaseInfo.phase == G:
+                    if phaseGRecommendation == "SKIP":
+                        log("Phase G skipped: No GitHub remote or gh not authenticated")
+                        continue
+                    # Phase G never prompts - either runs or skips
 
         # Handle Phase 13 based on mode
         if tier.phase == 13:
@@ -579,6 +608,7 @@ When `/test` is invoked:
 3. **Handle shortcuts:**
    - `prodapp` → `--phase=P` (production validation)
    - `docker` → `--phase=D` (Docker validation)
+   - `github` → `--phase=G` (GitHub repository audit)
 4. **Build execution plan from requested phases**
 
 ### Mode-Specific Behavior
@@ -633,7 +663,7 @@ ELSE (Autonomous - DEFAULT):
    ⛔ No other phases can run during this
    Wait for completion → GATE 5: Fixes Applied
 
-   TIER 5: Production & Docker Validation [P, D] - CONDITIONAL
+   TIER 5: Production, Docker & GitHub Validation [P, D, G] - CONDITIONAL
    ──────────────────────────────────────────────────────────────────
    **Phase P** - Check Phase P Recommendation from Discovery:
      - SKIP: Log "No installable app or not installed" and proceed to Phase D
@@ -641,10 +671,15 @@ ELSE (Autonomous - DEFAULT):
      (No prompts - fully autonomous)
 
    **Phase D** - Check Phase D Recommendation from Discovery:
-     - SKIP: Log "No Dockerfile or registry package" and proceed to Tier 6
+     - SKIP: Log "No Dockerfile or registry package" and proceed to Phase G
      - RUN: Execute Phase D, fix any version sync issues
      (No prompts - fully autonomous)
-   Wait for completion (or skip) → GATE 6: Production/Docker Validated
+
+   **Phase G** - Check Phase G Recommendation from Discovery:
+     - SKIP: Log "No GitHub remote or gh not authenticated" and proceed to Tier 6
+     - RUN: Execute Phase G, audit and fix GitHub security settings
+     (No prompts - fully autonomous)
+   Wait for completion (or skip) → GATE 6: Production/Docker/GitHub Validated
 
    TIER 6: Verification [12] - Run SEQUENTIALLY
    ──────────────────────────────────────────────────────────────────
@@ -692,11 +727,20 @@ ELSE (Autonomous - DEFAULT):
   2. **RUN**: Production app is installed → validate and fix issues
 
 **Phase D (Docker) - Autonomous:**
-- Position: Tier 5 (after Phase P, before Verify)
+- Position: Tier 5 (after Phase P, before Phase G)
 - Conditional execution based on Discovery results
 - Two possible outcomes (no prompts):
-  1. **SKIP**: No Dockerfile or registry package → proceed to Tier 6
+  1. **SKIP**: No Dockerfile or registry package → proceed to Phase G
   2. **RUN**: Dockerfile + registry package found → validate and fix version sync
+
+**Phase G (GitHub) - Autonomous:**
+- Position: Tier 5 (after Phase D, before Verify)
+- Conditional execution based on Discovery results
+- Two possible outcomes (no prompts):
+  1. **SKIP**: No GitHub remote or gh CLI not authenticated → proceed to Tier 6
+  2. **RUN**: GitHub remote + gh authenticated → full security audit
+- Audits: Dependabot, CodeQL workflows, secret scanning, branch protection
+- Auto-enables missing security features when possible
 
 **Phase 13 (Docs) - ALWAYS Runs:**
 - Position: Tier 7 (after Verify, before Cleanup)
@@ -750,3 +794,9 @@ For Docker validation (image and registry):
 /test docker
 ```
 This validates the Docker image builds correctly and the registry package version matches the project VERSION.
+
+For GitHub repository audit:
+```
+/test github
+```
+This audits the project's GitHub repository for security settings (Dependabot, CodeQL, secret scanning, branch protection) and auto-enables missing security features.

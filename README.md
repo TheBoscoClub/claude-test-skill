@@ -1,218 +1,447 @@
-# Claude Test Skill
+# Claude Code Test Skill
 
-A comprehensive 18-phase autonomous project audit system for Claude Code.
+A comprehensive 21-phase autonomous project audit system for Claude Code with full GitHub integration.
 
-> **Status**: Local-only development project. See [Future Considerations](#future-considerations-public-release) for thoughts on community release.
+[![Security Scan](https://github.com/greogory/test-skill/actions/workflows/security.yml/badge.svg)](https://github.com/greogory/test-skill/actions/workflows/security.yml)
 
-## What This Does
+## Overview
 
-The `/test` skill performs a complete autonomous audit of any software project:
+The `/test` skill performs a complete autonomous audit of any software project - running tests, scanning for vulnerabilities, checking code quality, validating production deployments, and auditing GitHub repository security settings. It fixes ALL issues automatically and loops until the codebase is clean.
+
+**Key Features:**
+- 🔄 **Autonomous**: Fixes all issues without prompting (no "manual items" lists)
+- 🧩 **Modular**: 93% context reduction via on-demand phase loading
+- 🔒 **Security-First**: Integrated CVE scanning, secret detection, GitHub security auditing
+- 🌍 **Multi-Language**: Python, Node.js, Go, Rust, Shell, Docker, YAML
+- 📸 **BTRFS Snapshots**: Safe rollback points before modifications
+- 🐙 **GitHub Integration**: Full repository security audit and auto-remediation
+
+---
+
+## Quick Start
+
+```bash
+/test                    # Full audit (autonomous - fixes everything)
+/test --phase=5          # Security audit only
+/test --phase=0-3        # Pre-flight through reporting
+/test prodapp            # Validate installed production app
+/test docker             # Validate Docker image and registry
+/test github             # Audit GitHub repository settings
+/test --interactive      # Enable prompts for decisions
+/test help               # Show all options
+```
+
+---
+
+## Phase Overview
 
 | Phase | Name | Description |
 |-------|------|-------------|
-| S | BTRFS Snapshot | Safety snapshots before modifications |
-| M | Safe Mocking | Sandbox environment, mock dangerous commands |
-| 0 | Pre-Flight | Validate environment, dependencies, permissions |
-| 1 | Discovery | Identify testable components |
-| 2 | Execute Tests | Run actual operations, verify outputs |
-| 2a | Runtime Health | Detect stuck processes, non-interactive failures |
-| 3 | Report Results | Detailed per-component reports |
-| 4 | Deprecation | Remove dead code, detect version mismatches |
-| 5 | Security | Secrets, CVEs, GitHub Dependabot integration |
-| 6 | Dependencies | Outdated, unused, vulnerable packages |
-| 7 | Code Quality | Linting, complexity, anti-patterns |
-| 8 | Coverage | 85% minimum enforcement (configurable) |
-| 9 | Debugging | Autonomous root cause analysis |
-| 10 | Auto-Fixing | Apply and verify fixes |
-| 11 | Configuration | Validate configs, env vars, secrets |
-| 12 | Verification | Re-run all checks, confirm no regressions |
-| 13 | Documentation | Update docs after all fixes |
-| A | App Testing | Deployable application testing in sandbox |
-| C | Cleanup | Restore environment, cleanup temp files |
+| **Safety &amp; Setup** |||
+| S | Snapshot | BTRFS safety snapshot before modifications |
+| M | Mocking | Sandbox environment for safe testing |
+| 0 | Pre-Flight | Environment validation, dependencies, permissions |
+| 1 | Discovery | Detect project type, test frameworks, tools, GitHub remote |
+| **Testing** |||
+| 2 | Execute | Run project tests (pytest, npm test, go test, cargo test) |
+| 2a | Runtime | Service health checks, stuck process detection |
+| 3 | Report | Detailed test results and failure analysis |
+| **Analysis** |||
+| 4 | Cleanup | Deprecation detection, dead code removal |
+| 5 | Security | CVE scanning, secrets detection, SAST (bandit, shellcheck, trivy, CodeQL) |
+| 6 | Dependencies | Package health, outdated/unused/vulnerable packages |
+| 7 | Quality | Linting, complexity analysis (ruff, pylint, eslint, hadolint, yamllint) |
+| 8 | Coverage | Test coverage enforcement (85% default) |
+| 9 | Debug | Autonomous failure root cause analysis |
+| **Remediation** |||
+| 10 | Fix | Auto-fix issues (ruff --fix, black, isort, shfmt, codespell) |
+| 11 | Config | Configuration audit, env vars, secrets management |
+| **Validation** |||
+| A | App Test | Deployable application testing in sandbox |
+| P | Production | Validate live installed application |
+| D | Docker | Validate Docker image and registry package |
+| G | GitHub | Audit GitHub repo security (Dependabot, CodeQL, branch protection) |
+| 12 | Verify | Re-run tests, confirm no regressions |
+| **Finalization** |||
+| 13 | Docs | Update documentation to match codebase |
+| C | Restore | Cleanup temp files, restore environment |
 
-## Architecture
+---
 
-```
-claude-test-skill/
-├── commands/
-│   ├── test.md              # Lightweight dispatcher (231 lines)
-│   └── test-legacy.md       # Original monolithic version (backup)
-└── skills/
-    └── test-phases/
-        ├── phase-0-preflight.md
-        ├── phase-5-security.md
-        ├── phase-A-app-testing.md
-        └── ... (other phases)
-```
+## Execution Modes
 
-### Context Efficiency
+| Mode | Flag | Behavior |
+|------|------|----------|
+| **Autonomous** (default) | (none) | Fixes ALL issues, no prompts, loops until clean |
+| **Interactive** | `--interactive` | May prompt for decisions, single pass |
 
-The original skill was 3,652 lines (130KB) that loaded entirely into context. The modular version:
+### Autonomous Mode (Default)
+- Fixes every issue regardless of priority/severity
+- No user prompts except for safety/architecture/external blocks
+- Loops between Fix (Phase 10) and Verify (Phase 12) until all tests pass
+- Documentation automatically synchronized
 
-- **Dispatcher**: 231 lines - always loaded
-- **Phases**: Loaded on-demand via Task subagents
-- **Result**: ~93% reduction in base context consumption
+### Interactive Mode
+- May prompt for decisions (e.g., Phase P/D conditional execution)
+- May output "manual required" or "recommendation" lists
+- Single pass - does not loop until clean
+- Useful for exploration or when human judgment needed
 
-## Installation (Current - Local)
+---
 
-### Development Mode (Symlinks) - Recommended
+## Installation
+
+### Option 1: Symlinks (Recommended for Development)
 
 Symlinks allow edits in this project to be immediately live in Claude Code:
 
 ```bash
-# Remove existing files
-rm ~/.claude/commands/test.md
+# Clone the repository
+git clone https://github.com/greogory/test-skill.git ~/ClaudeCodeProjects/test-skill
+
+# Remove existing files (if any)
+rm -f ~/.claude/commands/test.md
 rm -rf ~/.claude/skills/test-phases
 
-# Create symlinks to project
-ln -s /raid0/ClaudeCodeProjects/claude-test-skill/commands/test.md ~/.claude/commands/test.md
-ln -s /raid0/ClaudeCodeProjects/claude-test-skill/skills/test-phases ~/.claude/skills/test-phases
+# Create symlinks
+ln -s ~/ClaudeCodeProjects/test-skill/commands/test.md ~/.claude/commands/test.md
+ln -s ~/ClaudeCodeProjects/test-skill/skills/test-phases ~/.claude/skills/test-phases
 ```
 
-**Current setup** (as of 2025-12-27):
-```
-~/.claude/commands/test.md → this project's commands/test.md
-~/.claude/skills/test-phases → this project's skills/test-phases/
-```
-
-### Copy Mode (Standalone)
-
-If you prefer separate copies:
+### Option 2: Copy (Standalone Installation)
 
 ```bash
-# Copy to your Claude Code config
-cp commands/test.md ~/.claude/commands/
-cp -r skills/test-phases ~/.claude/skills/
+# Clone and copy
+git clone https://github.com/greogory/test-skill.git /tmp/test-skill
+cp /tmp/test-skill/commands/test.md ~/.claude/commands/
+cp -r /tmp/test-skill/skills/test-phases ~/.claude/skills/
+rm -rf /tmp/test-skill
 ```
 
-Note: Changes in the project won't affect the live skill until re-copied.
+---
 
-## Usage
+## Tool Detection
 
-```bash
-/test                    # Full audit
-/test --phase=5          # Security audit only
-/test --phase=0-3        # Pre-flight through reporting
-/test help               # Show all options
-```
+Phase 1 (Discovery) automatically detects which tools are installed on your system. The skill uses the tools it finds:
+
+### Code Quality Tools
+
+| Tool | Languages | Purpose | Install |
+|------|-----------|---------|---------|
+| ruff | Python | Fast linter + formatter | `pip install ruff` |
+| pylint | Python | Deep static analysis | `pip install pylint` |
+| mypy | Python | Type checking | `pip install mypy` |
+| black | Python | Code formatting | `pip install black` |
+| isort | Python | Import sorting | `pip install isort` |
+| eslint | JS/TS | Linting | `npm install -g eslint` |
+| prettier | JS/TS/JSON/MD | Formatting | `npm install -g prettier` |
+| hadolint | Docker | Dockerfile linting | OS package manager |
+| yamllint | YAML | YAML validation | `pip install yamllint` |
+| shellcheck | Shell | Shell script analysis | OS package manager |
+| shfmt | Shell | Shell formatting | OS package manager |
+| markdownlint-cli | Markdown | Markdown linting | `npm install -g markdownlint-cli` |
+| codespell | All | Spelling errors | `pip install codespell` |
+
+### Security Tools
+
+| Tool | Purpose | Install |
+|------|---------|---------|
+| pip-audit | Python CVE scanning | `pip install pip-audit` |
+| bandit | Python security analysis | `pip install bandit` |
+| npm audit | Node.js CVE scanning | (built-in) |
+| cargo audit | Rust CVE scanning | `cargo install cargo-audit` |
+| trivy | Container/filesystem scanning | OS package manager |
+| CodeQL | Advanced static analysis | GitHub Actions / Local install |
+
+### GitHub Tools
+
+| Tool | Purpose | Install |
+|------|---------|---------|
+| gh | GitHub CLI for repo auditing | OS package manager |
+
+---
 
 ## Configuration
 
-Projects can include `.claude-test.yaml`:
+Projects can include `.claude-test.yaml` for customization:
 
 ```yaml
+# Test coverage requirements
 coverage:
   minimum: 85
   fail_on_below: true
 
+# Sandbox configuration
 mocking:
   enabled: true
   sandbox_dir: /tmp/claude-test-sandbox-${PROJECT_NAME}
 
+# Cleanup behavior
 cleanup:
   after_test: true
   remove_sandbox: true
+
+# Tool-specific settings
+tools:
+  ruff:
+    extend-select: ["I", "UP", "YTT", "ASYNC"]
+  pylint:
+    disable: ["C0114", "C0115", "C0116"]
 ```
 
 ---
 
-## Future Considerations: Public Release
+## Phase Dependencies
 
-*Captured from discussion on 2025-12-27*
+Phases execute in tiers with strict dependencies:
 
-### Why This Could Be Valuable to the Community
+```
+TIER 0: Safety [S, M, 0] ──────────────── Can run in parallel
+           │
+           ▼
+TIER 1: Discovery [1] ──────────────────── GATE: Project Known
+           │
+           ▼
+TIER 2: Testing [2, 2a] ────────────────── Can run in parallel
+           │
+           ▼
+TIER 3: Analysis [3-9, 11] ─────────────── Can run in parallel (read-only)
+           │
+           ▼
+TIER 4: Fix [10] ───────────────────────── MODIFIES FILES (sequential)
+           │
+           ▼
+TIER 5: Validation [P, D, G] ───────────── CONDITIONAL (sequential)
+           │
+           ▼
+TIER 6: Verify [12] ────────────────────── Re-run tests
+           │
+          ⟲ Loop to Fix if issues found
+           │
+           ▼
+TIER 7: Docs [13] ──────────────────────── ALWAYS runs
+           │
+           ▼
+TIER 8: Cleanup [C] ────────────────────── ALWAYS last
+```
 
-| Capability | Community Benefit |
-|------------|-------------------|
-| 18-phase autonomous audit | Standardized testing methodology |
-| Multi-language support (Python, Node, Go, Rust) | Works across ecosystems |
-| BTRFS snapshot safety | Safe experimentation |
-| Modular phase architecture | Low context consumption, extensible |
-| GitHub security integration | Automated vulnerability management |
-| 85% coverage enforcement | Quality standards |
-| Deployable app testing | End-to-end validation |
+### Conditional Phases
 
-### Key Questions to Resolve Before Public Release
+**Phase P (Production)** - Skipped if:
+- No installable app detected
+- App not installed on this system
 
-#### 1. Distribution Method
+**Phase D (Docker)** - Skipped if:
+- No Dockerfile in project
+- No registry package found
 
-- **Claude plugins system?** - Native integration, but still evolving
-- **Git clone into `~/.claude/`?** - Simple but manual updates
-- **npm/pip package?** - Familiar to devs, handles versioning
-- **GitHub releases?** - Download and extract
-
-#### 2. Customization vs. Standardization
-
-- Should phases be overridable per-project?
-- How much should `.claude-test.yaml` control?
-- Should users be able to add custom phases?
-- How to handle language/framework-specific extensions?
-
-#### 3. Scope
-
-- Just the `/test` skill, or a broader "Claude Code Quality Toolkit"?
-- Include related skills like `/git-release`?
-- Should it bundle recommended MCP servers?
-- What about IDE integrations?
-
-#### 4. Maintenance Model
-
-- Who accepts PRs for language-specific improvements?
-- How to handle breaking changes to phase structure?
-- Versioning strategy (semver?)
-- Documentation standards for contributors
-
-#### 5. Technical Requirements for Public Release
-
-- [ ] Remove any system-specific paths (BTRFS assumptions, etc.)
-- [ ] Make BTRFS snapshots optional with graceful fallback
-- [ ] Test on macOS, Windows WSL, various Linux distros
-- [ ] Create installation script that detects environment
-- [ ] Add uninstall/upgrade scripts
-- [ ] Comprehensive documentation for each phase
-- [ ] Example outputs for different project types
-- [ ] CI/CD for testing the test skill itself (meta!)
-
-### Potential Project Names
-
-- `claude-test` - Simple, clear
-- `claude-code-audit` - Emphasizes comprehensive nature
-- `cc-quality` - Short, memorable
-- `claude-project-health` - Descriptive
-
-### License Considerations
-
-- MIT - Maximum adoption, minimal friction
-- Apache 2.0 - Patent protection
-- Consider Anthropic's preferences for community tools
+**Phase G (GitHub)** - Skipped if:
+- No GitHub remote configured
+- `gh` CLI not authenticated
 
 ---
 
-## Development Notes
+## GitHub Integration
 
-### Adding a New Phase
+Phase G performs a comprehensive GitHub repository audit:
 
-1. Create `skills/test-phases/phase-X-name.md`
-2. Add to phase table in `commands/test.md`
-3. Include in dispatcher's phase loading logic
-4. Document in this README
+### Security Features Audited
+- ✅ Dependabot vulnerability alerts
+- ✅ Dependabot security updates
+- ✅ Secret scanning (if available)
+- ✅ Code scanning (CodeQL/ShellCheck workflows)
+- ✅ Branch protection rules
 
-### Testing Changes
+### Automatic Remediation
+- Enables Dependabot alerts if missing
+- Enables automated security updates if missing
+- Reports open security alerts for manual review
 
-Since this is a testing tool, validate changes by:
-1. Running `/test` on itself (meta-testing)
-2. Running on diverse project types (Python, Node, Go, Rust)
-3. Testing with and without GitHub remotes
-4. Testing on BTRFS and non-BTRFS filesystems
+### Requirements
+- `gh` CLI installed and authenticated (`gh auth login`)
+- Push access to the repository (for enabling security features)
+
+---
+
+## Architecture
+
+```
+test-skill/
+├── commands/
+│   ├── test.md              # Main dispatcher (~800 lines)
+│   └── test-legacy.md       # Original monolithic version (backup)
+├── skills/
+│   └── test-phases/
+│       ├── phase-S-snapshot.md
+│       ├── phase-M-mocking.md
+│       ├── phase-0-preflight.md
+│       ├── phase-1-discovery.md
+│       ├── phase-2-execute.md
+│       ├── phase-2a-runtime.md
+│       ├── phase-3-report.md
+│       ├── phase-4-cleanup.md
+│       ├── phase-5-security.md
+│       ├── phase-6-dependencies.md
+│       ├── phase-7-quality.md
+│       ├── phase-8-coverage.md
+│       ├── phase-9-debug.md
+│       ├── phase-10-fix.md
+│       ├── phase-11-config.md
+│       ├── phase-12-verify.md
+│       ├── phase-13-docs.md
+│       ├── phase-A-app-testing.md
+│       ├── phase-P-production.md
+│       ├── phase-D-docker.md
+│       ├── phase-G-github.md
+│       └── phase-C-restore.md
+├── agents/
+│   ├── coverage-reviewer.md
+│   ├── security-scanner.md
+│   └── test-analyzer.md
+├── examples/
+│   └── test-skill.local.md
+├── .github/
+│   └── workflows/
+│       └── security.yml     # Daily security scanning
+├── plugin.json
+├── .gitignore
+├── .yamllint.yml
+└── README.md
+```
+
+### Context Efficiency
+
+The modular architecture significantly reduces context consumption:
+
+| Component | Lines | When Loaded |
+|-----------|-------|-------------|
+| Dispatcher | ~800 | Always |
+| Each Phase | 50-300 | On-demand via subagent |
+| **Typical audit** | ~1,500 | vs 3,652 monolithic |
+
+**Result**: ~60% reduction in context for typical audits
+
+---
+
+## Examples
+
+### Full Audit
+```bash
+/test
+```
+Runs all phases autonomously, fixes all issues, loops until clean.
+
+### Security-Only Audit
+```bash
+/test --phase=5,6
+```
+Runs only Security (5) and Dependencies (6) phases.
+
+### Pre-Commit Check
+```bash
+/test --phase=0-3,7
+```
+Quick validation: Pre-flight, Discovery, Execute, Report, and Quality.
+
+### Production Validation
+```bash
+/test prodapp
+```
+Validates the installed production application against `install-manifest.json`.
+
+### GitHub Repository Audit
+```bash
+/test github
+```
+Audits GitHub security settings and enables missing protections.
+
+---
+
+## Adding Custom Phases
+
+1. Create `~/.claude/skills/test-phases/phase-X-name.md`
+2. Add phase to the Available Phases table in `commands/test.md`
+3. Define tier placement in dependency graph
+4. Document in README
+
+### Phase File Template
+
+```markdown
+# Phase X: Your Phase Name
+
+## Purpose
+Brief description of what this phase does.
+
+## Steps
+
+### Step 1: First Action
+[Instructions for Claude]
+
+### Step 2: Second Action
+[Instructions for Claude]
+
+## Output Format
+
+Status: ✅ PASS / ⚠️ ISSUES / ❌ FAIL
+Issues Found: [count]
+Key Findings:
+- [finding 1]
+- [finding 2]
+```
+
+---
+
+## Troubleshooting
+
+### "Phase G skipped: gh not authenticated"
+Run `gh auth login` to authenticate with GitHub.
+
+### "No security tools detected"
+Install the recommended tools for your language. Phase 1 will detect them automatically.
+
+### "BTRFS snapshot failed"
+Ensure you have sudo access or run on a BTRFS filesystem. Snapshots are optional - the skill continues without them on other filesystems.
+
+### "Phase P skipped: App not installed"
+Phase P validates production installations. If the app isn't installed on this system, Phase P correctly skips.
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run `/test` on the skill itself (meta-testing!)
+5. Submit a pull request
+
+### Code Quality Standards
+- All shell scripts must pass ShellCheck
+- All markdown must pass markdownlint
+- All YAML must pass yamllint
+- No hardcoded secrets or credentials
+
+---
+
+## License
+
+MIT License - See LICENSE file for details.
 
 ---
 
 ## Changelog
 
-### 2025-12-27
-- Initial project creation from `~/.claude/` skill files
-- Modular architecture (93% context reduction)
-- Added Phase A: Deployable Application Testing
-- Added GitHub security integration (Dependabot, secret scanning, code scanning)
-- Graceful handling for projects without GitHub remotes
-- Set up symlinks from `~/.claude/` to this project for live development
+### v1.0.0 (2026-01-09)
+- Added Phase G: GitHub repository security audit
+- Added comprehensive tool detection in Phase 1
+- Integrated 20+ code quality and security tools
+- Added GitHub security workflow with daily scanning
+- Full user documentation
+- Public repository release
+
+### Initial Development (2025-12-27)
+- Created modular architecture from monolithic skill
+- 93% context reduction via on-demand phase loading
+- 18 phases covering complete audit lifecycle
+- BTRFS snapshot safety system
+- Multi-language support
