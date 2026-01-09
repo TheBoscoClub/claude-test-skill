@@ -137,6 +137,164 @@ check_tool "cargo-audit" "cargo-audit"
 export TOOLS_AVAILABLE
 ```
 
+### 4b. Detect GitHub Repository
+
+Check if the local project has a corresponding GitHub repository:
+
+```bash
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  GitHub Repository Detection"
+echo "───────────────────────────────────────────────────────────────────"
+
+detect_github_repo() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+
+    # Initialize variables
+    GITHUB_REPO=""
+    GITHUB_OWNER=""
+    GITHUB_REPO_NAME=""
+    GITHUB_REMOTE_URL=""
+    GITHUB_AUTHENTICATED=false
+    GITHUB_SECURITY_STATUS="unknown"
+
+    # Check for git repo
+    if ! git -C "$PROJECT_DIR" rev-parse --git-dir &>/dev/null; then
+        echo "  ⚪ Not a git repository"
+        echo "GitHub Status: not-a-repo"
+        return 1
+    fi
+
+    # Get remote URL
+    GITHUB_REMOTE_URL=$(git -C "$PROJECT_DIR" remote get-url origin 2>/dev/null)
+
+    if [[ -z "$GITHUB_REMOTE_URL" ]]; then
+        echo "  ⚪ No remote origin configured"
+        echo "GitHub Status: no-remote"
+        return 1
+    fi
+
+    # Check if it's a GitHub remote
+    if [[ ! "$GITHUB_REMOTE_URL" =~ github\.com ]]; then
+        echo "  ⚪ Remote is not GitHub: $GITHUB_REMOTE_URL"
+        echo "GitHub Status: not-github"
+        return 1
+    fi
+
+    # Extract owner/repo
+    if [[ "$GITHUB_REMOTE_URL" =~ github\.com[:/]([^/]+)/([^/.]+)(\.git)?$ ]]; then
+        GITHUB_OWNER="${BASH_REMATCH[1]}"
+        GITHUB_REPO_NAME="${BASH_REMATCH[2]}"
+        GITHUB_REPO="$GITHUB_OWNER/$GITHUB_REPO_NAME"
+    else
+        echo "  ⚠️ Could not parse GitHub URL: $GITHUB_REMOTE_URL"
+        echo "GitHub Status: parse-error"
+        return 1
+    fi
+
+    echo "  Repository: $GITHUB_REPO"
+    echo "  Remote URL: $GITHUB_REMOTE_URL"
+
+    # Check gh CLI authentication
+    if ! command -v gh &>/dev/null; then
+        echo "  ⚠️ GitHub CLI (gh) not installed"
+        echo "GitHub Status: gh-not-installed"
+        echo "GitHub Repo: $GITHUB_REPO"
+        return 0
+    fi
+
+    if ! gh auth status &>/dev/null 2>&1; then
+        echo "  ⚠️ GitHub CLI not authenticated"
+        echo "GitHub Status: not-authenticated"
+        echo "GitHub Repo: $GITHUB_REPO"
+        return 0
+    fi
+
+    GITHUB_AUTHENTICATED=true
+    echo "  ✅ GitHub CLI authenticated"
+
+    # Check repository existence and access
+    if ! gh repo view "$GITHUB_REPO" &>/dev/null 2>&1; then
+        echo "  ⚠️ Cannot access repository (may be deleted or private without access)"
+        echo "GitHub Status: no-access"
+        echo "GitHub Repo: $GITHUB_REPO"
+        return 0
+    fi
+
+    # Check security features
+    echo ""
+    echo "  Security Features:"
+
+    # Dependabot alerts
+    if gh api "repos/$GITHUB_REPO/vulnerability-alerts" &>/dev/null 2>&1; then
+        echo "    ✅ Dependabot alerts: Enabled"
+        DEPENDABOT_ENABLED=true
+    else
+        echo "    ⚠️ Dependabot alerts: Not enabled"
+        DEPENDABOT_ENABLED=false
+    fi
+
+    # Check for security workflows
+    WORKFLOWS=$(gh api "repos/$GITHUB_REPO/contents/.github/workflows" 2>/dev/null | jq -r '.[].name' 2>/dev/null)
+    if echo "$WORKFLOWS" | grep -qiE "codeql|security|shellcheck"; then
+        echo "    ✅ Security workflows: Found"
+        SECURITY_WORKFLOWS=true
+    else
+        echo "    ⚠️ Security workflows: Not found"
+        SECURITY_WORKFLOWS=false
+    fi
+
+    # Check open security alerts count
+    DEPENDABOT_ALERTS=$(gh api "repos/$GITHUB_REPO/dependabot/alerts?state=open" --jq 'length' 2>/dev/null || echo "0")
+    CODE_SCANNING_ALERTS=$(gh api "repos/$GITHUB_REPO/code-scanning/alerts?state=open" --jq 'length' 2>/dev/null || echo "0")
+    SECRET_ALERTS=$(gh api "repos/$GITHUB_REPO/secret-scanning/alerts?state=open" --jq 'length' 2>/dev/null || echo "0")
+
+    echo ""
+    echo "  Open Security Alerts:"
+    echo "    Dependabot: $DEPENDABOT_ALERTS"
+    echo "    Code Scanning: $CODE_SCANNING_ALERTS"
+    echo "    Secret Scanning: $SECRET_ALERTS"
+
+    TOTAL_ALERTS=$((DEPENDABOT_ALERTS + CODE_SCANNING_ALERTS + SECRET_ALERTS))
+
+    # Determine overall status
+    if [[ "$TOTAL_ALERTS" -gt 0 ]]; then
+        GITHUB_SECURITY_STATUS="alerts-open"
+    elif [[ "$DEPENDABOT_ENABLED" == "true" ]] && [[ "$SECURITY_WORKFLOWS" == "true" ]]; then
+        GITHUB_SECURITY_STATUS="secure"
+    else
+        GITHUB_SECURITY_STATUS="incomplete"
+    fi
+
+    # Check local vs remote sync
+    echo ""
+    echo "  Sync Status:"
+    LOCAL_COMMITS=$(git -C "$PROJECT_DIR" rev-list --count HEAD ^origin/main 2>/dev/null || git -C "$PROJECT_DIR" rev-list --count HEAD ^origin/master 2>/dev/null || echo "0")
+    REMOTE_COMMITS=$(git -C "$PROJECT_DIR" rev-list --count origin/main ^HEAD 2>/dev/null || git -C "$PROJECT_DIR" rev-list --count origin/master ^HEAD 2>/dev/null || echo "0")
+
+    if [[ "$LOCAL_COMMITS" -gt 0 ]]; then
+        echo "    ⚠️ $LOCAL_COMMITS local commit(s) not pushed"
+    fi
+    if [[ "$REMOTE_COMMITS" -gt 0 ]]; then
+        echo "    ⚠️ $REMOTE_COMMITS remote commit(s) not pulled"
+    fi
+    if [[ "$LOCAL_COMMITS" -eq 0 ]] && [[ "$REMOTE_COMMITS" -eq 0 ]]; then
+        echo "    ✅ In sync with remote"
+    fi
+
+    # Export results
+    echo ""
+    echo "GitHub Status: $GITHUB_SECURITY_STATUS"
+    echo "GitHub Repo: $GITHUB_REPO"
+    echo "GitHub Alerts: $TOTAL_ALERTS"
+    echo "GitHub Authenticated: $GITHUB_AUTHENTICATED"
+
+    export GITHUB_REPO GITHUB_OWNER GITHUB_REPO_NAME GITHUB_AUTHENTICATED GITHUB_SECURITY_STATUS
+}
+
+detect_github_repo
+```
+
 ### 5. Detect Installable Application
 
 Determine if this project produces an installable/deployable application:
@@ -340,6 +498,29 @@ Test Framework: [framework]
 Test Files Found: [count]
 Test Command: [command]
 Config Files: [list]
+
+─────────────────────────────────────────────────────────────────
+  GITHUB REPOSITORY
+─────────────────────────────────────────────────────────────────
+
+GitHub Status: [not-a-repo|no-remote|not-github|secure|alerts-open|incomplete]
+GitHub Repo: [owner/repo or N/A]
+GitHub Authenticated: [true|false]
+
+Security Features:
+  Dependabot Alerts: [Enabled|Not enabled]
+  Security Workflows: [Found|Not found]
+
+Open Alerts:
+  Dependabot: [count]
+  Code Scanning: [count]
+  Secret Scanning: [count]
+
+Sync Status: [In sync|X local commits not pushed|X remote commits not pulled]
+
+Phase G Recommendation: [SKIP|RUN]
+  - SKIP: No GitHub repo or not authenticated
+  - RUN: GitHub repo detected with authenticated access
 
 ─────────────────────────────────────────────────────────────────
   PRODUCTION APP DETECTION
