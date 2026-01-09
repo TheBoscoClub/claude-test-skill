@@ -1,27 +1,6 @@
 ---
 name: project-audit
-description: Autonomous 21-phase project audit - testing, security scanning, code quality, GitHub auditing, and auto-fixing
-license: MIT
-allowed-tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Glob
-  - Grep
-  - Task
-compatibility:
-  claude-code: ">=2.0.0"
-metadata:
-  author: greogory
-  version: 1.0.0
-  repository: https://github.com/greogory/test-skill
-  keywords:
-    - testing
-    - security
-    - audit
-    - code-quality
-    - github
+description: Autonomous 21-phase project audit with testing, security scanning, code quality, GitHub auditing, and auto-fixing
 ---
 
 # /test - Modular Project Audit
