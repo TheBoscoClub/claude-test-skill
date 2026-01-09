@@ -59,20 +59,150 @@ When running with `--interactive`, this phase MAY:
 
 ## Fix Categories
 
-### 1. Code Quality Issues
+### 1. Code Quality Issues - Auto-Fix Commands
+
+**Python Formatting & Linting:**
 ```bash
-# Formatting
-black . --quiet || ruff format .
-npx prettier --write "**/*.{js,ts,tsx,json,md}"
-gofmt -w .
+echo "───────────────────────────────────────────────────────────────────"
+echo "  Python Auto-Fix"
+echo "───────────────────────────────────────────────────────────────────"
 
-# Import sorting
-isort . --quiet
-ruff check --fix --select I .
+# Ruff - Fast, comprehensive (preferred)
+if command -v ruff &>/dev/null; then
+    echo "Running ruff format..."
+    ruff format . 2>&1
+    echo ""
+    echo "Running ruff check --fix (all fixable issues)..."
+    ruff check --fix . 2>&1
+    echo ""
+    echo "Running ruff check --fix --unsafe-fixes (aggressive fixes)..."
+    ruff check --fix --unsafe-fixes . 2>&1
+fi
 
-# Linting (ALL rules, not just safe)
-ruff check --fix .
-npx eslint --fix .
+# Black - Code formatting (fallback or additional)
+if command -v black &>/dev/null; then
+    echo ""
+    echo "Running black (formatting)..."
+    black . --quiet 2>&1
+fi
+
+# isort - Import sorting
+if command -v isort &>/dev/null; then
+    echo ""
+    echo "Running isort (import sorting)..."
+    isort . --quiet 2>&1
+fi
+```
+
+**Shell Script Formatting:**
+```bash
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  Shell Script Auto-Fix"
+echo "───────────────────────────────────────────────────────────────────"
+
+# shfmt - Format shell scripts
+if command -v shfmt &>/dev/null; then
+    echo "Running shfmt (formatting)..."
+    find . -name "*.sh" -not -path "./.snapshots/*" -exec shfmt -w {} \; 2>&1
+fi
+
+# Note: ShellCheck doesn't auto-fix, but we can apply common fixes
+# ShellCheck issues must be fixed manually or by Claude
+```
+
+**JavaScript/TypeScript Formatting & Linting:**
+```bash
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  JavaScript/TypeScript Auto-Fix"
+echo "───────────────────────────────────────────────────────────────────"
+
+if [[ -f package.json ]]; then
+    # Prettier - Code formatting
+    if command -v prettier &>/dev/null || [[ -f node_modules/.bin/prettier ]]; then
+        echo "Running prettier (formatting)..."
+        npx prettier --write "**/*.{js,ts,tsx,jsx,json,css,scss,md}" 2>&1
+    fi
+
+    # ESLint - Lint and fix
+    if command -v eslint &>/dev/null || [[ -f node_modules/.bin/eslint ]]; then
+        echo ""
+        echo "Running eslint --fix..."
+        npx eslint --fix . --ext .js,.ts,.tsx,.jsx 2>&1
+    fi
+fi
+```
+
+**Go Formatting:**
+```bash
+if [[ -f go.mod ]]; then
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  Go Auto-Fix"
+    echo "───────────────────────────────────────────────────────────────────"
+
+    echo "Running gofmt..."
+    gofmt -w . 2>&1
+
+    echo ""
+    echo "Running go mod tidy..."
+    go mod tidy 2>&1
+
+    if command -v golangci-lint &>/dev/null; then
+        echo ""
+        echo "Running golangci-lint --fix..."
+        golangci-lint run --fix 2>&1
+    fi
+fi
+```
+
+**Rust Formatting:**
+```bash
+if [[ -f Cargo.toml ]]; then
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  Rust Auto-Fix"
+    echo "───────────────────────────────────────────────────────────────────"
+
+    echo "Running cargo fmt..."
+    cargo fmt 2>&1
+
+    echo ""
+    echo "Running cargo clippy --fix..."
+    cargo clippy --fix --allow-dirty --allow-staged 2>&1
+fi
+```
+
+**Spelling Fixes:**
+```bash
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  Spelling Auto-Fix"
+echo "───────────────────────────────────────────────────────────────────"
+
+if command -v codespell &>/dev/null; then
+    echo "Running codespell --write-changes..."
+    codespell --write-changes --skip=".git,.venv,venv,node_modules,.snapshots,*.lock,package-lock.json" . 2>&1
+fi
+```
+
+**YAML Formatting:**
+```bash
+YAML_FILES=$(find . -name "*.yml" -o -name "*.yaml" 2>/dev/null | grep -v node_modules | grep -v .snapshots | head -1)
+
+if [[ -n "$YAML_FILES" ]]; then
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  YAML Auto-Fix"
+    echo "───────────────────────────────────────────────────────────────────"
+
+    # yamllint doesn't auto-fix, but prettier can format YAML
+    if command -v prettier &>/dev/null; then
+        echo "Running prettier on YAML files..."
+        npx prettier --write "**/*.{yml,yaml}" 2>&1
+    fi
+fi
 ```
 
 ### 2. Test Failures
@@ -96,13 +226,71 @@ done
 ```
 
 ### 4. Security Vulnerabilities
-```bash
-# Upgrade vulnerable packages
-pip-audit --fix
-npm audit fix
-cargo update
 
-# If audit fix doesn't work, manually update constraints
+**Python Security Fixes:**
+```bash
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  Security Vulnerability Fixes"
+echo "───────────────────────────────────────────────────────────────────"
+
+# pip-audit auto-fix
+if command -v pip-audit &>/dev/null; then
+    if [[ -f requirements.txt ]] || [[ -f pyproject.toml ]]; then
+        echo "Running pip-audit --fix..."
+        pip-audit --fix 2>&1
+
+        # If auto-fix fails, try manual upgrade of vulnerable packages
+        echo ""
+        echo "Checking for remaining vulnerabilities..."
+        VULNS=$(pip-audit --progress-spinner=off 2>&1 | grep -c "vulnerability" || echo "0")
+        if [[ "$VULNS" -gt 0 ]]; then
+            echo "Manual fixes needed for $VULNS vulnerabilities"
+            pip-audit --progress-spinner=off 2>&1 | grep -E "^Name|vulnerability"
+        fi
+    fi
+fi
+
+# Bandit findings (security issues in code) - these require manual review
+# but we can add usedforsecurity=False to non-crypto MD5/SHA1 calls
+```
+
+**Node.js Security Fixes:**
+```bash
+if [[ -f package.json ]]; then
+    echo ""
+    echo "Running npm audit fix..."
+    npm audit fix 2>&1
+
+    # For stubborn issues, try force (with caution)
+    echo ""
+    echo "Checking for remaining issues..."
+    REMAINING=$(npm audit --json 2>/dev/null | jq '.metadata.vulnerabilities.total // 0')
+    if [[ "$REMAINING" -gt 0 ]]; then
+        echo "$REMAINING vulnerabilities remain. Trying npm audit fix --force..."
+        echo "(Note: This may introduce breaking changes)"
+        npm audit fix --force --dry-run 2>&1 | head -20
+    fi
+fi
+```
+
+**Go Security Fixes:**
+```bash
+if [[ -f go.mod ]]; then
+    echo ""
+    echo "Updating Go dependencies..."
+    go get -u ./... 2>&1
+    go mod tidy 2>&1
+fi
+```
+
+**Rust Security Fixes:**
+```bash
+if [[ -f Cargo.toml ]]; then
+    echo ""
+    echo "Updating Rust dependencies..."
+    cargo update 2>&1
+fi
 ```
 
 ### 5. Deprecated Code
