@@ -77,6 +77,17 @@ Phase 1 automatically detects installed tools:
 
 ## Installation
 
+### Claude.ai (Web)
+
+Upload this `SKILL.md` file directly to your Claude.ai account:
+1. Go to [claude.ai](https://claude.ai) → Settings → Skills
+2. Click "Upload skill" and select this file
+3. The skill reference will be available in your projects
+
+### Claude Code (CLI)
+
+For full autonomous execution with all 21 phases:
+
 ```bash
 # Clone and symlink
 git clone https://github.com/greogory/test-skill.git ~/test-skill

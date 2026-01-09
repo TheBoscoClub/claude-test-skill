@@ -118,6 +118,17 @@ cp -r /tmp/test-skill/skills/test-phases ~/.claude/skills/
 rm -rf /tmp/test-skill
 ```
 
+### Option 3: Claude.ai Web Upload
+
+You can upload this skill directly to your Claude.ai account for use in the web interface:
+
+1. Download the `SKILL.md` file from this repository
+2. Go to [claude.ai](https://claude.ai) → Settings → Skills
+3. Click "Upload skill" and select the `SKILL.md` file
+4. The skill will be available in your Claude.ai projects
+
+**Note**: The Claude.ai version provides the skill reference and instructions. For full autonomous execution with all 21 phases, use Claude Code (Options 1 or 2).
+
 ---
 
 ## Tool Detection
