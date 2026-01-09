@@ -1,0 +1,126 @@
+name: Security & Quality Scan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck on shell scripts
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+          severity: warning
+        continue-on-error: true
+
+      - name: Run ShellCheck on embedded bash in markdown
+        run: |
+          # Extract bash code blocks from markdown files and check them
+          echo "Checking embedded bash in markdown files..."
+
+          # Find all markdown files with bash code blocks
+          find . -name "*.md" -not -path "./.git/*" | while read -r file; do
+            # Extract bash blocks and create temp file for checking
+            awk '/^```bash$/,/^```$/' "$file" | grep -v '^```' > /tmp/extracted_bash.sh
+            if [[ -s /tmp/extracted_bash.sh ]]; then
+              echo "Checking: $file"
+              shellcheck --severity=warning /tmp/extracted_bash.sh || true
+            fi
+          done
+
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: '**/*.md'
+        continue-on-error: true
+
+  yaml-lint:
+    name: YAML Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run yamllint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: .
+          config_file: .yamllint.yml
+        continue-on-error: true
+
+  codespell:
+    name: Spelling Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run codespell
+        uses: codespell-project/actions-codespell@v2
+        with:
+          skip: .git,*.lock
+          ignore_words_list: crate,ot
+        continue-on-error: true
+
+  security-audit:
+    name: Security Patterns
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "Scanning for potential secrets..."
+
+          # Check for common secret patterns
+          FINDINGS=0
+
+          # API keys
+          if grep -rE "(api[_-]?key|apikey|secret[_-]?key)\s*[=:]\s*['\"][^'\"]{8,}['\"]" \
+               --include="*.md" --include="*.sh" --include="*.json" . 2>/dev/null | \
+               grep -v "example\|template\|placeholder"; then
+            echo "::warning::Potential API key found"
+            FINDINGS=$((FINDINGS + 1))
+          fi
+
+          # AWS keys
+          if grep -rE "AKIA[0-9A-Z]{16}" . 2>/dev/null; then
+            echo "::error::AWS access key found!"
+            FINDINGS=$((FINDINGS + 1))
+          fi
+
+          # Private keys
+          if grep -rE "-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----" . 2>/dev/null; then
+            echo "::error::Private key found!"
+            FINDINGS=$((FINDINGS + 1))
+          fi
+
+          if [[ $FINDINGS -gt 0 ]]; then
+            echo "::warning::Found $FINDINGS potential security issues"
+          else
+            echo "✅ No secrets detected"
+          fi

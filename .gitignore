@@ -1,65 +1,42 @@
-# Temporary files
-*.tmp
-*.log
-*.bak
+# =============================================================================
+# test-skill - Claude Code Audit Plugin
+# =============================================================================
+# Project-specific ignores + Universal Claude Code template
+# =============================================================================
 
-# Test artifacts
-__pycache__/
-.pytest_cache/
-.coverage
-coverage.json
-node_modules/
-.npm/
+# -----------------------------------------------------------------------------
+# TEST-SKILL SPECIFIC
+# -----------------------------------------------------------------------------
 
-# OS files
-.DS_Store
-Thumbs.db
-
-# Editor files
-*.swp
-*~
-.idea/
-.vscode/
-
-# Sandbox directories (created during testing)
+# Sandbox directories created during Phase A/M testing
 /sandbox/
-/tmp/
+/test-sandbox/
+/mock-env/
 
-# Session exit timestamps
-exit.*
+# Audit output files (generated during /test runs)
+audit-*.log
+security-issues.json
+quality-issues.json
+*-issues.log
+app-test-issues.log
+production-issues.log
 
-# Database snapshots
-.snapshots/
+# CodeQL databases (large, generated)
+codeql-db/
+*.sarif
 
-# Claude Code instructions (local only)
-CLAUDE.md
+# Phase execution artifacts
+phase-*.output
+.phase-state/
 
-# Environment variables
-.env
-.env.local
-
-# Credentials and secrets
-*.pem
-*.key
-*.crt
-credentials.json
-secrets/
-authcode.txt
-*.authcode
-
-# Claude Code
-.claudeignore
-
-# Backport workflow - caches analyzed commits
-.backport-skip
+# Local plugin settings (keep example)
+*.local.md
+!examples/*.local.md
 
 # =============================================================================
 # Claude Code - Universal .gitignore Template
 # =============================================================================
-# Auto-appended to new projects. Contains security-critical patterns that
-# should NEVER be tracked in any repository.
-#
-# Location: ~/.claude/templates/gitignore-claude
+# Security-critical patterns that should NEVER be tracked in any repository.
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -156,7 +133,7 @@ nohup.out
 # CLAUDE CODE WORKFLOW FILES
 # -----------------------------------------------------------------------------
 
-# Backport workflow - caches analyzed commits
+# Backport workflow
 .backport-skip
 
 # Claude Code local settings
@@ -165,10 +142,14 @@ nohup.out
 .claude-state
 .claude-tmp/
 
+# Context recovery files
+.claude-checkpoint.md
+.claude-recovery-plan.md
+
 # Session exit timestamps
 exit.*
 
-# Project-specific Claude instructions (each project has its own)
+# Project-specific Claude instructions (local)
 CLAUDE.md
 
 # Claude ignore patterns
@@ -260,8 +241,6 @@ junit*.xml
 # -----------------------------------------------------------------------------
 *.tmp
 *.temp
-*.bak
-*.swp
 .cache/
 .temp/
 tmp/
