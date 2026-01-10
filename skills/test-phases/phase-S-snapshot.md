@@ -17,10 +17,15 @@ TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 SNAPSHOT_DIR="/snapshots/audit"
 SNAPSHOT_PATH="$SNAPSHOT_DIR/audit-$TIMESTAMP-$PROJECT_NAME"
 
-# Verify BTRFS
-if ! df -T "$PROJECT_DIR" | grep -q btrfs; then
-  echo "⚠️ Not a BTRFS filesystem - skipping snapshot"
-  exit 0
+# Verify BTRFS (use stat -f which works reliably for nested subvolumes)
+# Note: df -T can fail for nested subvolumes, showing "-" instead of "btrfs"
+FSTYPE=$(stat -f -c %T "$PROJECT_DIR" 2>/dev/null || echo "unknown")
+if [[ "$FSTYPE" != "btrfs" ]]; then
+  # Fallback: check if btrfs subvolume show succeeds
+  if ! sudo btrfs subvolume show "$PROJECT_DIR" &>/dev/null; then
+    echo "⚠️ Not a BTRFS filesystem ($FSTYPE) - skipping snapshot"
+    exit 0
+  fi
 fi
 
 # Create snapshot directory if needed
