@@ -266,3 +266,6 @@ out/
 # Local tool configs
 .bandit
 pyproject.toml
+
+.yamllint.yml
+.yamllint
