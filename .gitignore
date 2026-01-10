@@ -262,3 +262,7 @@ temp/
 *.app
 target/
 out/
+
+# Local tool configs
+.bandit
+pyproject.toml
