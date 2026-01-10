@@ -99,3 +99,4 @@ ln -s ~/test-skill/skills/test-phases ~/.claude/skills/test-phases
 
 - **Repository**: https://github.com/greogory/test-skill
 - **Full Documentation**: See README.md
+- **Version**: 1.0.1.2
