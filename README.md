@@ -2,7 +2,7 @@
 
 A comprehensive 21-phase autonomous project audit system for Claude Code with full GitHub integration.
 
-![Version](https://img.shields.io/badge/version-1.0.1.2-blue)
+![Version](https://img.shields.io/badge/version-1.0.2.1-blue)
 [![Security Scan](https://github.com/greogory/test-skill/actions/workflows/security.yml/badge.svg)](https://github.com/greogory/test-skill/actions/workflows/security.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/greogory/test-skill)](https://github.com/greogory/test-skill/releases)
 
@@ -458,3 +458,87 @@ MIT License - See LICENSE file for details.
 - 18 phases covering complete audit lifecycle
 - BTRFS snapshot safety system
 - Multi-language support
+
+---
+
+## Addendum: On Human Multitasking and Evolution's LTS Release
+
+*Added after a user accidentally typed `/git-release tweak` instead of `/git-release patch` because someone in their Teams meeting said "tweak the memory" at the exact moment they were typing.*
+
+### The Technical Analogy
+
+Human cognition can be modeled as an I/O system where each modality (language, vision, motor) can handle multiple **read-only input streams** concurrently, but has only a **single process table for output**. When a read-only process suddenly needs to write, other read processes can insert data into the write process's I/O register—resulting in cross-talk.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ HUMAN COGNITION: I/O MODEL                                  │
+├─────────────────────────────────────────────────────────────┤
+│  LANGUAGE MODALITY                                          │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  INPUT STREAMS (read-only, concurrent OK)           │   │
+│  │  ├─ Teams meeting audio ──────► buffer[0]           │   │
+│  │  ├─ Internal monologue ───────► buffer[1]           │   │
+│  │  └─ Reading (if any) ─────────► buffer[2]           │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                          │                                  │
+│                          ▼                                  │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  OUTPUT REGISTER (single writer, NO MUTEX)          │   │
+│  │  ┌──────────────────────────────────────────────┐   │   │
+│  │  │  "tweak" ← RACE CONDITION: buffer[0] won     │   │   │
+│  │  └──────────────────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                          │                                  │
+│                          ▼                                  │
+│                     Motor Cortex (keystrokes)               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Why Evolution Didn't Fix This
+
+Evolution optimized for **speed over correctness**. The panic-response code demonstrates this clearly:
+
+```c
+if (predator_detected) {
+    // DO NOT WAIT for environment_scan() to complete
+    // Tree collision is survivable. Tiger is not.
+    motor_cortex.execute(FLEE);  // non-blocking, fire-and-forget
+}
+```
+
+**Survivorship bias in action:** Ancestors who stopped to carefully survey escape routes got eaten. Those who face-planted into trees *but survived* passed on their genes.
+
+### Evolution v2.0.0-LTS
+
+```
+EVOLUTION v2.0.0-LTS (Homo sapiens)
+├── Release: ~300,000 years ago
+├── Support Status: ACTIVE (no EOL planned)
+├── Known Issues:
+│   ├── #4,271: Panic response overwrites output buffer
+│   ├── #12,847: Sugar addiction (deprecated food scarcity)
+│   └── #89,421: Cannot distinguish real tigers from work emails
+├── Patch Frequency: ~1 per 10,000 generations
+└── Upgrade Path: None available. You're stuck with this kernel.
+```
+
+The original devs are unreachable and left no documentation.
+
+### Regional Considerations
+
+```c
+// Region-specific threat assessment
+if (location.continent == "Asia" && habitat.includes("forest")) {
+    TIGER_THREAT = LITERAL;      // Bengal, Siberian, Indochinese, etc.
+    TREE_COLLISION_PRIORITY = ACCEPTABLE_RISK;
+} else {
+    TIGER_THREAT = METAPHORICAL; // deadlines, managers, merge conflicts
+    TREE_COLLISION_PRIORITY = EMBARRASSING;
+}
+```
+
+In rural India, Nepal, or the Russian Far East, that legacy panic-response code is still very much production-ready. Evolution's LTS release still getting real-world use cases.
+
+---
+
+*This addendum serves as a reminder that humans have eventual consistency at best—and sometimes experience dirty reads.*
