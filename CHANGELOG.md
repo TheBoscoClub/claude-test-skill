@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [1.0.2.1] - 2026-01-13
+
+### Fixed
+- **Phase A**: Call `cleanup_app_sandbox()` at end of phase (was defined but never called)
+- **Phase A**: Use `trap EXIT` to guarantee cleanup even on test failures
+- **Phase A**: Stop background processes spawned from sandbox bin directory
+- **Phase D**: Enhanced container cleanup with graceful 10-second timeout
+- **Phase D**: Stop containers from test images and test-prefixed names
+- **Phase D**: Gracefully shutdown docker-compose services after testing
+
 ## [1.0.2] - 2026-01-13
 
 ### Added
