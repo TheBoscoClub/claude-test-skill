@@ -9,7 +9,7 @@ A comprehensive 21-phase autonomous project audit system for Claude Code with fu
 
 | Version | Status | Release |
 |---------|--------|---------|
-| ![v1.0.3](https://img.shields.io/badge/v1.0.3-current-green) | Latest | [v1.0.3](https://github.com/greogory/test-skill/releases/tag/v1.0.3) |
+| ![v1.0.3](https://img.shields.io/badge/v1.0.3-current-brightgreen) | Latest | [v1.0.3](https://github.com/greogory/test-skill/releases/tag/v1.0.3) |
 | ![v1.0.2.1](https://img.shields.io/badge/v1.0.2.1-prior-red) | Prior tweak | [v1.0.2.1](https://github.com/greogory/test-skill/releases/tag/v1.0.2.1) |
 | ![v1.0.2](https://img.shields.io/badge/v1.0.2-prior-red) | Prior patch | [v1.0.2](https://github.com/greogory/test-skill/releases/tag/v1.0.2) |
 | ![v1.0.1.2](https://img.shields.io/badge/v1.0.1.2-prior-red) | Prior tweak | [v1.0.1.2](https://github.com/greogory/test-skill/releases/tag/v1.0.1.2) |
@@ -20,7 +20,8 @@ A comprehensive 21-phase autonomous project audit system for Claude Code with fu
 
 | Color | Meaning |
 |-------|---------|
-| ![green](https://img.shields.io/badge/-green-green) | Latest patch/minor version (current stable) |
+| ![brightgreen](https://img.shields.io/badge/-brightgreen-brightgreen) | Latest major version (current generation) |
+| ![green](https://img.shields.io/badge/-green-green) | Latest patch/minor within current major |
 | ![green](https://img.shields.io/badge/-green-green) ![orange](https://img.shields.io/badge/-orange-orange) | Current tweak on latest (stable + micro-fix) |
 | ![orange](https://img.shields.io/badge/-orange-orange) | Current tweak (if single badge preferred) |
 | ![red](https://img.shields.io/badge/-red-red) | Prior patch/minor versions (superseded) |
