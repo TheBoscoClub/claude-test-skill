@@ -2,7 +2,7 @@
 
 A comprehensive 21-phase autonomous project audit system for Claude Code with full GitHub integration.
 
-![Version](https://img.shields.io/badge/version-1.0.2.1-blue)
+![Version](https://img.shields.io/badge/version-1.0.3-blue)
 [![Security Scan](https://github.com/greogory/test-skill/actions/workflows/security.yml/badge.svg)](https://github.com/greogory/test-skill/actions/workflows/security.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/greogory/test-skill)](https://github.com/greogory/test-skill/releases)
 

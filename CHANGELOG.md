@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [1.0.3] - 2026-01-13
+
+### Added
+- README addendum: "On Human Multitasking and Evolution's LTS Release" — a humorous exploration of cognitive race conditions, inspired by a Teams meeting cross-talk incident
+
 ## [1.0.2.1] - 2026-01-13
 
 ### Fixed
