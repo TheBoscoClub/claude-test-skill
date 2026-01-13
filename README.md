@@ -9,11 +9,10 @@ A comprehensive 21-phase autonomous project audit system for Claude Code with fu
 
 | Version | Status | Release |
 |---------|--------|---------|
-| ![1](https://img.shields.io/badge/1-brightgreen)![0](https://img.shields.io/badge/0-green)![3](https://img.shields.io/badge/3-darkgreen)![1](https://img.shields.io/badge/1-yellow) | Latest tweak | [v1.0.3.1](https://github.com/greogory/test-skill/releases/tag/v1.0.3.1) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-red)![3](https://img.shields.io/badge/3-darkred) | Prior patch | [v1.0.3](https://github.com/greogory/test-skill/releases/tag/v1.0.3) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-red)![2](https://img.shields.io/badge/2-darkred)![1](https://img.shields.io/badge/1-orange) | Prior tweak | [v1.0.2.1](https://github.com/greogory/test-skill/releases/tag/v1.0.2.1) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-red)![2](https://img.shields.io/badge/2-darkred) | Prior patch | [v1.0.2](https://github.com/greogory/test-skill/releases/tag/v1.0.2) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-red)![1](https://img.shields.io/badge/1-darkred)![2](https://img.shields.io/badge/2-orange) | Prior tweak | [v1.0.1.2](https://github.com/greogory/test-skill/releases/tag/v1.0.1.2) |
+| ![1](https://img.shields.io/badge/1-brightgreen)![0](https://img.shields.io/badge/0-darkgreen)![3](https://img.shields.io/badge/3-green)![1](https://img.shields.io/badge/1-yellow) | Latest tweak | [v1.0.3.1](https://github.com/greogory/test-skill/releases/tag/v1.0.3.1) |
+| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![3](https://img.shields.io/badge/3-red) | Prior patch | [v1.0.3](https://github.com/greogory/test-skill/releases/tag/v1.0.3) |
+| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![2](https://img.shields.io/badge/2-red)![1](https://img.shields.io/badge/1-orange) | Prior tweak | [v1.0.2.1](https://github.com/greogory/test-skill/releases/tag/v1.0.2.1) |
+| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![2](https://img.shields.io/badge/2-red) | Prior patch | [v1.0.2](https://github.com/greogory/test-skill/releases/tag/v1.0.2) |
 
 <details>
 <summary>Badge Color Convention</summary>
@@ -23,13 +22,13 @@ Each version segment gets its own badge. The number of badges indicates version 
 | Level | Current | Prior | Example |
 |-------|---------|-------|---------|
 | Major (`W.0.0`) | ![W](https://img.shields.io/badge/W-brightgreen) | ![W](https://img.shields.io/badge/W-brightred) | v1.0.0, v2.0.0 |
-| Minor (`W.X.0`) | ![W](https://img.shields.io/badge/W-brightgreen)![X](https://img.shields.io/badge/X-green) | ![W](https://img.shields.io/badge/W-brightred)![X](https://img.shields.io/badge/X-red) | v1.1.0, v1.2.0 |
-| Patch (`W.X.Y`) | ![W](https://img.shields.io/badge/W-brightgreen)![X](https://img.shields.io/badge/X-green)![Y](https://img.shields.io/badge/Y-darkgreen) | ![W](https://img.shields.io/badge/W-brightred)![X](https://img.shields.io/badge/X-red)![Y](https://img.shields.io/badge/Y-darkred) | v1.0.3, v1.2.1 |
-| Tweak (`W.X.Y.Z`) | ![W](https://img.shields.io/badge/W-brightgreen)![X](https://img.shields.io/badge/X-green)![Y](https://img.shields.io/badge/Y-darkgreen)![Z](https://img.shields.io/badge/Z-yellow) | ![W](https://img.shields.io/badge/W-brightred)![X](https://img.shields.io/badge/X-red)![Y](https://img.shields.io/badge/Y-darkred)![Z](https://img.shields.io/badge/Z-orange) | v1.0.3.1 |
+| Minor (`W.X.0`) | ![W](https://img.shields.io/badge/W-brightgreen)![X](https://img.shields.io/badge/X-darkgreen) | ![W](https://img.shields.io/badge/W-brightred)![X](https://img.shields.io/badge/X-darkred) | v1.1.0, v1.2.0 |
+| Patch (`W.X.Y`) | ![W](https://img.shields.io/badge/W-brightgreen)![X](https://img.shields.io/badge/X-darkgreen)![Y](https://img.shields.io/badge/Y-green) | ![W](https://img.shields.io/badge/W-brightred)![X](https://img.shields.io/badge/X-darkred)![Y](https://img.shields.io/badge/Y-red) | v1.0.3, v1.2.1 |
+| Tweak (`W.X.Y.Z`) | ![W](https://img.shields.io/badge/W-brightgreen)![X](https://img.shields.io/badge/X-darkgreen)![Y](https://img.shields.io/badge/Y-green)![Z](https://img.shields.io/badge/Z-yellow) | ![W](https://img.shields.io/badge/W-brightred)![X](https://img.shields.io/badge/X-darkred)![Y](https://img.shields.io/badge/Y-red)![Z](https://img.shields.io/badge/Z-orange) | v1.0.3.1 |
 
 **Color Scheme:**
-- **Current**: brightgreen → green → darkgreen → yellow
-- **Prior**: brightred → red → darkred → orange
+- **Current**: brightgreen → darkgreen → green → yellow
+- **Prior**: brightred → darkred → red → orange
 
 </details>
 
