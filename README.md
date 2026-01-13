@@ -9,23 +9,25 @@ A comprehensive 21-phase autonomous project audit system for Claude Code with fu
 
 | Version | Status | Release |
 |---------|--------|---------|
-| ![v1.0.3](https://img.shields.io/badge/v1.0.3-current-brightgreen) | Latest | [v1.0.3](https://github.com/greogory/test-skill/releases/tag/v1.0.3) |
+| ![v1.0.3](https://img.shields.io/badge/v1.0.3-patch-darkgreen) | Latest patch | [v1.0.3](https://github.com/greogory/test-skill/releases/tag/v1.0.3) |
 | ![v1.0.2.1](https://img.shields.io/badge/v1.0.2.1-prior-red) | Prior tweak | [v1.0.2.1](https://github.com/greogory/test-skill/releases/tag/v1.0.2.1) |
-| ![v1.0.2](https://img.shields.io/badge/v1.0.2-prior-red) | Prior patch | [v1.0.2](https://github.com/greogory/test-skill/releases/tag/v1.0.2) |
+| ![v1.0.2](https://img.shields.io/badge/v1.0.2-prior-darkred) | Prior patch | [v1.0.2](https://github.com/greogory/test-skill/releases/tag/v1.0.2) |
 | ![v1.0.1.2](https://img.shields.io/badge/v1.0.1.2-prior-red) | Prior tweak | [v1.0.1.2](https://github.com/greogory/test-skill/releases/tag/v1.0.1.2) |
 | ![v1.0.1.1](https://img.shields.io/badge/v1.0.1.1-prior-red) | Prior tweak | [v1.0.1.1](https://github.com/greogory/test-skill/releases/tag/v1.0.1.1) |
 
 <details>
 <summary>Badge Color Convention</summary>
 
-| Color | Meaning |
-|-------|---------|
-| ![brightgreen](https://img.shields.io/badge/-brightgreen-brightgreen) | Latest major version (current generation) |
-| ![green](https://img.shields.io/badge/-green-green) | Latest patch/minor within current major |
-| ![green](https://img.shields.io/badge/-green-green) ![orange](https://img.shields.io/badge/-orange-orange) | Current tweak on latest (stable + micro-fix) |
-| ![orange](https://img.shields.io/badge/-orange-orange) | Current tweak (if single badge preferred) |
-| ![red](https://img.shields.io/badge/-red-red) | Prior patch/minor versions (superseded) |
-| ![brightred](https://img.shields.io/badge/-brightred-brightred) | Prior major versions (deprecated) |
+| Pattern | Color | Example | Meaning |
+|---------|-------|---------|---------|
+| `vW.0.0` | ![brightgreen](https://img.shields.io/badge/-brightgreen-brightgreen) | v1.0.0, v2.0.0 | Current major release |
+| `vW.X.0` | ![green](https://img.shields.io/badge/-green-green) | v1.1.0, v1.2.0 | Current minor release |
+| `vW.X.Y` | ![darkgreen](https://img.shields.io/badge/-darkgreen-darkgreen) | v1.0.3, v1.2.1 | Current patch release |
+| `vW.X.Y.Z` | ![green](https://img.shields.io/badge/-green-green) ![orange](https://img.shields.io/badge/-orange-orange) | v1.0.3.1 | Current tweak (micro-fix) |
+| Prior `vW.X.0` | ![red](https://img.shields.io/badge/-red-red) | v1.1.0 | Superseded minor |
+| Prior `vW.X.Y` | ![darkred](https://img.shields.io/badge/-darkred-darkred) | v1.0.2 | Superseded patch |
+| Prior `vW.X.Y.Z` | ![red](https://img.shields.io/badge/-red-red) | v1.0.2.1 | Superseded tweak |
+| Prior `vW.0.0` | ![brightred](https://img.shields.io/badge/-brightred-brightred) | v0.x.x | Deprecated major version |
 
 </details>
 
