@@ -311,35 +311,102 @@ Issues: [count]
 After all Docker tests complete, **always** clean up resources to prevent orphaned containers:
 
 ```bash
-# Stop any buildx builder containers that were started during testing
-echo "Cleaning up Docker test resources..."
+cleanup_docker_phase() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local PROJECT_NAME=$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')
 
-# Stop buildx builder containers (they stay running after builds)
-for container in $(docker ps -q --filter "name=buildx_buildkit"); do
-    echo "Stopping buildx container: $container"
-    docker stop "$container" 2>/dev/null || true
-done
+    echo "Cleaning up Docker test resources..."
 
-# Remove dangling test images (images tagged as test-* during builds)
-docker images --filter "reference=*:test-*" -q | xargs -r docker rmi 2>/dev/null || true
+    # ─────────────────────────────────────────────────────────────
+    # 1. STOP TEST CONTAINERS (graceful shutdown with timeout)
+    # ─────────────────────────────────────────────────────────────
 
-# Prune build cache if it's grown too large (>5GB)
-CACHE_SIZE=$(docker system df --format '{{.BuildCache}}' 2>/dev/null | grep -oP '\d+\.?\d*' | head -1)
-if [[ "${CACHE_SIZE%.*}" -gt 5 ]]; then
-    echo "Build cache >5GB, pruning..."
-    docker builder prune -f --filter "until=24h" 2>/dev/null || true
-fi
+    # Stop containers started from test images (test-build-* pattern)
+    for container in $(docker ps -q --filter "ancestor=${PROJECT_NAME}:test-*" 2>/dev/null); do
+        echo "Stopping test container: $container"
+        docker stop --time 10 "$container" 2>/dev/null || docker kill "$container" 2>/dev/null || true
+    done
 
-echo "✓ Docker cleanup complete"
+    # Stop any containers with test- prefix in name
+    for container in $(docker ps -q --filter "name=test-" 2>/dev/null); do
+        echo "Stopping test container: $container"
+        docker stop --time 10 "$container" 2>/dev/null || docker kill "$container" 2>/dev/null || true
+    done
+
+    # Stop containers started via docker-compose during testing
+    COMPOSE_FILE=""
+    [ -f "$PROJECT_DIR/docker-compose.yml" ] && COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
+    [ -f "$PROJECT_DIR/compose.yml" ] && COMPOSE_FILE="$PROJECT_DIR/compose.yml"
+
+    if [ -n "$COMPOSE_FILE" ]; then
+        # Check if any compose services are running
+        RUNNING=$(docker compose -f "$COMPOSE_FILE" ps -q 2>/dev/null)
+        if [ -n "$RUNNING" ]; then
+            echo "Stopping docker-compose services..."
+            docker compose -f "$COMPOSE_FILE" down --timeout 10 2>/dev/null || true
+        fi
+    fi
+
+    # ─────────────────────────────────────────────────────────────
+    # 2. STOP BUILDX BUILDER CONTAINERS
+    # ─────────────────────────────────────────────────────────────
+
+    for container in $(docker ps -q --filter "name=buildx_buildkit" 2>/dev/null); do
+        echo "Stopping buildx container: $container"
+        docker stop --time 10 "$container" 2>/dev/null || true
+    done
+
+    # ─────────────────────────────────────────────────────────────
+    # 3. REMOVE TEST IMAGES
+    # ─────────────────────────────────────────────────────────────
+
+    # Remove dangling test images (images tagged as test-* during builds)
+    docker images --filter "reference=*:test-*" -q 2>/dev/null | xargs -r docker rmi 2>/dev/null || true
+    docker images --filter "reference=${PROJECT_NAME}:test-*" -q 2>/dev/null | xargs -r docker rmi 2>/dev/null || true
+
+    # ─────────────────────────────────────────────────────────────
+    # 4. PRUNE BUILD CACHE (if too large)
+    # ─────────────────────────────────────────────────────────────
+
+    CACHE_SIZE=$(docker system df --format '{{.BuildCache}}' 2>/dev/null | grep -oP '\d+\.?\d*' | head -1)
+    if [[ "${CACHE_SIZE%.*}" -gt 5 ]] 2>/dev/null; then
+        echo "Build cache >5GB, pruning..."
+        docker builder prune -f --filter "until=24h" 2>/dev/null || true
+    fi
+
+    # ─────────────────────────────────────────────────────────────
+    # 5. VERIFY CLEANUP
+    # ─────────────────────────────────────────────────────────────
+
+    REMAINING=$(docker ps -q --filter "name=test-" --filter "name=buildx_buildkit" 2>/dev/null | wc -l)
+    if [ "$REMAINING" -eq 0 ]; then
+        echo "✅ Docker cleanup complete - all test containers stopped"
+    else
+        echo "⚠️ Docker cleanup: $REMAINING container(s) may still be running"
+        docker ps --filter "name=test-" --filter "name=buildx_buildkit" --format "  - {{.Names}} ({{.Status}})" 2>/dev/null
+    fi
+}
+
+cleanup_docker_phase
 ```
 
 ### Why Cleanup Matters
 
 | Resource | Problem if Left | Cleanup Action |
 |----------|-----------------|----------------|
+| Test containers | Consume memory/CPU, hold ports | `docker stop --time 10` (graceful) |
+| Compose services | Multiple containers left running | `docker compose down --timeout 10` |
 | Buildx containers | Consume memory, stay running indefinitely | `docker stop buildx_buildkit*` |
 | Test images | Consume disk space | `docker rmi *:test-*` |
 | Build cache | Can grow to 10s of GB | `docker builder prune` |
-| Dangling images | Accumulate over time | `docker image prune` |
+
+### Graceful Shutdown
+
+The cleanup uses `--time 10` (10 second timeout) to allow containers to:
+1. Receive SIGTERM and shutdown gracefully
+2. Flush logs and close connections
+3. Save state if applicable
+
+If graceful shutdown fails, containers are forcefully killed as a fallback.
 
 **This cleanup runs automatically at the end of Phase D, not in Phase C (Restore).** Docker resources should be cleaned immediately after Docker testing, not left until session cleanup.
