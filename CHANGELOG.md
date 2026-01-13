@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [1.0.3.1] - 2026-01-13
+
+### Added
+- Multi-segment version badges in README: each version segment gets its own colored badge
+- Version badge scheme documentation in `/git-release` skill
+
+### Changed
+- Version history table now uses hierarchical colors (brightgreen→green→darkgreen→yellow for current, brightred→red→darkred→orange for prior)
+
 ## [1.0.3] - 2026-01-13
 
 ### Added
