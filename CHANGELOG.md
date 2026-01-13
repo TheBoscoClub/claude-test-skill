@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [1.0.2] - 2026-01-13
+
+### Added
+- **Phase H (Holistic)**: Full-stack cross-component analysis for detecting issues that span multiple layers
+- **Phase I (Infrastructure)**: Infrastructure and runtime issue detection for environment validation
+- `holistic` shortcut command (`/test holistic`)
+
+### Changed
+- Updated commands/test.md with Phase H documentation and argument hints
+- Updated phase execution table with Phase H dependencies
+
 ## [1.0.1.2] - 2026-01-09
 
 ### Added
