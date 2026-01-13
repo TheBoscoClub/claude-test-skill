@@ -1,7 +1,7 @@
 ---
 description: Modular project audit - testing, security, debugging, fixing (phase-based loading for context efficiency) (user)
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task
-argument-hint: "[help] [prodapp] [docker] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
+argument-hint: "[help] [prodapp] [docker] [holistic] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
 ---
 
 # Modular Project Audit (/test)
@@ -42,6 +42,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 /test prodapp            # Validate installed production app (Phase P)
 /test docker             # Validate Docker image and registry (Phase D)
 /test github             # Audit GitHub repository settings (Phase G)
+/test holistic           # Full-stack cross-component analysis (Phase H)
 /test --phase=A          # Run single phase
 /test --phase=0-3        # Run phase range
 /test --list-phases      # Show available phases
@@ -84,6 +85,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **P** | **Production** | **Validate installed production app** |
 | **D** | **Docker** | **Validate Docker image and registry package** |
 | **G** | **GitHub** | **Audit GitHub repository security and settings** |
+| **H** | **Holistic** | **Full-stack cross-component analysis** |
 | 4 | Cleanup | Deprecation, dead code |
 | 5 | Security | Vulnerability scan |
 | 6 | Dependencies | Package health |
@@ -111,6 +113,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **P** | **5** | **10 + Discovery** | **No (validates live)** | **None (CONDITIONAL)** |
 | **D** | **5** | **10 + Discovery** | **No (validates registry)** | **P (CONDITIONAL)** |
 | **G** | **5** | **10 + Discovery** | **No (audits GitHub)** | **P, D (CONDITIONAL)** |
+| **H** | **3** | **1** | **YES (fixes cross-component)** | **7, 5 (after Discovery)** |
 | 12 | 6 | P (or 10 if P skipped) | No (re-tests) | None |
 | **13** | **7** | **12** | **YES (fixes docs)** | **None (ALWAYS RUNS)** |
 | **C** | **8** | **ALL** | **Cleans up** | **None (LAST)** |
@@ -609,6 +612,7 @@ When `/test` is invoked:
    - `prodapp` → `--phase=P` (production validation)
    - `docker` → `--phase=D` (Docker validation)
    - `github` → `--phase=G` (GitHub repository audit)
+   - `holistic` → `--phase=H` (full-stack cross-component analysis)
 4. **Build execution plan from requested phases**
 
 ### Mode-Specific Behavior

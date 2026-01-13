@@ -269,3 +269,4 @@ pyproject.toml
 
 .yamllint.yml
 .yamllint
+rnd/ui-test-logs/

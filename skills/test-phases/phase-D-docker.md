@@ -305,3 +305,41 @@ Issues: [count]
 | Unpinned base | ⚠️ WARN | Base image not pinned (reproducibility) |
 | Missing platforms | ⚠️ WARN | Registry image not multi-platform (amd64 only) |
 | Hardcoded secrets | ⚠️ ISSUE | Secrets in Dockerfile/compose |
+
+## Cleanup (MANDATORY)
+
+After all Docker tests complete, **always** clean up resources to prevent orphaned containers:
+
+```bash
+# Stop any buildx builder containers that were started during testing
+echo "Cleaning up Docker test resources..."
+
+# Stop buildx builder containers (they stay running after builds)
+for container in $(docker ps -q --filter "name=buildx_buildkit"); do
+    echo "Stopping buildx container: $container"
+    docker stop "$container" 2>/dev/null || true
+done
+
+# Remove dangling test images (images tagged as test-* during builds)
+docker images --filter "reference=*:test-*" -q | xargs -r docker rmi 2>/dev/null || true
+
+# Prune build cache if it's grown too large (>5GB)
+CACHE_SIZE=$(docker system df --format '{{.BuildCache}}' 2>/dev/null | grep -oP '\d+\.?\d*' | head -1)
+if [[ "${CACHE_SIZE%.*}" -gt 5 ]]; then
+    echo "Build cache >5GB, pruning..."
+    docker builder prune -f --filter "until=24h" 2>/dev/null || true
+fi
+
+echo "✓ Docker cleanup complete"
+```
+
+### Why Cleanup Matters
+
+| Resource | Problem if Left | Cleanup Action |
+|----------|-----------------|----------------|
+| Buildx containers | Consume memory, stay running indefinitely | `docker stop buildx_buildkit*` |
+| Test images | Consume disk space | `docker rmi *:test-*` |
+| Build cache | Can grow to 10s of GB | `docker builder prune` |
+| Dangling images | Accumulate over time | `docker image prune` |
+
+**This cleanup runs automatically at the end of Phase D, not in Phase C (Restore).** Docker resources should be cleaned immediately after Docker testing, not left until session cleanup.
