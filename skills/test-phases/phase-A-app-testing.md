@@ -445,6 +445,7 @@ generate_app_issues_report() {
 ```bash
 run_phase_A() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local PHASE_A_RESULT=0
 
     # Detect deployable app
     local DEPLOY_TYPE=$(detect_deployable_app)
@@ -455,33 +456,101 @@ run_phase_A() {
 
     echo "Detected deployment type: $DEPLOY_TYPE"
 
+    # CRITICAL: Ensure cleanup runs even if tests fail or script is interrupted
+    trap 'cleanup_app_sandbox' EXIT
+
     # Run all steps
     setup_app_sandbox
-    test_installation "$DEPLOY_TYPE"
-    test_app_functionality
-    test_upgrade
-    test_migration
-    test_performance
-    test_usability
-    generate_app_issues_report
+    test_installation "$DEPLOY_TYPE" || PHASE_A_RESULT=1
+    test_app_functionality || PHASE_A_RESULT=1
+    test_upgrade || PHASE_A_RESULT=1
+    test_migration || PHASE_A_RESULT=1
+    test_performance || PHASE_A_RESULT=1
+    test_usability || PHASE_A_RESULT=1
+    generate_app_issues_report || PHASE_A_RESULT=1
 
-    return $?
+    # Cleanup runs automatically via trap, but also call explicitly
+    # to ensure it runs before generating final report
+    cleanup_app_sandbox
+
+    # Remove trap since we already cleaned up
+    trap - EXIT
+
+    return $PHASE_A_RESULT
 }
 ```
 
-## Cleanup
+## Cleanup (MANDATORY)
+
+**This cleanup MUST run at the end of Phase A, even if tests fail.**
 
 ```bash
 cleanup_app_sandbox() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local SANDBOX_BASE="${SANDBOX_DIR:-/tmp/claude-test-sandbox-$(basename $PROJECT_DIR)}"
     local APP_SANDBOX="${SANDBOX_BASE}/app-install"
 
     echo ""
-    echo "Cleaning up application sandbox..."
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo "  PHASE A CLEANUP"
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo ""
+
+    # ─────────────────────────────────────────────────────────────────
+    # 1. STOP BACKGROUND PROCESSES started during testing
+    # ─────────────────────────────────────────────────────────────────
+
+    # Stop any processes running from sandbox bin directory
+    if [[ -d "$APP_SANDBOX/bin" ]]; then
+        for bin in "$APP_SANDBOX/bin"/*; do
+            if [[ -x "$bin" ]]; then
+                local bin_name=$(basename "$bin")
+                # Find and gracefully stop processes
+                pgrep -f "$APP_SANDBOX/bin/$bin_name" 2>/dev/null | while read pid; do
+                    echo "Stopping sandbox process: $bin_name (PID: $pid)"
+                    kill -TERM "$pid" 2>/dev/null
+                    sleep 1
+                    kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null
+                done
+            fi
+        done
+    fi
+
+    # Stop any test services that might be running
+    if [[ -d "$APP_SANDBOX/systemd/user" ]]; then
+        for service in "$APP_SANDBOX/systemd/user"/*.service; do
+            if [[ -f "$service" ]]; then
+                local svc_name=$(basename "$service")
+                systemctl --user stop "$svc_name" 2>/dev/null || true
+            fi
+        done
+    fi
+
+    # ─────────────────────────────────────────────────────────────────
+    # 2. REMOVE SANDBOX DIRECTORY
+    # ─────────────────────────────────────────────────────────────────
 
     if [[ -d "$APP_SANDBOX" ]]; then
+        echo "Removing sandbox: $APP_SANDBOX"
         rm -rf "$APP_SANDBOX"
         echo "✅ Sandbox removed"
     fi
+
+    # Also clean any orphaned test sandboxes older than 1 hour
+    find /tmp -maxdepth 1 -name "claude-test-sandbox-*" -type d -mmin +60 2>/dev/null | while read old_sandbox; do
+        echo "Removing stale sandbox: $old_sandbox"
+        rm -rf "$old_sandbox"
+    done
+
+    # ─────────────────────────────────────────────────────────────────
+    # 3. CLEANUP TEST ARTIFACTS
+    # ─────────────────────────────────────────────────────────────────
+
+    # Remove temporary log files created during testing
+    rm -f "$PROJECT_DIR"/*.install.log 2>/dev/null
+
+    echo ""
+    echo "✅ Phase A cleanup complete"
 }
 ```
 
