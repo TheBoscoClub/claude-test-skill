@@ -9,11 +9,11 @@ A comprehensive 21-phase autonomous project audit system for Claude Code with fu
 
 | Version | Status | Release |
 |---------|--------|---------|
-| ![1](https://img.shields.io/badge/1-brightgreen)![0](https://img.shields.io/badge/0-green)![3](https://img.shields.io/badge/3-darkgreen) | Latest patch | [v1.0.3](https://github.com/greogory/test-skill/releases/tag/v1.0.3) |
+| ![1](https://img.shields.io/badge/1-brightgreen)![0](https://img.shields.io/badge/0-green)![3](https://img.shields.io/badge/3-darkgreen)![1](https://img.shields.io/badge/1-yellow) | Latest tweak | [v1.0.3.1](https://github.com/greogory/test-skill/releases/tag/v1.0.3.1) |
+| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-red)![3](https://img.shields.io/badge/3-darkred) | Prior patch | [v1.0.3](https://github.com/greogory/test-skill/releases/tag/v1.0.3) |
 | ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-red)![2](https://img.shields.io/badge/2-darkred)![1](https://img.shields.io/badge/1-orange) | Prior tweak | [v1.0.2.1](https://github.com/greogory/test-skill/releases/tag/v1.0.2.1) |
 | ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-red)![2](https://img.shields.io/badge/2-darkred) | Prior patch | [v1.0.2](https://github.com/greogory/test-skill/releases/tag/v1.0.2) |
 | ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-red)![1](https://img.shields.io/badge/1-darkred)![2](https://img.shields.io/badge/2-orange) | Prior tweak | [v1.0.1.2](https://github.com/greogory/test-skill/releases/tag/v1.0.1.2) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-red)![1](https://img.shields.io/badge/1-darkred)![1](https://img.shields.io/badge/1-orange) | Prior tweak | [v1.0.1.1](https://github.com/greogory/test-skill/releases/tag/v1.0.1.1) |
 
 <details>
 <summary>Badge Color Convention</summary>
