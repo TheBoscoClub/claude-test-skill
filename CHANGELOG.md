@@ -13,6 +13,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [1.0.5] - 2026-01-14
+
+### Added
+- **Phase ST (Self-Test)**: Meta-testing phase that validates the test-skill framework itself
+  - Checks all 25 phase files exist and are readable
+  - Validates symlink configuration
+  - Verifies dispatcher references all phases
+  - Confirms all 13 required tools are installed
+  - Only runs with explicit `--phase=ST` (never in normal runs)
+- **docs/ARCHITECTURE.md**: Comprehensive architecture documentation
+- **Security tools**: Added grype (SBOM scanning), semgrep (multi-language SAST), checkov (IaC security)
+
+### Changed
+- **Phase 5 (Security)**: Consolidated Phase SEC into Phase 5 for comprehensive 8-tool security suite
+  - SAST: bandit, semgrep, shellcheck, CodeQL
+  - Dependency: pip-audit, trivy, grype, checkov
+  - Sections: GitHub security, local project, installed app
+- **Dispatcher**: Added `/test security` shortcut and `--phase=SEC` alias (both map to Phase 5)
+- Updated README.md to reflect 25-phase system
+- Updated all documentation to remove Phase SEC references
+
+### Removed
+- **phase-SEC-security.md**: Consolidated into phase-5-security.md (no functionality lost)
+
 ## [1.0.4] - 2026-01-14
 
 ### Added
@@ -109,7 +133,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Converted to modular plugin architecture (93% context reduction)
 - All phases load on-demand via subagents
 
-[Unreleased]: https://github.com/greogory/test-skill/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/greogory/test-skill/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/greogory/test-skill/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/greogory/test-skill/compare/v1.0.3.1...v1.0.4
 [1.0.3.1]: https://github.com/greogory/test-skill/compare/v1.0.3...v1.0.3.1
 [1.0.3]: https://github.com/greogory/test-skill/compare/v1.0.2.1...v1.0.3
