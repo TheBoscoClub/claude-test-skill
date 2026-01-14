@@ -9,10 +9,10 @@ A comprehensive 21-phase autonomous project audit system for Claude Code with fu
 
 | Version | Status | Release |
 |---------|--------|---------|
-| ![1](https://img.shields.io/badge/1-brightgreen)![0](https://img.shields.io/badge/0-darkgreen)![3](https://img.shields.io/badge/3-green)![1](https://img.shields.io/badge/1-yellow) | Latest tweak | [v1.0.3.1](https://github.com/greogory/test-skill/releases/tag/v1.0.3.1) |
+| ![1](https://img.shields.io/badge/1-brightgreen)![0](https://img.shields.io/badge/0-darkgreen)![4](https://img.shields.io/badge/4-green) | Latest patch | [v1.0.4](https://github.com/greogory/test-skill/releases/tag/v1.0.4) |
+| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![3](https://img.shields.io/badge/3-red)![1](https://img.shields.io/badge/1-orange) | Prior tweak | [v1.0.3.1](https://github.com/greogory/test-skill/releases/tag/v1.0.3.1) |
 | ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![3](https://img.shields.io/badge/3-red) | Prior patch | [v1.0.3](https://github.com/greogory/test-skill/releases/tag/v1.0.3) |
 | ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![2](https://img.shields.io/badge/2-red)![1](https://img.shields.io/badge/1-orange) | Prior tweak | [v1.0.2.1](https://github.com/greogory/test-skill/releases/tag/v1.0.2.1) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![2](https://img.shields.io/badge/2-red) | Prior patch | [v1.0.2](https://github.com/greogory/test-skill/releases/tag/v1.0.2) |
 
 <details>
 <summary>Badge Color Convention</summary>
@@ -55,6 +55,7 @@ The `/test` skill performs a complete autonomous audit of any software project -
 /test prodapp            # Validate installed production app
 /test docker             # Validate Docker image and registry
 /test github             # Audit GitHub repository settings
+/test --phase=SEC        # Standalone security audit (GitHub + local + app)
 /test --interactive      # Enable prompts for decisions
 /test help               # Show all options
 ```
@@ -77,6 +78,7 @@ The `/test` skill performs a complete autonomous audit of any software project -
 | **Analysis** |||
 | 4 | Cleanup | Deprecation detection, dead code removal |
 | 5 | Security | CVE scanning, secrets detection, SAST (bandit, shellcheck, trivy, CodeQL) |
+| SEC | Security (Standalone) | Comprehensive security audit: GitHub, local project, installed app |
 | 6 | Dependencies | Package health, outdated/unused/vulnerable packages |
 | 7 | Quality | Linting, complexity analysis (ruff, pylint, eslint, hadolint, yamllint) |
 | 8 | Coverage | Test coverage enforcement (85% default) |
@@ -332,6 +334,7 @@ test-skill/
 │       ├── phase-P-production.md
 │       ├── phase-D-docker.md
 │       ├── phase-G-github.md
+│       ├── phase-SEC-security.md
 │       └── phase-C-restore.md
 ├── agents/
 │   ├── coverage-reviewer.md

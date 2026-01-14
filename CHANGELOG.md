@@ -13,6 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [1.0.4] - 2026-01-14
+
+### Added
+- **Phase SEC (Security)**: New standalone comprehensive security testing phase covering:
+  - GitHub security features audit (Dependabot, secret scanning, CodeQL)
+  - Local project security (SAST with bandit/shellcheck, dependency scanning, secret detection)
+  - Installed app security (permissions, config sync, service security, database)
+  - Can be invoked standalone with `/test --phase SEC`
+- **Phase P Step 2b**: Validate wrapper script targets (prevents silent `exec` failures at runtime)
+- **Phase P Step 5b**: Validate production/development separation (critical isolation check)
+
+### Changed
+- Version badge color scheme: darkgreen for minor, green for patch (improved contrast)
+
 ## [1.0.3.1] - 2026-01-13
 
 ### Added
@@ -95,7 +109,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Converted to modular plugin architecture (93% context reduction)
 - All phases load on-demand via subagents
 
-[Unreleased]: https://github.com/greogory/test-skill/compare/v1.0.1.2...HEAD
+[Unreleased]: https://github.com/greogory/test-skill/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/greogory/test-skill/compare/v1.0.3.1...v1.0.4
+[1.0.3.1]: https://github.com/greogory/test-skill/compare/v1.0.3...v1.0.3.1
+[1.0.3]: https://github.com/greogory/test-skill/compare/v1.0.2.1...v1.0.3
+[1.0.2.1]: https://github.com/greogory/test-skill/compare/v1.0.2...v1.0.2.1
+[1.0.2]: https://github.com/greogory/test-skill/compare/v1.0.1.2...v1.0.2
 [1.0.1.2]: https://github.com/greogory/test-skill/compare/v1.0.1.1...v1.0.1.2
 [1.0.1.1]: https://github.com/greogory/test-skill/compare/v1.0.1...v1.0.1.1
 [1.0.1]: https://github.com/greogory/test-skill/compare/v1.0.0...v1.0.1
