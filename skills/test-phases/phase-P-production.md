@@ -282,6 +282,85 @@ validate_binaries() {
 }
 ```
 
+## Step 2b: Validate Wrapper Script Targets
+
+**CRITICAL**: Wrapper scripts are small shell scripts in `/usr/local/bin/` that `exec` into other scripts. If the target of the `exec` doesn't exist, the wrapper will fail silently at runtime.
+
+```bash
+validate_wrapper_targets() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
+    local APP_NAME_LOWER=$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]' | tr -d '-')
+
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  Step 2b: Validating Wrapper Script Targets"
+    echo "───────────────────────────────────────────────────────────────────"
+    echo ""
+
+    local FOUND=0
+    local BROKEN=0
+
+    # Find wrapper scripts in /usr/local/bin that might belong to this app
+    local wrappers=()
+    while IFS= read -r wrapper; do
+        wrappers+=("$wrapper")
+    done < <(ls /usr/local/bin/${APP_NAME_LOWER}* /usr/local/bin/${APP_NAME}* 2>/dev/null | sort -u)
+
+    if [[ ${#wrappers[@]} -eq 0 ]]; then
+        echo "ℹ️ No wrapper scripts found for $APP_NAME"
+        return 0
+    fi
+
+    for wrapper in "${wrappers[@]}"; do
+        local basename=$(basename "$wrapper")
+        echo -n "  $basename: "
+
+        # Check if it's a shell script wrapper (contains exec)
+        if ! head -5 "$wrapper" 2>/dev/null | grep -q "exec"; then
+            echo "✅ Not a wrapper (standalone script)"
+            ((FOUND++))
+            continue
+        fi
+
+        # Extract exec target path
+        local exec_target=$(grep -m1 "^exec " "$wrapper" 2>/dev/null | sed 's/^exec //' | awk '{print $1}')
+
+        if [[ -z "$exec_target" ]]; then
+            echo "⚠️ Could not extract exec target"
+            continue
+        fi
+
+        # Resolve variables in the path (e.g., ${AUDIOBOOKS_HOME})
+        local resolved_target
+        if [[ "$exec_target" == *'$'* ]]; then
+            # Try to resolve using environment or common patterns
+            resolved_target=$(eval echo "$exec_target" 2>/dev/null || echo "$exec_target")
+        else
+            resolved_target="$exec_target"
+        fi
+
+        # Check if target exists and is executable
+        if [[ -x "$resolved_target" ]]; then
+            echo "✅ -> $resolved_target (exists)"
+            ((FOUND++))
+        else
+            echo "❌ BROKEN: -> $resolved_target (NOT FOUND)"
+            echo "Wrapper script broken: $wrapper -> $resolved_target" >> "$ISSUES_FILE"
+            ((BROKEN++))
+        fi
+    done
+
+    echo ""
+    if [[ $BROKEN -gt 0 ]]; then
+        echo "  ❌ $BROKEN BROKEN WRAPPER(S) - Commands will fail at runtime!"
+        echo "     FIX: Re-run install.sh or manually copy missing scripts"
+    else
+        echo "  ✅ All $FOUND wrapper targets verified"
+    fi
+    echo ""
+}
+```
+
 ## Step 3: Validate Running Services
 
 ```bash
@@ -678,6 +757,172 @@ validate_permissions_and_ownership() {
 }
 ```
 
+## Step 5b: Validate Production/Development Separation
+
+**CRITICAL**: Production installations MUST be completely independent from development project directories. This prevents:
+- Accidental dev code running in production
+- Broken production when dev directory is modified
+- Security risks from mixing development and production
+- Configuration drift and debugging nightmares
+
+```bash
+validate_prod_dev_separation() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
+
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  Step 5b: Validating Production/Development Separation"
+    echo "───────────────────────────────────────────────────────────────────"
+    echo ""
+
+    local issues=0
+
+    # Define development paths that should NEVER appear in production
+    local DEV_PATTERNS=(
+        "/raid0/ClaudeCodeProjects/"
+        "/home/.*/ClaudeCodeProjects/"
+        "/home/.*/Projects/"
+        "/home/.*/dev/"
+        "/home/.*/src/"
+        "ClaudeCodeProjects"
+    )
+
+    # Build grep pattern
+    local grep_pattern=$(printf "%s\\|" "${DEV_PATTERNS[@]}")
+    grep_pattern="${grep_pattern%\\|}"  # Remove trailing \|
+
+    echo "  Checking for development path references..."
+    echo ""
+
+    # 1. Check SYSTEM-LEVEL systemd services
+    echo "  [1/5] System systemd services (/etc/systemd/system/):"
+    if [[ -d /etc/systemd/system ]]; then
+        local sys_services=$(grep -l -E "$grep_pattern" /etc/systemd/system/${APP_NAME}*.service /etc/systemd/system/audiobook*.service 2>/dev/null || true)
+        if [[ -n "$sys_services" ]]; then
+            echo "    ❌ CRITICAL: System services reference development paths!" | tee -a "$ISSUES_FILE"
+            for svc in $sys_services; do
+                echo "      - $svc" | tee -a "$ISSUES_FILE"
+                grep -E "$grep_pattern" "$svc" 2>/dev/null | head -3 | sed 's/^/         /' | tee -a "$ISSUES_FILE"
+            done
+            echo "    FIX: Reinstall services from production installer" >> "$ISSUES_FILE"
+            ((issues++))
+        else
+            echo "    ✅ No development paths found"
+        fi
+    else
+        echo "    ⚠️ No system service directory"
+    fi
+
+    # 2. Check USER-LEVEL systemd services
+    echo "  [2/5] User systemd services (~/.config/systemd/user/):"
+    local user_svc_dir="$HOME/.config/systemd/user"
+    if [[ -d "$user_svc_dir" ]]; then
+        local user_services=$(grep -l -E "$grep_pattern" "$user_svc_dir"/${APP_NAME}*.service "$user_svc_dir"/audiobook*.service 2>/dev/null || true)
+        if [[ -n "$user_services" ]]; then
+            echo "    ❌ CRITICAL: User services reference development paths!" | tee -a "$ISSUES_FILE"
+            for svc in $user_services; do
+                echo "      - $svc" | tee -a "$ISSUES_FILE"
+            done
+            echo "    FIX: Remove stale user services if system services are primary" >> "$ISSUES_FILE"
+            echo "         rm ~/.config/systemd/user/${APP_NAME}*.service" >> "$ISSUES_FILE"
+            ((issues++))
+        else
+            echo "    ✅ No development paths found"
+        fi
+    else
+        echo "    ✅ No user service directory"
+    fi
+
+    # 3. Check installed scripts in INSTALL_DIR
+    echo "  [3/5] Installed scripts ($INSTALL_DIR):"
+    if [[ -n "$INSTALL_DIR" ]] && [[ -d "$INSTALL_DIR" ]]; then
+        local bad_scripts=$(grep -rl -E "$grep_pattern" "$INSTALL_DIR" --include="*.sh" --include="*.py" --include="*.conf" 2>/dev/null || true)
+        if [[ -n "$bad_scripts" ]]; then
+            local script_count=$(echo "$bad_scripts" | wc -l)
+            echo "    ❌ CRITICAL: $script_count installed files reference development paths!" | tee -a "$ISSUES_FILE"
+            echo "$bad_scripts" | head -5 | while read -r script; do
+                echo "      - $script" | tee -a "$ISSUES_FILE"
+            done
+            [[ "$script_count" -gt 5 ]] && echo "      ... and $((script_count - 5)) more"
+            echo "    FIX: Re-run installation from clean project source" >> "$ISSUES_FILE"
+            ((issues++))
+        else
+            echo "    ✅ No development paths found in installed scripts"
+        fi
+    else
+        echo "    ⚠️ No installation directory identified"
+    fi
+
+    # 4. Check for symlinks pointing to development directories
+    echo "  [4/5] Symlinks pointing to development directories:"
+    if [[ -n "$INSTALL_DIR" ]] && [[ -d "$INSTALL_DIR" ]]; then
+        local bad_symlinks=$(find "$INSTALL_DIR" -type l 2>/dev/null | while read -r link; do
+            target=$(readlink -f "$link" 2>/dev/null)
+            if echo "$target" | grep -qE "$grep_pattern"; then
+                echo "$link -> $target"
+            fi
+        done)
+        if [[ -n "$bad_symlinks" ]]; then
+            echo "    ❌ CRITICAL: Symlinks point to development directories!" | tee -a "$ISSUES_FILE"
+            echo "$bad_symlinks" | head -3 | sed 's/^/      /' | tee -a "$ISSUES_FILE"
+            echo "    FIX: Remove symlinks and copy files from production source" >> "$ISSUES_FILE"
+            ((issues++))
+        else
+            echo "    ✅ No symlinks to development directories"
+        fi
+    fi
+
+    # 5. Check database path references
+    echo "  [5/5] Configuration path references:"
+    if [[ -n "$INSTALL_DIR" ]]; then
+        local config_files=$(find "$INSTALL_DIR" \( -name "*.conf" -o -name "*.env" -o -name "*.yml" -o -name "*.yaml" -o -name "config*.py" \) 2>/dev/null)
+        local bad_configs=""
+        for cfg in $config_files; do
+            if grep -qE "$grep_pattern" "$cfg" 2>/dev/null; then
+                bad_configs+="$cfg"$'\n'
+            fi
+        done
+        if [[ -n "$bad_configs" ]]; then
+            echo "    ❌ CRITICAL: Config files reference development paths!" | tee -a "$ISSUES_FILE"
+            echo "$bad_configs" | head -3 | while read -r cfg; do
+                [[ -n "$cfg" ]] && echo "      - $cfg" | tee -a "$ISSUES_FILE"
+            done
+            ((issues++))
+        else
+            echo "    ✅ No development paths in config files"
+        fi
+    fi
+
+    echo ""
+
+    # Summary
+    if [[ "$issues" -gt 0 ]]; then
+        echo "  ═══════════════════════════════════════════════════════════════"
+        echo "  ❌ PROD/DEV SEPARATION VIOLATION: $issues issues found"
+        echo "  ═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "  Production installations MUST NOT reference development paths."
+        echo "  This is a CRITICAL architectural requirement."
+        echo ""
+        echo "  Common causes:"
+        echo "    - Installed from dev directory instead of release tarball"
+        echo "    - Manually copied services with wrong paths"
+        echo "    - Symlinks created during development"
+        echo "    - Old user services not cleaned up after migration to system services"
+        echo ""
+        echo "  Resolution:"
+        echo "    1. Run: /git-release (creates clean release)"
+        echo "    2. Install from the release tarball, NOT the project directory"
+        echo "    3. Remove any stale user services: rm ~/.config/systemd/user/${APP_NAME}*.service"
+        echo ""
+    else
+        echo "  ✅ Production/Development separation is clean"
+        echo "     All production files are independent from development directories."
+    fi
+    echo ""
+}
+```
+
 ## Step 6: Validate Ports and Network
 
 ```bash
@@ -889,6 +1134,7 @@ run_phase_P() {
     validate_configs
     validate_data_dirs
     validate_permissions_and_ownership  # Step 5a: Check perms/ownership
+    validate_prod_dev_separation        # Step 5b: CRITICAL - Check prod/dev isolation
     validate_ports
     run_health_checks
     check_service_logs
