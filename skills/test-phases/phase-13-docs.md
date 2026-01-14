@@ -98,6 +98,70 @@ if [ "$CHANGELOG_VERSION" != "$VERSION" ]; then
 fi
 ```
 
+### 4a. Git Commit Synchronization
+
+**CRITICAL: Documentation MUST reflect recent commits.**
+
+```bash
+# Get commits since last documented version
+LAST_DOCUMENTED_VERSION=$(grep -m1 "## \[" CHANGELOG.md | grep -oP '\d+\.\d+\.\d+')
+LAST_TAG="v$LAST_DOCUMENTED_VERSION"
+
+# Check if tag exists
+if git rev-parse "$LAST_TAG" >/dev/null 2>&1; then
+    # Get all commits since the last documented version
+    RECENT_COMMITS=$(git log --oneline "$LAST_TAG"..HEAD)
+
+    # Get files changed in those commits
+    CHANGED_FILES=$(git diff --name-only "$LAST_TAG"..HEAD)
+else
+    # No tag, check last 10 commits
+    RECENT_COMMITS=$(git log --oneline -10)
+    CHANGED_FILES=$(git diff --name-only HEAD~10..HEAD 2>/dev/null || git diff --name-only)
+fi
+
+# For each significant commit, verify documentation reflects the change
+# Categories to check:
+# - feat: commits → should be documented in CHANGELOG and README features
+# - fix: commits → should be in CHANGELOG
+# - BREAKING: → should have migration notes
+# - API changes → should update API docs
+# - Config changes → should update configuration docs
+```
+
+**Verification Steps:**
+
+1. **Analyze recent commits**:
+   ```bash
+   # Extract commit types and their scope
+   git log --oneline "$LAST_TAG"..HEAD | while read hash msg; do
+       if [[ "$msg" =~ ^feat ]]; then
+           echo "FEATURE: $msg - verify documented"
+       elif [[ "$msg" =~ ^fix ]]; then
+           echo "FIX: $msg - verify in CHANGELOG"
+       elif [[ "$msg" =~ BREAKING ]]; then
+           echo "BREAKING: $msg - verify migration notes"
+       fi
+   done
+   ```
+
+2. **Cross-reference changed files with docs**:
+   - If `src/api/` changed → check API documentation
+   - If `install.sh` changed → check installation docs
+   - If `config/` changed → check configuration docs
+   - If phase files changed → check dispatcher and README
+
+3. **Verify CHANGELOG completeness**:
+   - Every `feat:` commit since last release → in Added section
+   - Every `fix:` commit since last release → in Fixed section
+   - Every `BREAKING` commit → in Changed section with migration notes
+
+4. **Fix documentation gaps**:
+   - Add missing features to CHANGELOG
+   - Update README if major features added
+   - Add migration notes for breaking changes
+   - Update examples if API/CLI changed
+
 ### 5. API Documentation
 
 For each endpoint in codebase:
@@ -150,6 +214,13 @@ For code that changed in this audit:
   PHASE 13: FIX ALL DOCUMENTATION
 ═══════════════════════════════════════════════════════════════════
 
+Git Commit Analysis:
+  Last documented version: v3.1.0
+  Commits since last release: 12
+  Features (feat:): 3 → all documented in CHANGELOG ✅
+  Fixes (fix:): 7 → all documented in CHANGELOG ✅
+  Breaking changes: 0
+
 Version Sync:
   VERSION file: 3.2.0
   Fixed CLAUDE.md: 3.0.5 → 3.2.0
@@ -163,6 +234,7 @@ Content Updates:
   Updated API documentation for 3 new endpoints
   Removed reference to deleted web.legacy/ directory
   Added missing configuration options section
+  Updated README for new features from commits
 
 Obsolete Removal:
   Removed 2 references to audiobook-toolkit (old repo name)
@@ -172,7 +244,7 @@ Documentation Files Modified: 8
 Issues Found: 15
 Issues Fixed: 15
 
-Status: ✅ PASS - All documentation synchronized
+Status: ✅ PASS - All documentation synchronized with current commits
 ```
 
 ---
