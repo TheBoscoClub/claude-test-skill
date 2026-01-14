@@ -1,512 +1,514 @@
-# Phase 5: Security Audit
+# Phase 5: Comprehensive Security Testing & Mitigation
 
-Scan for security vulnerabilities, exposed secrets, common attack vectors, and **GitHub security alerts**.
+**THE security phase** - tests and mitigates all security issues across:
+- **GitHub** - Repository security settings, alerts, workflows
+- **Local Project** - Code vulnerabilities, secrets, dependencies, SAST
+- **Installed App** - Production security verification (when applicable)
 
-## Step 1: Secret Detection
+## Invocation
 
 ```bash
+# Run as part of full audit
+/test                        # Phase 5 runs in Tier 3
+
+# Run standalone (comprehensive security only)
+/test --phase=5
+/test --phase=SEC            # Alias for Phase 5
+
+# Run with auto-fix disabled (audit only)
+/test --phase=5 --audit-only
+
+# Run specific section
+/test --phase=5 --target=github
+/test --phase=5 --target=local
+/test --phase=5 --target=installed
+```
+
+---
+
+## Phase Configuration
+
+```bash
+# Initialize phase
 echo "═══════════════════════════════════════════════════════════════════"
-echo "  PHASE 5: SECURITY AUDIT"
+echo "  PHASE 5: COMPREHENSIVE SECURITY TESTING & MITIGATION"
 echo "═══════════════════════════════════════════════════════════════════"
+echo ""
 
-echo "Scanning for hardcoded secrets..."
+# Determine what to test
+HAS_GITHUB_REMOTE=false
+HAS_INSTALLED_APP=false
+PROJECT_ROOT="${PROJECT_DIR:-\$(pwd)}"
+PROJECT_NAME="${PROJECT_NAME:-\$(basename "\$PROJECT_ROOT")}"
 
-# API keys and passwords
-grep -rE "(api[_-]?key|apikey|secret[_-]?key|password|passwd|pwd)\s*[=:]\s*['\"][^'\"]+['\"]" \
-    --include="*.py" --include="*.js" --include="*.ts" --include="*.go" . 2>/dev/null | head -10
+# Check for GitHub remote
+if git remote get-url origin 2>/dev/null | grep -q "github.com"; then
+    HAS_GITHUB_REMOTE=true
+    REMOTE_URL=\$(git remote get-url origin 2>/dev/null)
+    if [[ "\$REMOTE_URL" =~ github\.com[:/]([^/]+)/([^/.]+) ]]; then
+        GITHUB_REPO="\${BASH_REMATCH[1]}/\${BASH_REMATCH[2]}"
+    fi
+fi
 
-# AWS keys
-grep -rE "AKIA[0-9A-Z]{16}" . 2>/dev/null | head -5
+# Check for installed app (common locations)
+INSTALLED_PATHS=(
+    "/opt/\${PROJECT_NAME}"
+    "/opt/\${PROJECT_NAME}s"
+    "/usr/local/\${PROJECT_NAME}"
+    "/srv/\${PROJECT_NAME}"
+)
 
-# Private keys
-grep -rE "-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----" . 2>/dev/null | head -5
+for path in "\${INSTALLED_PATHS[@]}"; do
+    if [[ -d "\$path" ]]; then
+        HAS_INSTALLED_APP=true
+        INSTALLED_APP_PATH="\$path"
+        break
+    fi
+done
 
-# JWT tokens
-grep -rE "eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*" . 2>/dev/null | head -5
+echo "Testing targets:"
+echo "  Local project: \$PROJECT_ROOT"
+echo "  GitHub repo:   \${GITHUB_REPO:-none}"
+echo "  Installed app: \${INSTALLED_APP_PATH:-none}"
+echo ""
+
+# Initialize counters
+TOTAL_ISSUES=0
+FIXED_ISSUES=0
+CRITICAL_ISSUES=0
+
+# Detect primary language
+PRIMARY_LANG="Unknown"
+if [[ -n "\$(find "\$PROJECT_ROOT" -maxdepth 3 -name '*.py' -not -path '*/.venv/*' -not -path '*/.snapshots/*' 2>/dev/null | head -1)" ]]; then
+    PRIMARY_LANG="Python"
+elif [[ -f "\$PROJECT_ROOT/package.json" ]]; then
+    PRIMARY_LANG="JavaScript"
+elif [[ -f "\$PROJECT_ROOT/go.mod" ]]; then
+    PRIMARY_LANG="Go"
+fi
+echo "Primary language: \$PRIMARY_LANG"
 ```
 
-## Step 2: Static Application Security Testing (SAST)
+---
 
-Run language-specific security scanners to detect vulnerabilities in code:
+## Section 1: GitHub Security
+
+Tests and mitigates GitHub repository security settings and alerts.
 
 ```bash
 echo ""
-echo "───────────────────────────────────────────────────────────────────"
-echo "  Step 2: Static Application Security Testing (SAST)"
-echo "───────────────────────────────────────────────────────────────────"
+echo "╔═══════════════════════════════════════════════════════════════════╗"
+echo "║  SECTION 1: GITHUB SECURITY                                       ║"
+echo "╚═══════════════════════════════════════════════════════════════════╝"
 
-# Python Security with Bandit
-if command -v bandit &>/dev/null; then
-    PYTHON_FILES=$(find . -name "*.py" -not -path "./.venv/*" -not -path "./venv/*" -not -path "./.snapshots/*" 2>/dev/null | head -1)
-    if [[ -n "$PYTHON_FILES" ]]; then
-        echo ""
-        echo "Running Bandit (Python security scanner)..."
-        bandit -r . -x ./.venv,./.snapshots,./venv --format json 2>/dev/null | \
-            jq -r '.results[] | "  [\(.severity)] \(.issue_text) (\(.filename):\(.line_number))"' 2>/dev/null | head -20
-        echo ""
-        echo "Bandit Summary:"
-        bandit -r . -x ./.venv,./.snapshots,./venv --format json 2>/dev/null | \
-            jq -r '"  High: \([.results[] | select(.severity == "HIGH")] | length), Medium: \([.results[] | select(.severity == "MEDIUM")] | length), Low: \([.results[] | select(.severity == "LOW")] | length)"' 2>/dev/null
-    fi
-fi
-
-# Shell Script Security with ShellCheck
-if command -v shellcheck &>/dev/null; then
-    SHELL_FILES=$(find . -name "*.sh" -not -path "./.snapshots/*" 2>/dev/null | head -1)
-    if [[ -n "$SHELL_FILES" ]]; then
-        echo ""
-        echo "Running ShellCheck (Shell script security)..."
-        find . -name "*.sh" -not -path "./.snapshots/*" -exec shellcheck -f gcc {} \; 2>/dev/null | head -30
-    fi
-fi
-
-# CodeQL (if available and database exists)
-if command -v codeql &>/dev/null; then
-    echo ""
-    echo "CodeQL available for advanced security analysis"
-    echo "  Run manually: codeql database create --language=python codeql-db"
-    echo "  Then: codeql database analyze codeql-db --format=csv --output=results.csv"
-fi
-
-# Trivy for container/filesystem scanning
-if command -v trivy &>/dev/null; then
-    echo ""
-    echo "Running Trivy filesystem scan..."
-    trivy fs --security-checks vuln,secret,config . 2>&1 | head -40
-fi
-```
-
-## Step 2a: Dependency Vulnerability Scan (Local)
-
-```bash
-echo ""
-echo "───────────────────────────────────────────────────────────────────"
-echo "  Step 2a: Dependency Vulnerability Scan"
-echo "───────────────────────────────────────────────────────────────────"
-
-# Python - pip-audit with detailed output
-if command -v pip-audit &>/dev/null; then
-    if [[ -f requirements.txt ]] || [[ -f pyproject.toml ]] || [[ -f setup.py ]]; then
-        echo ""
-        echo "Running pip-audit..."
-        pip-audit --progress-spinner=off 2>&1 | head -30
-    fi
-elif command -v safety &>/dev/null; then
-    echo ""
-    echo "Running safety check..."
-    safety check 2>&1 | head -20
-fi
-
-# Node.js
-if [[ -f package.json ]]; then
-    echo ""
-    echo "Running npm audit..."
-    npm audit --json 2>/dev/null | jq '.vulnerabilities | to_entries[] | {name: .key, severity: .value.severity}' 2>/dev/null | head -20
-fi
-
-# Go
-if command -v govulncheck &>/dev/null && [[ -f go.mod ]]; then
-    echo ""
-    echo "Running govulncheck..."
-    govulncheck ./... 2>&1 | head -20
-fi
-
-# Rust
-if command -v cargo-audit &>/dev/null && [[ -f Cargo.toml ]]; then
-    echo ""
-    echo "Running cargo audit..."
-    cargo audit 2>&1 | head -20
-fi
-```
-
-## Step 3: GitHub Security Alerts
-
-**Check GitHub's automated security features for the project's repository.**
-
-```bash
-echo ""
-echo "───────────────────────────────────────────────────────────────────"
-echo "  Step 3: GitHub Security Alerts"
-echo "───────────────────────────────────────────────────────────────────"
-
-# Detect GitHub repo
-get_github_repo() {
-    local remote_url=$(git remote get-url origin 2>/dev/null)
-    if [[ -z "$remote_url" ]]; then
-        echo ""
-        return 1
-    fi
-
-    # Extract owner/repo from various URL formats
-    local repo=""
-    if [[ "$remote_url" =~ github\.com[:/]([^/]+)/([^/.]+) ]]; then
-        repo="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
-    fi
-    echo "$repo"
-}
-
-GITHUB_REPO=$(get_github_repo)
-
-if [[ -z "$GITHUB_REPO" ]]; then
-    echo "ℹ️ No GitHub remote detected - skipping GitHub security checks"
+if [[ "\$HAS_GITHUB_REMOTE" != "true" ]]; then
+    echo "ℹ️ No GitHub remote - skipping GitHub security checks"
 else
-    echo "Repository: $GITHUB_REPO"
-    echo ""
-
-    # Check if gh CLI is available and authenticated
     if ! command -v gh &>/dev/null; then
-        echo "⚠️ GitHub CLI (gh) not installed - install with: sudo pacman -S github-cli"
+        echo "⚠️ GitHub CLI (gh) not installed"
     elif ! gh auth status &>/dev/null 2>&1; then
         echo "⚠️ GitHub CLI not authenticated - run: gh auth login"
     else
-        echo "✅ GitHub CLI authenticated"
+        echo "Repository: https://github.com/\$GITHUB_REPO"
         echo ""
 
-        # ═══════════════════════════════════════════════════════════════
-        # DEPENDABOT ALERTS
-        # ═══════════════════════════════════════════════════════════════
-        echo "Checking Dependabot alerts..."
-        DEPENDABOT_ALERTS=$(gh api repos/$GITHUB_REPO/dependabot/alerts --jq 'length' 2>/dev/null || echo "0")
+        # 1.1 Security Features (Auto-Enable)
+        echo "───────────────────────────────────────────────────────────────"
+        echo "  1.1 Security Features"
+        echo "───────────────────────────────────────────────────────────────"
 
-        if [[ "$DEPENDABOT_ALERTS" == "0" ]]; then
-            echo "  ✅ No Dependabot alerts"
+        # Dependabot alerts
+        if gh api "repos/\$GITHUB_REPO/vulnerability-alerts" &>/dev/null 2>&1; then
+            echo "  ✅ Dependabot alerts: Enabled"
         else
-            echo "  ❌ $DEPENDABOT_ALERTS Dependabot alert(s) found!"
-            echo ""
-
-            # List alerts with details
-            gh api repos/$GITHUB_REPO/dependabot/alerts \
-                --jq '.[] | "  - [\(.security_advisory.severity | ascii_upcase)] \(.security_advisory.summary) (\(.dependency.package.name))"' \
-                2>/dev/null | head -10
-
-            echo ""
-            echo "  View all: https://github.com/$GITHUB_REPO/security/dependabot"
+            echo "  ❌ Dependabot alerts: Not enabled"
+            TOTAL_ISSUES=\$((TOTAL_ISSUES + 1))
+            if [[ "\$AUDIT_ONLY" != "true" ]]; then
+                gh api -X PUT "repos/\$GITHUB_REPO/vulnerability-alerts" &>/dev/null && echo "  ✅ Now enabled" && FIXED_ISSUES=\$((FIXED_ISSUES + 1))
+            fi
         fi
 
-        echo ""
-
-        # ═══════════════════════════════════════════════════════════════
-        # SECRET SCANNING ALERTS
-        # ═══════════════════════════════════════════════════════════════
-        echo "Checking secret scanning alerts..."
-        SECRET_ALERTS=$(gh api repos/$GITHUB_REPO/secret-scanning/alerts --jq 'length' 2>/dev/null || echo "0")
-
-        if [[ "$SECRET_ALERTS" == "0" ]]; then
-            echo "  ✅ No secret scanning alerts"
+        # Dependabot security updates
+        if gh api "repos/\$GITHUB_REPO/automated-security-fixes" &>/dev/null 2>&1; then
+            echo "  ✅ Dependabot security updates: Enabled"
         else
-            echo "  ❌ $SECRET_ALERTS secret scanning alert(s) found!"
-            echo ""
-
-            gh api repos/$GITHUB_REPO/secret-scanning/alerts \
-                --jq '.[] | "  - [\(.state)] \(.secret_type): \(.secret_type_display_name)"' \
-                2>/dev/null | head -10
-
-            echo ""
-            echo "  View all: https://github.com/$GITHUB_REPO/security/secret-scanning"
+            echo "  ❌ Dependabot security updates: Not enabled"
+            TOTAL_ISSUES=\$((TOTAL_ISSUES + 1))
+            if [[ "\$AUDIT_ONLY" != "true" ]]; then
+                gh api -X PUT "repos/\$GITHUB_REPO/automated-security-fixes" &>/dev/null && echo "  ✅ Now enabled" && FIXED_ISSUES=\$((FIXED_ISSUES + 1))
+            fi
         fi
 
+        # 1.2 Open Alerts
         echo ""
+        echo "───────────────────────────────────────────────────────────────"
+        echo "  1.2 Open Alerts"
+        echo "───────────────────────────────────────────────────────────────"
 
-        # ═══════════════════════════════════════════════════════════════
-        # CODE SCANNING ALERTS (CodeQL, etc.)
-        # ═══════════════════════════════════════════════════════════════
-        echo "Checking code scanning alerts..."
-        CODE_ALERTS=$(gh api repos/$GITHUB_REPO/code-scanning/alerts --jq 'length' 2>/dev/null || echo "0")
-
-        if [[ "$CODE_ALERTS" == "0" ]]; then
-            echo "  ✅ No code scanning alerts"
+        # Dependabot alerts
+        DEPENDABOT_COUNT=\$(gh api "repos/\$GITHUB_REPO/dependabot/alerts?state=open" 2>/dev/null | jq 'length' || echo "0")
+        if [[ "\$DEPENDABOT_COUNT" -eq 0 ]]; then
+            echo "  ✅ Dependabot: No open alerts"
         else
-            echo "  ❌ $CODE_ALERTS code scanning alert(s) found!"
-            echo ""
-
-            gh api repos/$GITHUB_REPO/code-scanning/alerts \
-                --jq '.[] | "  - [\(.rule.severity // "unknown")] \(.rule.description) (\(.most_recent_instance.location.path):\(.most_recent_instance.location.start_line))"' \
-                2>/dev/null | head -10
-
-            echo ""
-            echo "  View all: https://github.com/$GITHUB_REPO/security/code-scanning"
+            echo "  ❌ Dependabot: \$DEPENDABOT_COUNT open alert(s)"
+            TOTAL_ISSUES=\$((TOTAL_ISSUES + DEPENDABOT_COUNT))
         fi
 
-        echo ""
+        # Code scanning alerts
+        CODE_COUNT=\$(gh api "repos/\$GITHUB_REPO/code-scanning/alerts?state=open" 2>/dev/null | jq 'length' || echo "0")
+        if [[ "\$CODE_COUNT" -eq 0 ]]; then
+            echo "  ✅ Code scanning: No open alerts"
+        else
+            echo "  ❌ Code scanning: \$CODE_COUNT open alert(s)"
+            TOTAL_ISSUES=\$((TOTAL_ISSUES + CODE_COUNT))
+        fi
 
-        # ═══════════════════════════════════════════════════════════════
-        # CHECK SECURITY FEATURES ENABLED
-        # ═══════════════════════════════════════════════════════════════
-        echo "Checking security features status..."
-
-        # Get repo security settings
-        SECURITY_INFO=$(gh api repos/$GITHUB_REPO 2>/dev/null)
-
-        if [[ -n "$SECURITY_INFO" ]]; then
-            # Check Dependabot
-            DEPENDABOT_ENABLED=$(gh api repos/$GITHUB_REPO/vulnerability-alerts 2>/dev/null && echo "true" || echo "false")
-            if [[ "$DEPENDABOT_ENABLED" == "true" ]]; then
-                echo "  ✅ Dependabot alerts: Enabled"
-            else
-                echo "  ⚠️ Dependabot alerts: Not enabled"
-                echo "     Enable at: https://github.com/$GITHUB_REPO/settings/security_analysis"
-            fi
-
-            # Check for security policy
-            if gh api repos/$GITHUB_REPO/contents/SECURITY.md &>/dev/null 2>&1; then
-                echo "  ✅ Security policy: Present"
-            else
-                echo "  ⚠️ Security policy: Missing (consider adding SECURITY.md)"
-            fi
-
-            # Check for branch protection
-            DEFAULT_BRANCH=$(echo "$SECURITY_INFO" | jq -r '.default_branch')
-            if gh api repos/$GITHUB_REPO/branches/$DEFAULT_BRANCH/protection &>/dev/null 2>&1; then
-                echo "  ✅ Branch protection: Enabled on $DEFAULT_BRANCH"
-            else
-                echo "  ⚠️ Branch protection: Not enabled on $DEFAULT_BRANCH"
-            fi
+        # Secret scanning alerts
+        SECRET_COUNT=\$(gh api "repos/\$GITHUB_REPO/secret-scanning/alerts?state=open" 2>/dev/null | jq 'length' || echo "0")
+        if [[ "\$SECRET_COUNT" -eq 0 ]]; then
+            echo "  ✅ Secret scanning: No open alerts"
+        else
+            echo "  🚨 SECRET SCANNING: \$SECRET_COUNT ALERT(S) - CRITICAL!"
+            TOTAL_ISSUES=\$((TOTAL_ISSUES + SECRET_COUNT))
+            CRITICAL_ISSUES=\$((CRITICAL_ISSUES + SECRET_COUNT))
         fi
     fi
 fi
 ```
 
-## Step 4: Code Vulnerability Patterns
+---
+
+## Section 2: Local Project Security
 
 ```bash
 echo ""
+echo "╔═══════════════════════════════════════════════════════════════════╗"
+echo "║  SECTION 2: LOCAL PROJECT SECURITY                                ║"
+echo "╚═══════════════════════════════════════════════════════════════════╝"
+
+# 2.1 Secret Detection
+echo ""
 echo "───────────────────────────────────────────────────────────────────"
-echo "  Step 4: Code Vulnerability Patterns"
+echo "  2.1 Secret Detection"
 echo "───────────────────────────────────────────────────────────────────"
 
-echo "Scanning for common vulnerability patterns..."
+SECRETS_FOUND=0
+# AWS keys
+AWS_KEYS=\$(grep -rE "AKIA[0-9A-Z]{16}" "\$PROJECT_ROOT" 2>/dev/null | grep -v ".snapshots" | head -5)
+if [[ -n "\$AWS_KEYS" ]]; then
+    echo "  🚨 AWS Access Key(s) found!"
+    SECRETS_FOUND=\$((SECRETS_FOUND + 1))
+    CRITICAL_ISSUES=\$((CRITICAL_ISSUES + 1))
+fi
 
-# SQL Injection (Python)
-grep -rn "execute.*%s\|execute.*format\|execute.*f\"" --include="*.py" . 2>/dev/null | head -5
+# Private keys
+PRIVATE_KEYS=\$(grep -rE "-----BEGIN.*PRIVATE KEY-----" "\$PROJECT_ROOT" 2>/dev/null | grep -v ".snapshots" | head -5)
+if [[ -n "\$PRIVATE_KEYS" ]]; then
+    echo "  🚨 Private key(s) found!"
+    SECRETS_FOUND=\$((SECRETS_FOUND + 1))
+    CRITICAL_ISSUES=\$((CRITICAL_ISSUES + 1))
+fi
+
+[[ "\$SECRETS_FOUND" -eq 0 ]] && echo "  ✅ No hardcoded secrets detected"
+TOTAL_ISSUES=\$((TOTAL_ISSUES + SECRETS_FOUND))
+
+# 2.2 SAST
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  2.2 Static Application Security Testing (SAST)"
+echo "───────────────────────────────────────────────────────────────────"
+
+# Bandit (Python)
+if command -v bandit &>/dev/null && [[ "\$PRIMARY_LANG" == "Python" ]]; then
+    echo "Running Bandit..."
+    BANDIT_HIGH=\$(bandit -r "\$PROJECT_ROOT" -x ./.venv,./.snapshots,./venv --format json 2>/dev/null | jq '[.results[] | select(.severity == "HIGH")] | length' || echo "0")
+    if [[ "\$BANDIT_HIGH" -gt 0 ]]; then
+        echo "  ❌ Bandit HIGH severity: \$BANDIT_HIGH"
+        TOTAL_ISSUES=\$((TOTAL_ISSUES + BANDIT_HIGH))
+        CRITICAL_ISSUES=\$((CRITICAL_ISSUES + BANDIT_HIGH))
+    else
+        echo "  ✅ Bandit: No high severity issues"
+    fi
+fi
+
+# Semgrep
+if command -v semgrep &>/dev/null; then
+    echo "Running Semgrep..."
+    SEMGREP_COUNT=\$(semgrep scan --config auto --json "\$PROJECT_ROOT" 2>/dev/null | jq '.results | length' || echo "0")
+    if [[ "\$SEMGREP_COUNT" -gt 0 ]]; then
+        echo "  ❌ Semgrep found \$SEMGREP_COUNT issue(s)"
+        TOTAL_ISSUES=\$((TOTAL_ISSUES + SEMGREP_COUNT))
+    else
+        echo "  ✅ Semgrep: No issues"
+    fi
+fi
+
+# ShellCheck
+if command -v shellcheck &>/dev/null; then
+    SHELL_FILES=\$(find "\$PROJECT_ROOT" -name "*.sh" -not -path "*/.snapshots/*" 2>/dev/null | head -1)
+    if [[ -n "\$SHELL_FILES" ]]; then
+        echo "Running ShellCheck..."
+        SHELLCHECK_ERRORS=\$(find "\$PROJECT_ROOT" -name "*.sh" -not -path "*/.snapshots/*" -exec shellcheck -S error {} \; 2>/dev/null | wc -l)
+        if [[ "\$SHELLCHECK_ERRORS" -gt 0 ]]; then
+            echo "  ⚠️ ShellCheck errors: \$SHELLCHECK_ERRORS"
+            TOTAL_ISSUES=\$((TOTAL_ISSUES + 1))
+        else
+            echo "  ✅ ShellCheck: No errors"
+        fi
+    fi
+fi
+
+# CodeQL (Local)
+if command -v codeql &>/dev/null && [[ "\$PRIMARY_LANG" == "Python" ]]; then
+    echo "Running CodeQL local analysis..."
+    CODEQL_DB="/tmp/codeql-audit-\$\$"
+    if codeql database create "\$CODEQL_DB" --language=python --source-root="\$PROJECT_ROOT" 2>/dev/null; then
+        codeql database analyze "\$CODEQL_DB" --format=sarif-latest --output="/tmp/codeql-\$\$.sarif" \
+            "codeql/python-queries:codeql-suites/python-security-extended.qls" 2>/dev/null
+        CODEQL_ISSUES=\$(jq '.runs[0].results | length' "/tmp/codeql-\$\$.sarif" 2>/dev/null || echo "0")
+        if [[ "\$CODEQL_ISSUES" -gt 0 ]]; then
+            echo "  ❌ CodeQL found \$CODEQL_ISSUES issues"
+            TOTAL_ISSUES=\$((TOTAL_ISSUES + CODEQL_ISSUES))
+        else
+            echo "  ✅ CodeQL: No issues"
+        fi
+        rm -rf "\$CODEQL_DB" "/tmp/codeql-\$\$.sarif"
+    fi
+fi
+
+# 2.3 Dependency Vulnerabilities
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  2.3 Dependency Vulnerabilities"
+echo "───────────────────────────────────────────────────────────────────"
+
+# pip-audit
+if command -v pip-audit &>/dev/null && [[ -f "\$PROJECT_ROOT/requirements.txt" ]]; then
+    echo "Running pip-audit..."
+    if pip-audit --progress-spinner=off 2>&1 | grep -q "No known vulnerabilities"; then
+        echo "  ✅ pip-audit: No vulnerabilities"
+    else
+        echo "  ❌ pip-audit found vulnerabilities"
+        TOTAL_ISSUES=\$((TOTAL_ISSUES + 1))
+        [[ "\$AUDIT_ONLY" != "true" ]] && pip-audit --fix 2>&1 | head -5 && FIXED_ISSUES=\$((FIXED_ISSUES + 1))
+    fi
+fi
+
+# Trivy
+if command -v trivy &>/dev/null; then
+    echo "Running Trivy filesystem scan..."
+    TRIVY_VULNS=\$(trivy fs --security-checks vuln,secret --format json "\$PROJECT_ROOT" 2>/dev/null | jq '[.Results[]?.Vulnerabilities // [] | .[]] | length' || echo "0")
+    if [[ "\$TRIVY_VULNS" -gt 0 ]]; then
+        echo "  ❌ Trivy found \$TRIVY_VULNS vulnerabilities"
+        TOTAL_ISSUES=\$((TOTAL_ISSUES + TRIVY_VULNS))
+    else
+        echo "  ✅ Trivy: No vulnerabilities"
+    fi
+fi
+
+# Grype
+if command -v grype &>/dev/null; then
+    echo "Running Grype vulnerability scan..."
+    GRYPE_COUNT=\$(grype dir:"\$PROJECT_ROOT" --output json 2>/dev/null | jq '.matches | length' || echo "0")
+    if [[ "\$GRYPE_COUNT" -gt 0 ]]; then
+        echo "  ❌ Grype found \$GRYPE_COUNT issues"
+        TOTAL_ISSUES=\$((TOTAL_ISSUES + GRYPE_COUNT))
+    else
+        echo "  ✅ Grype: No vulnerabilities"
+    fi
+fi
+
+# npm audit
+if [[ -f "\$PROJECT_ROOT/package.json" ]]; then
+    echo "Running npm audit..."
+    VULN_TOTAL=\$(npm audit --json 2>/dev/null | jq '.metadata.vulnerabilities.total // 0' || echo "0")
+    if [[ "\$VULN_TOTAL" -eq 0 ]]; then
+        echo "  ✅ npm audit: No vulnerabilities"
+    else
+        echo "  ❌ npm audit: \$VULN_TOTAL vulnerabilities"
+        TOTAL_ISSUES=\$((TOTAL_ISSUES + 1))
+        [[ "\$AUDIT_ONLY" != "true" ]] && npm audit fix 2>&1 | tail -3 && FIXED_ISSUES=\$((FIXED_ISSUES + 1))
+    fi
+fi
+
+# 2.4 Code Vulnerability Patterns
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  2.4 Code Vulnerability Patterns"
+echo "───────────────────────────────────────────────────────────────────"
+
+PATTERN_ISSUES=0
+
+# SQL Injection
+if grep -rqn "execute.*format\|execute.*f\"" --include="*.py" "\$PROJECT_ROOT" 2>/dev/null; then
+    echo "  ⚠️ Potential SQL injection patterns found"
+    PATTERN_ISSUES=\$((PATTERN_ISSUES + 1))
+fi
 
 # Command Injection
-grep -rn "os\.system\|subprocess.*shell=True\|exec(\|eval(" --include="*.py" . 2>/dev/null | head -5
+if grep -rqn "subprocess.*shell=True" --include="*.py" "\$PROJECT_ROOT" 2>/dev/null | grep -v test; then
+    echo "  ⚠️ Potential command injection (shell=True)"
+    PATTERN_ISSUES=\$((PATTERN_ISSUES + 1))
+fi
 
-# XSS
-grep -rn "innerHTML\|dangerouslySetInnerHTML" --include="*.js" --include="*.jsx" --include="*.tsx" . 2>/dev/null | head -5
+# XSS (innerHTML/dangerouslySetInnerHTML)
+if grep -rqn "innerHTML" --include="*.js" --include="*.jsx" --include="*.tsx" "\$PROJECT_ROOT" 2>/dev/null; then
+    echo "  ⚠️ Potential XSS (innerHTML usage)"
+    PATTERN_ISSUES=\$((PATTERN_ISSUES + 1))
+fi
 
-# Insecure deserialization
-grep -rn "pickle\.loads\|yaml\.load(" --include="*.py" . 2>/dev/null | head -5
+[[ "\$PATTERN_ISSUES" -eq 0 ]] && echo "  ✅ No obvious vulnerability patterns"
+TOTAL_ISSUES=\$((TOTAL_ISSUES + PATTERN_ISSUES))
+
+# 2.5 IaC Security (Checkov)
+if command -v checkov &>/dev/null; then
+    IAC_FILES=\$(find "\$PROJECT_ROOT" -name "*.tf" -o -name "Dockerfile" -o -name "docker-compose*.yml" 2>/dev/null | head -1)
+    if [[ -n "\$IAC_FILES" ]]; then
+        echo ""
+        echo "───────────────────────────────────────────────────────────────────"
+        echo "  2.5 Infrastructure as Code Security (Checkov)"
+        echo "───────────────────────────────────────────────────────────────────"
+        CHECKOV_FAILED=\$(checkov -d "\$PROJECT_ROOT" --quiet --compact --output json 2>/dev/null | jq '[.results.failed_checks // []] | length' || echo "0")
+        if [[ "\$CHECKOV_FAILED" -gt 0 ]]; then
+            echo "  ❌ Checkov found \$CHECKOV_FAILED IaC issues"
+            TOTAL_ISSUES=\$((TOTAL_ISSUES + CHECKOV_FAILED))
+        else
+            echo "  ✅ Checkov: No IaC security issues"
+        fi
+    fi
+fi
 ```
 
-## Step 5: Configuration Security
+---
+
+## Section 3: Installed App Security
 
 ```bash
 echo ""
-echo "───────────────────────────────────────────────────────────────────"
-echo "  Step 5: Configuration Security"
-echo "───────────────────────────────────────────────────────────────────"
+echo "╔═══════════════════════════════════════════════════════════════════╗"
+echo "║  SECTION 3: INSTALLED APP SECURITY                                ║"
+echo "╚═══════════════════════════════════════════════════════════════════╝"
 
-# Debug mode in production
-grep -rE "(DEBUG|debug)\s*[=:]\s*(true|True|1)" --include="*.py" --include="*.json" . 2>/dev/null | head -5
+if [[ "\$HAS_INSTALLED_APP" != "true" ]]; then
+    echo "ℹ️ No installed app detected - skipping"
+else
+    echo "Installed app path: \$INSTALLED_APP_PATH"
 
-# Insecure protocols
-grep -rE "http://" --include="*.py" --include="*.js" . 2>/dev/null | grep -v "localhost\|127.0.0.1" | head -5
+    # 3.1 File Permissions
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  3.1 File Permissions"
+    echo "───────────────────────────────────────────────────────────────────"
 
-# Disabled SSL verification
-grep -rE "(verify\s*=\s*False|SSL_VERIFY.*false|rejectUnauthorized.*false)" . 2>/dev/null | head -5
-```
-
-## Step 6: Collect Issues for Remediation
-
-All security issues found should be collected for Phase 10 (Auto-Fixing).
-
-```bash
-# Create security issues file for Phase 10 to process
-SECURITY_ISSUES_FILE="${PROJECT_DIR:-$(pwd)}/security-issues.json"
-
-collect_security_issues() {
-    local issues=()
-
-    # Collect Dependabot alerts
-    if [[ -n "$GITHUB_REPO" ]] && command -v gh &>/dev/null; then
-        gh api repos/$GITHUB_REPO/dependabot/alerts \
-            --jq '.[] | {type: "dependabot", severity: .security_advisory.severity, package: .dependency.package.name, ecosystem: .dependency.package.ecosystem, summary: .security_advisory.summary, fix_available: (.security_vulnerability.first_patched_version != null)}' \
-            2>/dev/null >> "$SECURITY_ISSUES_FILE.tmp"
+    WORLD_WRITABLE=\$(find "\$INSTALLED_APP_PATH" -type f -perm -002 2>/dev/null | head -10)
+    if [[ -n "\$WORLD_WRITABLE" ]]; then
+        echo "  ❌ World-writable files found"
+        TOTAL_ISSUES=\$((TOTAL_ISSUES + 1))
+        CRITICAL_ISSUES=\$((CRITICAL_ISSUES + 1))
+        [[ "\$AUDIT_ONLY" != "true" ]] && echo "\$WORLD_WRITABLE" | xargs -I {} sudo chmod o-w {} 2>/dev/null && FIXED_ISSUES=\$((FIXED_ISSUES + 1))
+    else
+        echo "  ✅ No world-writable files"
     fi
 
-    # Collect npm audit issues
-    if [[ -f package.json ]]; then
-        npm audit --json 2>/dev/null | jq '.vulnerabilities | to_entries[] | {type: "npm", severity: .value.severity, package: .key, fix_available: (.value.fixAvailable != false)}' >> "$SECURITY_ISSUES_FILE.tmp" 2>/dev/null
-    fi
+    # 3.2 Service Security
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  3.2 Service Security"
+    echo "───────────────────────────────────────────────────────────────────"
 
-    # Combine into final file
-    if [[ -f "$SECURITY_ISSUES_FILE.tmp" ]]; then
-        jq -s '.' "$SECURITY_ISSUES_FILE.tmp" > "$SECURITY_ISSUES_FILE" 2>/dev/null
-        rm -f "$SECURITY_ISSUES_FILE.tmp"
-        echo "Security issues collected to: $SECURITY_ISSUES_FILE"
-    fi
-}
-
-collect_security_issues
-```
-
----
-
-## Remediation Instructions (for Phase 10)
-
-When Phase 10 (Auto-Fixing) runs, it should process security issues:
-
-### Dependabot Alerts Remediation
-
-```bash
-remediate_dependabot() {
-    local GITHUB_REPO="$1"
-
-    # Get alerts with available fixes
-    gh api repos/$GITHUB_REPO/dependabot/alerts \
-        --jq '.[] | select(.security_vulnerability.first_patched_version != null) | {number: .number, package: .dependency.package.name, ecosystem: .dependency.package.ecosystem, current: .dependency.package.version, fixed: .security_vulnerability.first_patched_version.identifier}' \
-        2>/dev/null | while read -r alert; do
-
-        local pkg=$(echo "$alert" | jq -r '.package')
-        local ecosystem=$(echo "$alert" | jq -r '.ecosystem')
-        local fixed_version=$(echo "$alert" | jq -r '.fixed')
-
-        echo "Updating $pkg to $fixed_version..."
-
-        case "$ecosystem" in
-            pip)
-                pip install "$pkg>=$fixed_version" 2>&1
-                # Update requirements.txt
-                sed -i "s/^${pkg}==.*/${pkg}>=${fixed_version}/" requirements.txt 2>/dev/null
-                ;;
-            npm)
-                npm install "${pkg}@${fixed_version}" 2>&1
-                ;;
-            go)
-                go get "${pkg}@${fixed_version}" 2>&1
-                ;;
-            cargo)
-                cargo update -p "$pkg" 2>&1
-                ;;
-        esac
-    done
-}
-```
-
-### npm Audit Auto-Fix
-
-```bash
-remediate_npm() {
-    if [[ -f package.json ]]; then
-        echo "Running npm audit fix..."
-        npm audit fix 2>&1
-
-        # For breaking changes, show what would need manual update
-        echo ""
-        echo "Checking for breaking changes requiring manual update..."
-        npm audit fix --dry-run --force 2>&1 | head -20
-    fi
-}
-```
-
-### Python Safety/pip-audit Auto-Fix
-
-```bash
-remediate_python() {
-    if [[ -f requirements.txt ]]; then
-        echo "Updating vulnerable Python packages..."
-
-        # Get vulnerable packages
-        if command -v pip-audit &>/dev/null; then
-            pip-audit --fix 2>&1
+    for svc in "\${PROJECT_NAME}-api" "\${PROJECT_NAME}s-api"; do
+        if systemctl is-active --quiet "\$svc" 2>/dev/null; then
+            SVC_USER=\$(systemctl show "\$svc" --property=User --value 2>/dev/null)
+            if [[ "\$SVC_USER" == "root" ]] || [[ -z "\$SVC_USER" ]]; then
+                echo "  ⚠️ Service runs as root"
+                TOTAL_ISSUES=\$((TOTAL_ISSUES + 1))
+            else
+                echo "  ✅ Service runs as: \$SVC_USER"
+            fi
+            break
         fi
+    done
 
-        # Regenerate requirements.txt
-        pip freeze > requirements.txt.new
-        echo "Updated requirements saved to requirements.txt.new"
-        echo "Review and rename to requirements.txt when ready"
+    # 3.3 Database Security
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  3.3 Database Security"
+    echo "───────────────────────────────────────────────────────────────────"
+
+    DB_FILES=\$(find "\$INSTALLED_APP_PATH" -name "*.db" -o -name "*.sqlite*" 2>/dev/null)
+    if [[ -n "\$DB_FILES" ]]; then
+        for db in \$DB_FILES; do
+            DB_PERMS=\$(stat -c "%a" "\$db" 2>/dev/null)
+            echo "  Database: \$(basename "\$db") - Permissions: \$DB_PERMS"
+        done
+    else
+        echo "  ℹ️ No SQLite databases found"
     fi
-}
-```
-
----
-
-## Report Format
-
-```markdown
-## Security Audit Report
-
-### GitHub Security Status
-| Feature | Status |
-|---------|--------|
-| Repository | [owner/repo] |
-| Dependabot Alerts | X open |
-| Secret Scanning | X alerts |
-| Code Scanning | X alerts |
-| Branch Protection | ✅/⚠️ |
-| Security Policy | ✅/⚠️ |
-
-### Dependabot Alerts
-| Severity | Package | Ecosystem | Fix Available |
-|----------|---------|-----------|---------------|
-| CRITICAL | [pkg] | pip | ✅ |
-| HIGH | [pkg] | npm | ✅ |
-
-### Secret Scanning Alerts
-| Type | State | Location |
-|------|-------|----------|
-| [type] | open | [file] |
-
-### Code Scanning Alerts
-| Severity | Rule | Location |
-|----------|------|----------|
-| [sev] | [desc] | file:line |
-
-### Local Vulnerabilities
-| Source | Package | Severity |
-|--------|---------|----------|
-| pip-audit | [pkg] | HIGH |
-| npm audit | [pkg] | MODERATE |
-
-### Code Vulnerability Patterns
-| Type | File | Line | Risk |
-|------|------|------|------|
-| SQL Injection | db.py | 45 | HIGH |
-
-### Secrets Detected
-| Type | File | Line | Severity |
-|------|------|------|----------|
-| API Key | config.py | 23 | CRITICAL |
-
-### Security Score: [0-100]
-
-### Remediation Summary
-- Auto-fixable: X issues
-- Manual required: Y issues
-- See: security-issues.json
-
-**Status**: ✅ SECURE / ⚠️ ISSUES / ❌ CRITICAL
-```
-
----
-
-## Integration with Phase 10
-
-Phase 10 (Auto-Fixing) should:
-
-1. Read `security-issues.json` if it exists
-2. For each issue with `fix_available: true`:
-   - Apply the appropriate remediation command
-   - Verify the fix worked
-   - Update the issues file
-3. For issues requiring manual intervention:
-   - Document clearly in the final report
-   - Provide specific remediation steps
-
-```bash
-# Phase 10 should include:
-if [[ -f security-issues.json ]]; then
-    echo "Processing security issues from Phase 5..."
-
-    # Count fixable vs manual
-    FIXABLE=$(jq '[.[] | select(.fix_available == true)] | length' security-issues.json)
-    MANUAL=$(jq '[.[] | select(.fix_available != true)] | length' security-issues.json)
-
-    echo "Auto-fixable: $FIXABLE"
-    echo "Manual required: $MANUAL"
-
-    # Process fixable issues
-    # ... remediation code ...
 fi
 ```
+
+---
+
+## Summary Report
+
+```bash
+echo ""
+echo "═══════════════════════════════════════════════════════════════════"
+echo "  PHASE 5: SECURITY AUDIT SUMMARY"
+echo "═══════════════════════════════════════════════════════════════════"
+echo ""
+echo "Tools Used:"
+command -v bandit &>/dev/null && echo "  ✅ bandit"
+command -v semgrep &>/dev/null && echo "  ✅ semgrep"
+command -v shellcheck &>/dev/null && echo "  ✅ shellcheck"
+command -v codeql &>/dev/null && echo "  ✅ codeql"
+command -v trivy &>/dev/null && echo "  ✅ trivy"
+command -v grype &>/dev/null && echo "  ✅ grype"
+command -v pip-audit &>/dev/null && echo "  ✅ pip-audit"
+command -v checkov &>/dev/null && echo "  ✅ checkov"
+echo ""
+echo "Results:"
+echo "  Total issues found:    \$TOTAL_ISSUES"
+echo "  Critical issues:       \$CRITICAL_ISSUES"
+echo "  Issues auto-fixed:     \$FIXED_ISSUES"
+echo "  Issues remaining:      \$((TOTAL_ISSUES - FIXED_ISSUES))"
+echo ""
+
+if [[ "\$CRITICAL_ISSUES" -gt 0 ]]; then
+    echo "Status: 🚨 CRITICAL - \$CRITICAL_ISSUES critical issue(s)"
+elif [[ "\$TOTAL_ISSUES" -gt "\$FIXED_ISSUES" ]]; then
+    echo "Status: ⚠️ ISSUES - \$((TOTAL_ISSUES - FIXED_ISSUES)) issue(s) need attention"
+elif [[ "\$TOTAL_ISSUES" -gt 0 ]]; then
+    echo "Status: ✅ MITIGATED - All issues auto-fixed"
+else
+    echo "Status: ✅ SECURE - No security issues found"
+fi
+echo ""
+echo "═══════════════════════════════════════════════════════════════════"
+```
+
+---
+
+## Integration Notes
+
+### Invocation:
+- `/test` - Phase 5 runs in Tier 3
+- `/test --phase=5` or `/test --phase=SEC` - Standalone
+- `/test --phase=5 --audit-only` - No auto-fixes
+
+### Auto-Mitigation:
+- Enables GitHub Dependabot/security features
+- Runs `pip-audit --fix` and `npm audit fix`
+- Fixes file permissions
+
+### Tool Requirements:
+| Tool | Install |
+|------|---------|
+| bandit | `pipx install bandit` |
+| semgrep | `pipx install semgrep` |
+| shellcheck | `pacman -S shellcheck` |
+| codeql | `yay -S codeql` |
+| trivy | `pacman -S trivy` |
+| grype | `yay -S grype-bin` |
+| pip-audit | `pipx install pip-audit` |
+| checkov | `pipx install checkov` |
