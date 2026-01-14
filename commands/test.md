@@ -1,7 +1,7 @@
 ---
 description: Modular project audit - testing, security, debugging, fixing (phase-based loading for context efficiency) (user)
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task
-argument-hint: "[help] [prodapp] [docker] [holistic] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
+argument-hint: "[help] [prodapp] [docker] [security] [holistic] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
 ---
 
 # Modular Project Audit (/test)
@@ -41,6 +41,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 /test                    # Full audit (autonomous - fixes everything)
 /test prodapp            # Validate installed production app (Phase P)
 /test docker             # Validate Docker image and registry (Phase D)
+/test security           # Comprehensive security audit (Phase 5/SEC)
 /test github             # Audit GitHub repository settings (Phase G)
 /test holistic           # Full-stack cross-component analysis (Phase H)
 /test --phase=A          # Run single phase
@@ -87,7 +88,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **G** | **GitHub** | **Audit GitHub repository security and settings** |
 | **H** | **Holistic** | **Full-stack cross-component analysis** |
 | 4 | Cleanup | Deprecation, dead code |
-| 5 | Security | Vulnerability scan |
+| **5/SEC** | **Security** | **Comprehensive security (GitHub + Local + Installed)** |
 | 6 | Dependencies | Package health |
 | 7 | Quality | Linting, complexity |
 | 8 | Coverage | Test coverage analysis |
@@ -97,6 +98,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | 12 | Verify | Final verification |
 | 13 | Docs | Documentation review |
 | C | Cleanup | Restore environment |
+| **ST** | **Self-Test** | **Validate test-skill framework (explicit only)** |
 
 ### Quick Dependency Reference
 
@@ -118,6 +120,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **13** | **7** | **12** | **YES (fixes docs)** | **None (ALWAYS RUNS)** |
 | **C** | **8** | **ALL** | **Cleans up** | **None (LAST)** |
 | A | Special | 1 | Sandbox only | Tier 3 |
+| **ST** | **Special** | **None** | **No (read-only)** | **None (ISOLATED)** |
 
 **Legend:**
 - Bolded phases are **execution gates** - they block until complete
@@ -125,6 +128,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 - Phase D is **conditional** - may be skipped if no Docker/registry detected (no prompts)
 - Phase G is **conditional** - may be skipped if no GitHub remote detected (no prompts)
 - Phase 13 **ALWAYS runs** - documentation must stay synchronized with code
+- Phase ST is **isolated** - ONLY runs when explicitly called with `--phase=ST` (never in normal runs)
 
 ### Phase P Conditional Execution
 
@@ -267,9 +271,15 @@ invalidated rollback points.
 │  │   Always runs regardless of prior failures (cleanup is mandatory)   │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
-│  SPECIAL PHASE (Independent track):                                         │
+│  SPECIAL PHASES (Independent tracks):                                        │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │ A (App Test) ─> Depends on 1, sandbox testing independent of main   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ ST (Self-Test) ─> ISOLATED: validates test-skill framework itself   │   │
+│  │   ⛔ NEVER included in normal /test runs                            │   │
+│  │   ⛔ ONLY runs when explicitly called: /test --phase=ST             │   │
+│  │   ✅ No dependencies - can run standalone                           │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -611,8 +621,10 @@ When `/test` is invoked:
 3. **Handle shortcuts:**
    - `prodapp` → `--phase=P` (production validation)
    - `docker` → `--phase=D` (Docker validation)
+   - `security` → `--phase=5` (comprehensive security audit)
    - `github` → `--phase=G` (GitHub repository audit)
    - `holistic` → `--phase=H` (full-stack cross-component analysis)
+   - `--phase=SEC` → `--phase=5` (alias for security phase)
 4. **Build execution plan from requested phases**
 
 ### Mode-Specific Behavior
@@ -757,6 +769,15 @@ ELSE (Autonomous - DEFAULT):
 - Always executes regardless of prior failures
 - Cleanup is mandatory for environment hygiene
 
+**Phase ST (Self-Test) - Explicit Only:**
+- Position: ISOLATED (never part of normal tier execution)
+- NEVER included in normal `/test` runs (not even full audit)
+- ONLY runs when explicitly called: `/test --phase=ST`
+- No dependencies - runs completely standalone
+- Purpose: Validates the test-skill framework itself (meta-testing)
+- Checks: Phase file existence, symlinks, dispatcher, tool availability
+- Use cases: After modifying phase files, updating symlinks, installing tools
+
 **When user requests only specific phases:**
 - Still enforce tier dependencies
 - Example: `/test --phase=5` still requires 1 (Discovery) to run first
@@ -782,9 +803,11 @@ For app deployment testing only:
 /test --phase=A
 ```
 
-For security-focused audit:
+For comprehensive security audit (standalone):
 ```
-/test --phase=5,6
+/test security
+# or: /test --phase=5
+# or: /test --phase=SEC
 ```
 
 For production validation (installed app):
@@ -805,6 +828,13 @@ For GitHub repository audit:
 ```
 This audits the project's GitHub repository for security settings (Dependabot, CodeQL, secret scanning, branch protection) and auto-enables missing security features.
 
+For test-skill framework validation (meta-testing):
+```
+/test --phase=ST
+```
+This validates the test-skill framework itself - phase files, symlinks, dispatcher, and tool availability.
+**Note:** Phase ST is NEVER included in normal `/test` runs. It only runs when explicitly called.
+
 ---
 
-*Document Version: 1.0.1.2*
+*Document Version: 1.0.1.3*
