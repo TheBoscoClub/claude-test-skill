@@ -48,6 +48,75 @@ pkill -f "pytest\|jest\|vitest" 2>/dev/null || true
 unset NODE_ENV FLASK_ENV DJANGO_SETTINGS_MODULE GO_ENV RUST_TEST
 ```
 
+### 3a. Disable Auto-Enabled MCP Servers
+
+Restore MCP servers to their pre-test state:
+
+```bash
+restore_mcp_servers() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local SETTINGS_FILE="$HOME/.claude/settings.json"
+    local MCP_ENABLED_FILE="${PROJECT_DIR}/.test-mcp-enabled"
+
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  MCP Server Cleanup"
+    echo "───────────────────────────────────────────────────────────────────"
+
+    # Check if we have a list of enabled servers
+    if [ ! -f "$MCP_ENABLED_FILE" ]; then
+        echo "  ✓ No MCP servers were auto-enabled (nothing to restore)"
+        return 0
+    fi
+
+    # Check if settings file is writable
+    if [ ! -w "$SETTINGS_FILE" ]; then
+        echo "  ⚠️ Cannot modify settings.json (not writable)"
+        echo "     MCP servers remain enabled"
+        rm -f "$MCP_ENABLED_FILE"
+        return 1
+    fi
+
+    # Disable each server that was enabled
+    local disabled_count=0
+    while IFS= read -r plugin; do
+        [ -z "$plugin" ] && continue
+
+        local plugin_key="${plugin}@claude-plugins-official"
+
+        # Check if still enabled (might have been manually disabled)
+        if grep -q "\"$plugin_key\": true" "$SETTINGS_FILE" 2>/dev/null; then
+            echo "  🔌 Disabling $plugin..."
+
+            # Use sed to disable (replace true with false)
+            sed -i "s/\"$plugin_key\": true/\"$plugin_key\": false/" "$SETTINGS_FILE"
+
+            echo "    ✅ Disabled $plugin"
+            ((disabled_count++))
+        else
+            echo "  ✓ $plugin already disabled"
+        fi
+    done < "$MCP_ENABLED_FILE"
+
+    # Remove the tracking file
+    rm -f "$MCP_ENABLED_FILE"
+    echo ""
+    echo "  📝 Removed tracking file: $MCP_ENABLED_FILE"
+    echo ""
+    echo "MCP Servers Restored: $disabled_count disabled"
+}
+
+restore_mcp_servers
+```
+
+**What This Does:**
+1. Reads `.test-mcp-enabled` to find which servers were auto-enabled
+2. Disables each server in `settings.json`
+3. Removes the tracking file
+4. Reports what was restored
+
+**Note:** If the user manually enabled a server during testing that was in the list, it will still be disabled. This ensures clean restoration to pre-test state.
+
 ### 4. BTRFS Snapshot Restore (Optional)
 
 ```bash
@@ -98,6 +167,11 @@ Removed:
 Environment:
   ✅ Test env vars unset
   ✅ Services stopped
+
+MCP Servers:
+  🔌 Disabled playwright (was auto-enabled)
+  🔌 Disabled pyright-lsp (was auto-enabled)
+  ✅ 2 servers restored to pre-test state
 
 Snapshots:
   📸 /snapshots/audit/audit-20231215-143022-myproject

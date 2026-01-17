@@ -137,7 +137,230 @@ check_tool "cargo-audit" "cargo-audit"
 export TOOLS_AVAILABLE
 ```
 
-### 4b. Detect GitHub Repository
+### 4b. Detect Available MCP Servers
+
+Detect which MCP (Model Context Protocol) servers are available for enhanced testing:
+
+```bash
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  Available MCP Servers"
+echo "───────────────────────────────────────────────────────────────────"
+
+detect_mcp_servers() {
+    local SETTINGS_FILE="$HOME/.claude/settings.json"
+    declare -A MCP_AVAILABLE
+
+    if [ ! -f "$SETTINGS_FILE" ]; then
+        echo "  ⚪ No Claude settings found"
+        echo "MCP Servers: none"
+        return 0
+    fi
+
+    # Check for enabled plugins that provide MCP functionality
+    echo ""
+    echo "  Testing/Automation:"
+
+    # Playwright - E2E browser testing
+    if grep -q '"playwright@claude-plugins-official": true' "$SETTINGS_FILE" 2>/dev/null; then
+        echo "    ✅ playwright (E2E browser testing)"
+        MCP_AVAILABLE["playwright"]=1
+    else
+        echo "    ⚪ playwright (disabled - enable for E2E testing)"
+        MCP_AVAILABLE["playwright"]=0
+    fi
+
+    echo ""
+    echo "  Code Intelligence:"
+
+    # LSP servers for type checking and diagnostics
+    for lsp in pyright-lsp typescript-lsp rust-analyzer-lsp gopls-lsp clangd-lsp; do
+        if grep -q "\"${lsp}@claude-plugins-official\": true" "$SETTINGS_FILE" 2>/dev/null; then
+            echo "    ✅ $lsp"
+            MCP_AVAILABLE["$lsp"]=1
+        fi
+    done
+
+    echo ""
+    echo "  Codebase Analysis:"
+
+    # Context7 - codebase context
+    if grep -q '"context7@claude-plugins-official": true' "$SETTINGS_FILE" 2>/dev/null; then
+        echo "    ✅ context7 (codebase context)"
+        MCP_AVAILABLE["context7"]=1
+    else
+        echo "    ⚪ context7 (disabled)"
+        MCP_AVAILABLE["context7"]=0
+    fi
+
+    # Greptile - code search
+    if grep -q '"greptile@claude-plugins-official": true' "$SETTINGS_FILE" 2>/dev/null; then
+        echo "    ✅ greptile (code search)"
+        MCP_AVAILABLE["greptile"]=1
+    else
+        echo "    ⚪ greptile (disabled)"
+        MCP_AVAILABLE["greptile"]=0
+    fi
+
+    # Count enabled MCP servers
+    local mcp_count=0
+    for key in "${!MCP_AVAILABLE[@]}"; do
+        if [ "${MCP_AVAILABLE[$key]}" -eq 1 ]; then
+            ((mcp_count++))
+        fi
+    done
+
+    echo ""
+    echo "MCP Servers Available: $mcp_count"
+
+    # Export for other phases
+    export MCP_AVAILABLE
+}
+
+detect_mcp_servers
+```
+
+**MCP Server Usage in /test Phases:**
+
+| MCP Server | Phase | Usage |
+|------------|-------|-------|
+| **playwright** | A, 2a | Run E2E browser tests for web UIs |
+| **pyright-lsp** | 7 | Real-time Python type checking with project context |
+| **typescript-lsp** | 7 | TypeScript type checking and diagnostics |
+| **rust-analyzer-lsp** | 7 | Rust analysis and diagnostics |
+| **gopls-lsp** | 7 | Go analysis and diagnostics |
+| **clangd-lsp** | 7 | C/C++ analysis and diagnostics |
+| **context7** | 1, 5 | Enhanced codebase understanding |
+| **greptile** | 1 | Semantic code search |
+
+**Note:** When MCP servers are available, phases should prefer them over CLI tools for richer, context-aware analysis.
+
+### 4b-2. Auto-Enable MCP Servers for Testing
+
+When certain MCP servers would benefit testing but are disabled, `/test` can temporarily enable them:
+
+```bash
+auto_enable_mcp_servers() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local SETTINGS_FILE="$HOME/.claude/settings.json"
+    local MCP_ENABLED_FILE="${PROJECT_DIR}/.test-mcp-enabled"
+    local ENABLED_SERVERS=()
+
+    # Check if settings file is writable
+    if [ ! -w "$SETTINGS_FILE" ]; then
+        echo "  ⚠️ Cannot modify settings.json (not writable)"
+        return 1
+    fi
+
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  Auto-Enable MCP Servers"
+    echo "───────────────────────────────────────────────────────────────────"
+
+    # Determine which servers would help this project
+    local NEED_PLAYWRIGHT=false
+    local NEED_PYRIGHT=false
+    local NEED_TYPESCRIPT=false
+
+    # Check for web UI (needs playwright)
+    if [[ -d "$PROJECT_DIR/frontend" ]] || \
+       [[ -d "$PROJECT_DIR/web" ]] || \
+       [[ -f "$PROJECT_DIR/index.html" ]] || \
+       grep -qE "react|vue|angular|svelte|next" "$PROJECT_DIR/package.json" 2>/dev/null; then
+        NEED_PLAYWRIGHT=true
+    fi
+
+    # Check for Python (needs pyright-lsp)
+    if find "$PROJECT_DIR" -name "*.py" -not -path "*/.venv/*" -not -path "*/venv/*" | head -1 | grep -q .; then
+        NEED_PYRIGHT=true
+    fi
+
+    # Check for TypeScript (needs typescript-lsp)
+    if [[ -f "$PROJECT_DIR/tsconfig.json" ]] || \
+       find "$PROJECT_DIR" -name "*.ts" -o -name "*.tsx" 2>/dev/null | head -1 | grep -q .; then
+        NEED_TYPESCRIPT=true
+    fi
+
+    # Enable needed but disabled servers
+    enable_plugin() {
+        local plugin="$1"
+        local plugin_key="${plugin}@claude-plugins-official"
+
+        # Check if disabled
+        if grep -q "\"$plugin_key\": false" "$SETTINGS_FILE" 2>/dev/null; then
+            echo "  🔌 Enabling $plugin for testing..."
+
+            # Use sed to enable (replace false with true)
+            sed -i "s/\"$plugin_key\": false/\"$plugin_key\": true/" "$SETTINGS_FILE"
+
+            # Track for cleanup
+            ENABLED_SERVERS+=("$plugin")
+            echo "    ✅ Enabled $plugin"
+            return 0
+        else
+            echo "  ✓ $plugin already enabled or not installed"
+            return 1
+        fi
+    }
+
+    # Enable servers based on project needs
+    if $NEED_PLAYWRIGHT; then
+        if grep -q '"playwright@claude-plugins-official": false' "$SETTINGS_FILE" 2>/dev/null; then
+            enable_plugin "playwright"
+        fi
+    fi
+
+    if $NEED_PYRIGHT; then
+        if grep -q '"pyright-lsp@claude-plugins-official": false' "$SETTINGS_FILE" 2>/dev/null; then
+            enable_plugin "pyright-lsp"
+        fi
+    fi
+
+    if $NEED_TYPESCRIPT; then
+        if grep -q '"typescript-lsp@claude-plugins-official": false' "$SETTINGS_FILE" 2>/dev/null; then
+            enable_plugin "typescript-lsp"
+        fi
+    fi
+
+    # Save list of enabled servers for cleanup
+    if [ ${#ENABLED_SERVERS[@]} -gt 0 ]; then
+        printf '%s\n' "${ENABLED_SERVERS[@]}" > "$MCP_ENABLED_FILE"
+        echo ""
+        echo "  📝 Saved enabled servers list to: $MCP_ENABLED_FILE"
+        echo "     (Phase C will disable these during cleanup)"
+    else
+        echo ""
+        echo "  ✓ No servers needed to be enabled"
+    fi
+
+    echo ""
+    echo "MCP Servers Auto-Enabled: ${#ENABLED_SERVERS[@]}"
+    for server in "${ENABLED_SERVERS[@]}"; do
+        echo "  - $server"
+    done
+
+    export MCP_ENABLED_SERVERS=("${ENABLED_SERVERS[@]}")
+}
+
+# Run auto-enable if not in read-only mode
+if [ "${TEST_READONLY:-false}" != "true" ]; then
+    auto_enable_mcp_servers
+fi
+```
+
+**Auto-Enable Rules:**
+
+| Project Has | MCP Server | Action |
+|-------------|------------|--------|
+| Web UI (React, Vue, etc.) | playwright | Enable for E2E testing |
+| Python files | pyright-lsp | Enable for type checking |
+| TypeScript files | typescript-lsp | Enable for TS diagnostics |
+| Go files | gopls-lsp | Enable for Go analysis |
+| Rust files | rust-analyzer-lsp | Enable for Rust analysis |
+
+**Important:** All auto-enabled servers are tracked in `.test-mcp-enabled` and will be disabled during Phase C (Cleanup).
+
+### 4c. Detect GitHub Repository
 
 Check if the local project has a corresponding GitHub repository:
 
@@ -500,6 +723,44 @@ Test Command: [command]
 Config Files: [list]
 
 ─────────────────────────────────────────────────────────────────
+  ISOLATION LEVEL
+─────────────────────────────────────────────────────────────────
+
+Danger Score: [score]
+Isolation Level: [sandbox|sandbox-warn|vm-recommended|vm-required]
+Danger Indicators: [list or "none"]
+
+Phase M/V Recommendation:
+  - sandbox: Use Phase M (standard mocking/containerization)
+  - sandbox-warn: Use Phase M with extra monitoring
+  - vm-recommended: Prefer Phase V if VM available
+  - vm-required: MUST use Phase V - abort if no VM
+
+─────────────────────────────────────────────────────────────────
+  MCP SERVERS
+─────────────────────────────────────────────────────────────────
+
+MCP Servers Available: [count]
+
+Testing/Automation:
+  playwright: [Enabled|Disabled]
+
+Code Intelligence (LSP):
+  pyright-lsp: [Enabled|Disabled]
+  typescript-lsp: [Enabled|Disabled]
+  rust-analyzer-lsp: [Enabled|Disabled]
+  gopls-lsp: [Enabled|Disabled]
+  clangd-lsp: [Enabled|Disabled]
+
+Codebase Analysis:
+  context7: [Enabled|Disabled]
+  greptile: [Enabled|Disabled]
+
+MCP Recommendations:
+  - Phase 7 (Quality): Use LSP servers for [language] type checking
+  - Phase A/2a (Testing): Use playwright for E2E tests (if web UI detected)
+
+─────────────────────────────────────────────────────────────────
   GITHUB REPOSITORY
 ─────────────────────────────────────────────────────────────────
 
@@ -551,6 +812,246 @@ Phase D Recommendation: [SKIP|RUN|PROMPT]
   - RUN: Dockerfile exists and registry package found
   - PROMPT: Dockerfile exists but no registry package found
 ```
+
+## Isolation Level Detection
+
+Determine whether sandbox (Phase M) or full VM (Phase V) isolation is required for safe testing.
+
+### Danger Pattern Detection
+
+```bash
+detect_isolation_level() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local ISOLATION_LEVEL="sandbox"  # Default: safe for sandbox
+    local DANGER_SCORE=0
+    local DANGER_INDICATORS=()
+
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  Isolation Level Detection"
+    echo "───────────────────────────────────────────────────────────────────"
+
+    # === CRITICAL: System Authentication & Security ===
+
+    # PAM modifications (can lock you out of your system)
+    if grep -rqE "pam\.d|pam_|libpam|security/pam" "$PROJECT_DIR" --include="*.sh" --include="*.py" --include="*.conf" --include="Makefile" 2>/dev/null; then
+        DANGER_INDICATORS+=("PAM configuration changes detected")
+        ((DANGER_SCORE += 100))
+    fi
+
+    # PAM config files in project
+    if find "$PROJECT_DIR" -name "*.pam" -o -name "*pam*.conf" 2>/dev/null | grep -q .; then
+        DANGER_INDICATORS+=("PAM config files in project")
+        ((DANGER_SCORE += 100))
+    fi
+
+    # sudo/polkit rules
+    if grep -rqE "sudoers|polkit|pkla|\.rules" "$PROJECT_DIR" --include="*.sh" --include="*.py" --include="*.rules" 2>/dev/null; then
+        DANGER_INDICATORS+=("sudo/polkit rules modifications")
+        ((DANGER_SCORE += 80))
+    fi
+
+    # === CRITICAL: Boot & Kernel ===
+
+    # Bootloader modifications (systemd-boot, grub)
+    if grep -rqE "bootctl|efibootmgr|grub-|loader/entries|cmdline|kernel-install" "$PROJECT_DIR" --include="*.sh" --include="*.py" 2>/dev/null; then
+        DANGER_INDICATORS+=("Bootloader/kernel parameter changes")
+        ((DANGER_SCORE += 100))
+    fi
+
+    # Kernel modules
+    if grep -rqE "modprobe|insmod|rmmod|\.ko\b|depmod|/lib/modules" "$PROJECT_DIR" --include="*.sh" --include="*.py" 2>/dev/null; then
+        DANGER_INDICATORS+=("Kernel module operations")
+        ((DANGER_SCORE += 90))
+    fi
+
+    # sysctl modifications
+    if grep -rqE "sysctl\s+-w|sysctl\.d|/proc/sys" "$PROJECT_DIR" --include="*.sh" --include="*.py" --include="*.conf" 2>/dev/null; then
+        DANGER_INDICATORS+=("sysctl kernel parameter changes")
+        ((DANGER_SCORE += 70))
+    fi
+
+    # === HIGH: System Services ===
+
+    # Systemd system-level services (not user-level)
+    if grep -rqE "/etc/systemd/system|systemctl\s+(enable|disable|mask)\s+[^-]|systemctl\s+daemon-reload" "$PROJECT_DIR" --include="*.sh" --include="*.py" 2>/dev/null; then
+        DANGER_INDICATORS+=("System-level systemd service modifications")
+        ((DANGER_SCORE += 80))
+    fi
+
+    # System service files in project (*.service not in user paths)
+    if find "$PROJECT_DIR" -name "*.service" -exec grep -L "WantedBy=default.target" {} \; 2>/dev/null | grep -q .; then
+        DANGER_INDICATORS+=("System-level service files detected")
+        ((DANGER_SCORE += 60))
+    fi
+
+    # init.d scripts
+    if find "$PROJECT_DIR" -path "*/init.d/*" -o -name "*.init" 2>/dev/null | grep -q .; then
+        DANGER_INDICATORS+=("init.d scripts detected")
+        ((DANGER_SCORE += 60))
+    fi
+
+    # === HIGH: Display & Graphics ===
+
+    # Display manager config (SDDM, GDM, LightDM)
+    if grep -rqE "sddm|gdm|lightdm|/etc/X11|xorg\.conf|Xsetup|Xsession" "$PROJECT_DIR" --include="*.sh" --include="*.conf" --include="*.py" 2>/dev/null; then
+        DANGER_INDICATORS+=("Display manager configuration changes")
+        ((DANGER_SCORE += 80))
+    fi
+
+    # Wayland/X11 compositor config
+    if grep -rqE "kwinrc|mutter|weston|sway/config|hyprland" "$PROJECT_DIR" --include="*.sh" --include="*.conf" 2>/dev/null; then
+        DANGER_INDICATORS+=("Window compositor configuration")
+        ((DANGER_SCORE += 50))
+    fi
+
+    # === HIGH: D-Bus System Bus ===
+
+    # D-Bus system configuration (not session)
+    if grep -rqE "/etc/dbus-1|dbus-1/system\.d|org\.freedesktop\.(systemd|login|UDisks|NetworkManager)" "$PROJECT_DIR" --include="*.sh" --include="*.conf" --include="*.py" 2>/dev/null; then
+        DANGER_INDICATORS+=("D-Bus system bus modifications")
+        ((DANGER_SCORE += 70))
+    fi
+
+    # === MEDIUM: Hardware & Devices ===
+
+    # udev rules
+    if find "$PROJECT_DIR" -name "*.rules" 2>/dev/null | xargs grep -l "SUBSYSTEM\|KERNEL\|ATTR" 2>/dev/null | grep -q .; then
+        DANGER_INDICATORS+=("udev rules detected")
+        ((DANGER_SCORE += 60))
+    fi
+
+    # Device management
+    if grep -rqE "udisksctl|lsblk.*-o|blkid|mount\s+-o|umount|mkfs\.|parted|fdisk|gdisk" "$PROJECT_DIR" --include="*.sh" --include="*.py" 2>/dev/null; then
+        DANGER_INDICATORS+=("Disk/device management operations")
+        ((DANGER_SCORE += 70))
+    fi
+
+    # === MEDIUM: Network ===
+
+    # Network configuration (system-level)
+    if grep -rqE "/etc/systemd/network|/etc/NetworkManager|nmcli\s+con|ifconfig|ip\s+(addr|link|route)" "$PROJECT_DIR" --include="*.sh" --include="*.py" --include="*.conf" 2>/dev/null; then
+        DANGER_INDICATORS+=("Network configuration changes")
+        ((DANGER_SCORE += 50))
+    fi
+
+    # Firewall rules
+    if grep -rqE "iptables|nftables|firewall-cmd|ufw" "$PROJECT_DIR" --include="*.sh" --include="*.py" 2>/dev/null; then
+        DANGER_INDICATORS+=("Firewall rule modifications")
+        ((DANGER_SCORE += 50))
+    fi
+
+    # === MEDIUM: Package Management ===
+
+    # System package manager operations
+    if grep -rqE "pacman\s+-S|apt\s+install|dnf\s+install|yum\s+install|zypper\s+in" "$PROJECT_DIR" --include="*.sh" --include="*.py" 2>/dev/null; then
+        DANGER_INDICATORS+=("System package installation")
+        ((DANGER_SCORE += 40))
+    fi
+
+    # === LOW: Filesystem ===
+
+    # BTRFS subvolume operations
+    if grep -rqE "btrfs\s+subvolume|btrfs\s+property" "$PROJECT_DIR" --include="*.sh" --include="*.py" 2>/dev/null; then
+        DANGER_INDICATORS+=("BTRFS subvolume operations")
+        ((DANGER_SCORE += 30))
+    fi
+
+    # fstab modifications
+    if grep -rqE "/etc/fstab|systemctl\s+daemon-reload.*mount" "$PROJECT_DIR" --include="*.sh" --include="*.py" 2>/dev/null; then
+        DANGER_INDICATORS+=("fstab mount modifications")
+        ((DANGER_SCORE += 60))
+    fi
+
+    # === Determine Isolation Level ===
+
+    # Thresholds:
+    # 0-29:   sandbox (safe - app logic only)
+    # 30-59:  sandbox-warn (sandbox OK but be careful)
+    # 60-99:  vm-recommended (VM strongly recommended)
+    # 100+:   vm-required (MUST use VM)
+
+    if [ "$DANGER_SCORE" -ge 100 ]; then
+        ISOLATION_LEVEL="vm-required"
+    elif [ "$DANGER_SCORE" -ge 60 ]; then
+        ISOLATION_LEVEL="vm-recommended"
+    elif [ "$DANGER_SCORE" -ge 30 ]; then
+        ISOLATION_LEVEL="sandbox-warn"
+    else
+        ISOLATION_LEVEL="sandbox"
+    fi
+
+    # Output results
+    echo ""
+    echo "  Danger Score: $DANGER_SCORE"
+    echo "  Isolation Level: $ISOLATION_LEVEL"
+    echo ""
+
+    if [ ${#DANGER_INDICATORS[@]} -gt 0 ]; then
+        echo "  Danger Indicators Found:"
+        for indicator in "${DANGER_INDICATORS[@]}"; do
+            echo "    ⚠️  $indicator"
+        done
+    else
+        echo "  ✅ No dangerous patterns detected"
+    fi
+
+    echo ""
+
+    # Export for other phases
+    export ISOLATION_LEVEL DANGER_SCORE
+
+    # Machine-readable output
+    echo "Isolation Level: $ISOLATION_LEVEL"
+    echo "Danger Score: $DANGER_SCORE"
+    echo "Danger Indicators: ${DANGER_INDICATORS[*]:-none}"
+}
+
+detect_isolation_level
+```
+
+### Isolation Level Meanings
+
+| Level | Score | Meaning | Testing Approach |
+|-------|-------|---------|------------------|
+| `sandbox` | 0-29 | Safe for containerized testing | Use Phase M (mocking/sandbox) |
+| `sandbox-warn` | 30-59 | Sandbox OK but monitor closely | Use Phase M with extra logging |
+| `vm-recommended` | 60-99 | VM isolation strongly recommended | Prefer Phase V if available |
+| `vm-required` | 100+ | **MUST use VM isolation** | Phase V mandatory; abort if no VM |
+
+### Dispatcher Integration
+
+When the dispatcher sees `ISOLATION_LEVEL`:
+
+```
+IF ISOLATION_LEVEL == "vm-required":
+    IF no VM available (Phase V prerequisites not met):
+        ABORT with "CRITICAL: This project requires VM isolation but no VM is available"
+        EXIT 1
+    ELSE:
+        LOG "VM isolation required - Phase V will be used"
+        SET USE_VM=true
+
+ELIF ISOLATION_LEVEL == "vm-recommended":
+    IF VM available:
+        LOG "VM isolation recommended and available - using Phase V"
+        SET USE_VM=true
+    ELSE:
+        WARN "VM isolation recommended but not available"
+        WARN "Proceeding with sandbox (Phase M) - exercise caution"
+        SET USE_VM=false
+
+ELIF ISOLATION_LEVEL == "sandbox-warn":
+    LOG "Sandbox isolation with monitoring"
+    SET USE_VM=false
+    SET EXTRA_MONITORING=true
+
+ELSE:  # sandbox
+    LOG "Standard sandbox isolation sufficient"
+    SET USE_VM=false
+```
+
+---
 
 ## Phase P Gate Decision
 

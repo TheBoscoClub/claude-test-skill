@@ -2,6 +2,40 @@
 
 Comprehensive linting, formatting, complexity analysis, and style checks using all available tools.
 
+## MCP/LSP Server Integration
+
+When LSP servers are available (detected in Phase 1), **prefer them over CLI tools** for richer, project-aware analysis:
+
+| Language | LSP Server | Advantages over CLI |
+|----------|------------|---------------------|
+| Python | pyright-lsp | Full project context, cross-file type inference, faster |
+| TypeScript/JS | typescript-lsp | Real-time diagnostics, project-wide analysis |
+| Rust | rust-analyzer-lsp | Incremental analysis, macro expansion |
+| Go | gopls-lsp | Project-aware analysis, cross-package refs |
+| C/C++ | clangd-lsp | Compile-command aware, accurate diagnostics |
+
+### Using LSP Servers
+
+If LSP servers are enabled (from Discovery `MCP_AVAILABLE`):
+
+```
+# For Python projects with pyright-lsp enabled:
+1. Invoke pyright-lsp diagnostics for the project
+2. Collect type errors, undefined references, import issues
+3. Still run ruff/black for formatting (LSP doesn't format)
+
+# For TypeScript projects with typescript-lsp enabled:
+1. Invoke typescript-lsp diagnostics
+2. Collect type errors, unused variables, unreachable code
+3. Still run prettier/eslint for formatting and style
+
+# General pattern:
+- LSP for type checking and semantic analysis
+- CLI tools for formatting and style enforcement
+```
+
+**Note:** When both LSP and CLI tools are available, run both but deduplicate issues. LSP diagnostics are often more accurate for type-related issues.
+
 ## Execution Steps
 
 ### 1. Python Linting & Type Checking

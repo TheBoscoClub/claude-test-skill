@@ -4,6 +4,76 @@
 
 Test the project's **deployable/installable application** separately from the source code. This ensures end users have a smooth experience with installation, updates, and migrations.
 
+## MCP: Playwright Integration
+
+When the **playwright MCP server** is enabled and the app has a web UI, use it for E2E browser testing:
+
+### Web UI Detection
+
+```bash
+detect_web_ui() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+
+    # Check for web UI indicators
+    if [[ -d "$PROJECT_DIR/src/frontend" ]] || \
+       [[ -d "$PROJECT_DIR/frontend" ]] || \
+       [[ -d "$PROJECT_DIR/web" ]] || \
+       [[ -d "$PROJECT_DIR/static" ]] || \
+       [[ -f "$PROJECT_DIR/index.html" ]] || \
+       grep -q "react\|vue\|angular\|svelte" "$PROJECT_DIR/package.json" 2>/dev/null; then
+        echo "web-app"
+        return 0
+    fi
+
+    # Check for API with potential web interface
+    if grep -qE "flask|fastapi|express|django" "$PROJECT_DIR/requirements.txt" "$PROJECT_DIR/package.json" 2>/dev/null; then
+        echo "web-api"
+        return 0
+    fi
+
+    return 1
+}
+```
+
+### Playwright E2E Testing
+
+When Playwright MCP is available (`MCP_AVAILABLE["playwright"]=1` from Discovery):
+
+```
+# E2E Test Flow:
+1. Start the application in sandbox (or connect to running instance)
+2. Use playwright MCP to:
+   - Navigate to key pages
+   - Test login/auth flows
+   - Submit forms and verify responses
+   - Check for JavaScript errors in console
+   - Verify responsive design (multiple viewports)
+   - Test accessibility (WCAG compliance)
+   - Capture screenshots for regression testing
+
+# Key playwright MCP actions:
+- browser_navigate: Load pages
+- browser_click: Interact with elements
+- browser_fill: Enter form data
+- browser_screenshot: Visual capture
+- browser_evaluate: Run JS assertions
+```
+
+### Example Playwright Test Sequence
+
+```
+IF MCP_AVAILABLE["playwright"] == 1 AND detect_web_ui():
+    1. browser_navigate to http://localhost:${APP_PORT}
+    2. browser_screenshot for baseline
+    3. For each critical flow (login, main action, etc.):
+       - Perform actions
+       - Verify expected state
+       - Capture any console errors
+    4. Report: Pages tested, errors found, screenshots captured
+```
+
+**Note:** Playwright testing is non-blocking. If Playwright is unavailable, skip to standard functional testing.
+
 ## When to Run This Phase
 
 Run this phase when the project has:

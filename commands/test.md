@@ -44,10 +44,12 @@ This skill operates **entirely non-interactively** except in extremely rare case
 /test security           # Comprehensive security audit (Phase 5/SEC)
 /test github             # Audit GitHub repository settings (Phase G)
 /test holistic           # Full-stack cross-component analysis (Phase H)
+/test --phase=V          # Force VM testing (Phase V)
 /test --phase=A          # Run single phase
 /test --phase=0-3        # Run phase range
 /test --list-phases      # Show available phases
 /test --interactive      # Enable interactive mode (prompts, manual items allowed)
+/test --force-sandbox    # DANGEROUS: Skip VM requirement for vm-required projects
 /test --phase=5 --interactive  # Combine with other options
 /test help               # Show help
 ```
@@ -87,6 +89,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **D** | **Docker** | **Validate Docker image and registry package** |
 | **G** | **GitHub** | **Audit GitHub repository security and settings** |
 | **H** | **Holistic** | **Full-stack cross-component analysis** |
+| **V** | **VM Testing** | **Heavy isolation testing in libvirt/QEMU VM** |
 | 4 | Cleanup | Deprecation, dead code |
 | **5/SEC** | **Security** | **Comprehensive security (GitHub + Local + Installed)** |
 | 6 | Dependencies | Package health |
@@ -120,6 +123,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **13** | **7** | **12** | **YES (fixes docs)** | **None (ALWAYS RUNS)** |
 | **C** | **8** | **ALL** | **Cleans up** | **None (LAST)** |
 | A | Special | 1 | Sandbox only | Tier 3 |
+| **V** | **Special** | **1 (isolation-required)** | **VM only** | **None (CONDITIONAL)** |
 | **ST** | **Special** | **None** | **No (read-only)** | **None (ISOLATED)** |
 
 **Legend:**
@@ -127,6 +131,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 - Phase P is **conditional** - may be skipped based on Discovery results (no prompts)
 - Phase D is **conditional** - may be skipped if no Docker/registry detected (no prompts)
 - Phase G is **conditional** - may be skipped if no GitHub remote detected (no prompts)
+- Phase V is **conditional** - runs when `ISOLATION_LEVEL` is `vm-required` or `vm-recommended`
 - Phase 13 **ALWAYS runs** - documentation must stay synchronized with code
 - Phase ST is **isolated** - ONLY runs when explicitly called with `--phase=ST` (never in normal runs)
 
@@ -167,6 +172,54 @@ Phase G (GitHub Audit) execution depends on Discovery (Phase 1) results:
 | exists | `authenticated` | **RUN** - Full GitHub repository audit |
 
 When Phase G is skipped, Phase 12 (Verify) proceeds after Phase D (or P if D skipped, or 10 if both skipped).
+
+### Phase V (VM Testing) Conditional Execution
+
+Phase V execution depends on **both** Discovery (Phase 1) isolation analysis AND Pre-Flight (Phase 0) VM availability:
+
+| Discovery: Isolation Level | Pre-Flight: VM Available | Phase V Action |
+|---------------------------|-------------------------|----------------|
+| `sandbox` | Any | **SKIP** - Sandbox (Phase M) sufficient |
+| `sandbox-warn` | Any | **SKIP** - Sandbox with monitoring |
+| `vm-recommended` | `false` | **WARN + SKIP** - Proceed with sandbox (caution) |
+| `vm-recommended` | `true` | **RUN** - Use VM for safer testing |
+| `vm-required` | `false` | **⛔ ABORT** - Cannot safely test this project |
+| `vm-required` | `true` | **RUN** - VM isolation mandatory |
+
+**Isolation Level Detection** (performed by Discovery):
+- Scans project for dangerous patterns: PAM configs, kernel params, systemd services, bootloader, etc.
+- Calculates `DANGER_SCORE` based on weighted pattern matches
+- Outputs `ISOLATION_LEVEL`: `sandbox`, `sandbox-warn`, `vm-recommended`, or `vm-required`
+
+**VM Availability Detection** (performed by Pre-Flight):
+- Checks for libvirt/virsh installation and libvirtd service
+- Lists existing VMs (especially test VMs matching `*-test`, `*-dev` patterns)
+- Detects ISO library for creating new VMs if needed
+- Checks SSH connectivity to running test VMs
+- Optionally detects physical test hardware (Raspberry Pi, spare systems)
+
+**Critical Safety Rule:**
+If `ISOLATION_LEVEL == "vm-required"` and `VM_AVAILABLE == false`:
+```
+⛔ CRITICAL: This project modifies system authentication, kernel, or boot configuration.
+⛔ Testing these changes requires VM isolation to prevent bricking the host system.
+⛔ No VM available. Aborting audit to protect host integrity.
+
+To proceed:
+1. Set up a test VM: virsh define /path/to/vm.xml
+2. Or explicitly bypass (DANGEROUS): /test --force-sandbox
+```
+
+### Phase M vs Phase V Selection
+
+The dispatcher automatically selects the appropriate isolation:
+
+| Isolation Level | Phase M (Sandbox) | Phase V (VM) |
+|-----------------|-------------------|--------------|
+| `sandbox` | ✅ Used | ⚪ Skipped |
+| `sandbox-warn` | ✅ Used (monitoring) | ⚪ Skipped |
+| `vm-recommended` | ⚠️ Fallback if no VM | ✅ Preferred |
+| `vm-required` | ⛔ Never (abort) | ✅ Mandatory |
 
 ## Phase Dependencies & Execution Order
 
@@ -313,13 +366,15 @@ function executeAudit(requestedPhases):
         executionPlan.append({phases: tier0, parallel: true, gate: "SAFETY"})
 
     # TIER 1: Discovery (sequential - BLOCKER)
-    # Discovery ALSO determines Phase P recommendation
+    # Discovery ALSO determines Phase P recommendation AND isolation level
     if 1 in requestedPhases:
         executionPlan.append({phases: [1], parallel: false, gate: "DISCOVERY"})
         # After Discovery completes, extract:
         #   - phasePRecommendation: "SKIP" | "RUN" | "PROMPT"
         #   - installableApp: type of app (or "none")
         #   - productionStatus: installation status
+        #   - isolationLevel: "sandbox" | "sandbox-warn" | "vm-recommended" | "vm-required"
+        #   - dangerScore: numeric score from pattern detection
 
     # TIER 2: Test Execution (parallel within tier)
     tier2 = intersection(requestedPhases, [2, 2a])
@@ -416,6 +471,38 @@ function executeAudit(requestedPhases):
                 abort("Critical gate failed: " + tier.gate)
             else:
                 warn("Gate " + tier.gate + " had failures")
+
+        # ISOLATION LEVEL GATE (after Discovery completes)
+        if tier.gate == "DISCOVERY":
+            # Check isolation requirements vs VM availability
+            if isolationLevel == "vm-required" and not vmAvailable:
+                abort("""
+⛔ CRITICAL: This project requires VM isolation.
+⛔ Danger Score: {dangerScore}
+⛔ Indicators: {dangerIndicators}
+⛔ No VM available. Aborting to protect host system.
+
+To proceed:
+1. Set up a test VM: virsh start <vm-name>
+2. Or bypass (DANGEROUS): /test --force-sandbox
+""")
+            elif isolationLevel == "vm-required" and vmAvailable:
+                log("VM isolation REQUIRED - Phase V will execute")
+                useVM = true
+            elif isolationLevel == "vm-recommended" and vmAvailable:
+                log("VM isolation recommended and available - using Phase V")
+                useVM = true
+            elif isolationLevel == "vm-recommended" and not vmAvailable:
+                warn("VM isolation recommended but not available")
+                warn("Proceeding with sandbox - exercise caution")
+                useVM = false
+            elif isolationLevel == "sandbox-warn":
+                log("Sandbox with extra monitoring")
+                useVM = false
+                extraMonitoring = true
+            else:  # sandbox
+                log("Standard sandbox isolation sufficient")
+                useVM = false
 
         waitForGate(tier.gate)  # Ensure tier completes before next
 ```
@@ -769,6 +856,21 @@ ELSE (Autonomous - DEFAULT):
 - Always executes regardless of prior failures
 - Cleanup is mandatory for environment hygiene
 
+**Phase V (VM Testing) - Conditional on Isolation Level:**
+- Position: Special - replaces Phase M when VM isolation is needed
+- Conditional execution based on Discovery `ISOLATION_LEVEL` output
+- Three possible outcomes:
+  1. **SKIP**: `ISOLATION_LEVEL` is `sandbox` or `sandbox-warn` → use Phase M instead
+  2. **RUN**: `ISOLATION_LEVEL` is `vm-required` or `vm-recommended` AND VM available
+  3. **ABORT**: `ISOLATION_LEVEL` is `vm-required` AND no VM available
+- Capabilities:
+  - Deploy project to existing test VM via SSH
+  - Create new VM from ISO library if needed
+  - Run tests in full OS isolation
+  - Snapshot/restore for rollback after dangerous tests
+  - Cross-distro testing (Ubuntu, Fedora, Debian, CachyOS, Windows)
+- Use cases: PAM modifications, kernel params, systemd services, bootloader changes
+
 **Phase ST (Self-Test) - Explicit Only:**
 - Position: ISOLATED (never part of normal tier execution)
 - NEVER included in normal `/test` runs (not even full audit)
@@ -837,4 +939,57 @@ This validates the test-skill framework itself - phase files, symlinks, dispatch
 
 ---
 
-*Document Version: 1.0.1.3*
+## MCP Server Integration
+
+The `/test` skill can leverage MCP (Model Context Protocol) servers for enhanced testing when available:
+
+| MCP Server | Used By | Enhancement |
+|------------|---------|-------------|
+| **playwright** | Phase A, 2a | E2E browser testing for web UIs |
+| **pyright-lsp** | Phase 7 | Project-aware Python type checking |
+| **typescript-lsp** | Phase 7 | TypeScript diagnostics with full context |
+| **rust-analyzer-lsp** | Phase 7 | Rust analysis with macro expansion |
+| **gopls-lsp** | Phase 7 | Go package-aware analysis |
+| **clangd-lsp** | Phase 7 | C/C++ compile-command aware diagnostics |
+| **context7** | Phase 1 | Enhanced codebase understanding |
+| **greptile** | Phase 1 | Semantic code search |
+
+### Auto-Enable/Disable
+
+**`/test` automatically manages MCP servers:**
+
+1. **Discovery (Phase 1)** detects which MCP servers would benefit the project
+2. If a beneficial server is disabled, `/test` **temporarily enables it**
+3. Enabled servers are tracked in `.test-mcp-enabled`
+4. **Cleanup (Phase C)** automatically disables any servers that were auto-enabled
+5. Your original plugin configuration is restored
+
+**Example flow:**
+```
+Phase 1 (Discovery):
+  Project has: React frontend, Python backend
+  Auto-enabling: playwright (for E2E), pyright-lsp (for type checking)
+  Saved to: .test-mcp-enabled
+
+Phase A (App Testing):
+  Using playwright for E2E browser tests... ✅
+
+Phase 7 (Quality):
+  Using pyright-lsp for type checking... ✅
+
+Phase C (Cleanup):
+  Disabling playwright (was auto-enabled) ✅
+  Disabling pyright-lsp (was auto-enabled) ✅
+  Removed .test-mcp-enabled ✅
+```
+
+**No manual intervention needed** - your settings are preserved automatically.
+
+To skip auto-enable behavior, use:
+```
+/test --no-mcp-enable
+```
+
+---
+
+*Document Version: 1.0.2.0*
