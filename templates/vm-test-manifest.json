@@ -38,8 +38,10 @@
 
     "ssh_config": {
       "user": "testuser",
+      "password": "/test 0nly!",
       "key": "~/.ssh/id_ed25519",
-      "port": 22
+      "port": 22,
+      "sudo": "NOPASSWD"
     },
 
     "test_sequences": [
