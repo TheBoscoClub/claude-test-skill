@@ -41,7 +41,8 @@
       "password": "/test 0nly!",
       "key": "~/.ssh/id_ed25519",
       "port": 22,
-      "sudo": "NOPASSWD"
+      "sudo": "NOPASSWD",
+      "static_ip": "192.168.122.100"
     },
 
     "test_sequences": [
