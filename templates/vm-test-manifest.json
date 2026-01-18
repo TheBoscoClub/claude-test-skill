@@ -1,0 +1,70 @@
+{
+  "vm_testing": {
+    "enabled": true,
+    "default_vm": "test-vm-cachyos",
+    "description": "Default test VM for isolated testing (CachyOS with KDE)",
+
+    "dangerous_operations": [
+      "pam_modification",
+      "systemd_service_install",
+      "kernel_params",
+      "reboot_required"
+    ],
+
+    "test_environments": [
+      {
+        "name": "test-vm-cachyos",
+        "type": "existing",
+        "vm_name": "test-vm-cachyos",
+        "snapshot": "clean-install",
+        "description": "CachyOS KDE - primary test VM for isolation testing"
+      },
+      {
+        "name": "ubuntu-lts",
+        "type": "create",
+        "iso_pattern": "ubuntu-*-desktop-amd64.iso",
+        "memory_mb": 4096,
+        "disk_gb": 40,
+        "auto_install": false
+      },
+      {
+        "name": "fedora-latest",
+        "type": "create",
+        "iso_pattern": "Fedora-Workstation-*.iso",
+        "memory_mb": 4096,
+        "disk_gb": 40
+      }
+    ],
+
+    "ssh_config": {
+      "user": "testuser",
+      "key": "~/.ssh/id_ed25519",
+      "port": 22
+    },
+
+    "test_sequences": [
+      {
+        "name": "basic-validation",
+        "steps": ["deploy", "basic"]
+      },
+      {
+        "name": "install-and-verify",
+        "steps": ["deploy", "install", "validate"]
+      },
+      {
+        "name": "install-and-reboot",
+        "steps": ["deploy", "install", "reboot", "validate"]
+      },
+      {
+        "name": "pam-change-test",
+        "steps": ["snapshot", "deploy", "modify_pam", "reboot", "test_login", "restore"]
+      }
+    ]
+  },
+
+  "notes": {
+    "iso_location": "/raid0/ISOs",
+    "vm_images": "/var/lib/libvirt/images",
+    "setup_instructions": "Copy this file to your project root and customize for project-specific VM testing needs"
+  }
+}
