@@ -487,10 +487,14 @@ To proceed:
 2. Or bypass (DANGEROUS): /test --force-sandbox
 """)
             elif isolationLevel == "vm-required" and vmAvailable:
-                log("VM isolation REQUIRED - Phase V will execute")
+                log("VM isolation REQUIRED - starting test VM...")
+                # Trigger VM startup from phase-VM-lifecycle.md
+                start_test_vm()  # Creates .test-vm-state for cleanup
                 useVM = true
             elif isolationLevel == "vm-recommended" and vmAvailable:
-                log("VM isolation recommended and available - using Phase V")
+                log("VM isolation recommended and available - starting test VM...")
+                # Trigger VM startup from phase-VM-lifecycle.md
+                start_test_vm()  # Creates .test-vm-state for cleanup
                 useVM = true
             elif isolationLevel == "vm-recommended" and not vmAvailable:
                 warn("VM isolation recommended but not available")
@@ -503,6 +507,8 @@ To proceed:
             else:  # sandbox
                 log("Standard sandbox isolation sufficient")
                 useVM = false
+
+            # Note: VM shutdown is handled by Phase C cleanup (reads .test-vm-state)
 
         waitForGate(tier.gate)  # Ensure tier completes before next
 ```

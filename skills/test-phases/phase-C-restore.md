@@ -48,7 +48,107 @@ pkill -f "pytest\|jest\|vitest" 2>/dev/null || true
 unset NODE_ENV FLASK_ENV DJANGO_SETTINGS_MODULE GO_ENV RUST_TEST
 ```
 
-### 3a. Disable Auto-Enabled MCP Servers
+### 3a. Shutdown Test VM (if started by /test)
+
+Shutdown the test VM if it was started by this audit to preserve system resources.
+
+```bash
+shutdown_test_vm() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local STATE_FILE="${PROJECT_DIR}/.test-vm-state"
+
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  VM Lifecycle Cleanup"
+    echo "───────────────────────────────────────────────────────────────────"
+    echo ""
+
+    # Check if state file exists
+    if [[ ! -f "$STATE_FILE" ]]; then
+        echo "  ✓ No VM was managed by /test (no state file)"
+        return 0
+    fi
+
+    # Read state file
+    local VM_NAME=$(grep "^vm_name=" "$STATE_FILE" | cut -d= -f2)
+    local STARTED_BY_TEST=$(grep "^started_by_test=" "$STATE_FILE" | cut -d= -f2)
+    local ORIGINAL_STATE=$(grep "^original_state=" "$STATE_FILE" | cut -d= -f2)
+
+    echo "  VM: $VM_NAME"
+    echo "  Started by /test: $STARTED_BY_TEST"
+    echo "  Original State: $ORIGINAL_STATE"
+    echo ""
+
+    # Check for override to keep VM running
+    if [[ "$TEST_KEEP_VM_RUNNING" == "true" ]]; then
+        echo "  ⚠️ TEST_KEEP_VM_RUNNING=true - leaving VM running"
+        rm -f "$STATE_FILE"
+        return 0
+    fi
+
+    # Only shutdown if we started it
+    if [[ "$STARTED_BY_TEST" != "true" ]]; then
+        echo "  ✓ VM was already running - leaving it running"
+        echo "    (VM was not started by /test)"
+        rm -f "$STATE_FILE"
+        return 0
+    fi
+
+    # Check if VM is still running
+    local CURRENT_STATE=$(virsh domstate "$VM_NAME" 2>/dev/null | tr -d '[:space:]')
+
+    if [[ "$CURRENT_STATE" != "running" ]]; then
+        echo "  ✓ VM already stopped"
+        rm -f "$STATE_FILE"
+        return 0
+    fi
+
+    echo "  Shutting down VM to preserve system resources..."
+
+    # Try graceful shutdown first
+    echo "  Attempting graceful shutdown..."
+    sudo virsh shutdown "$VM_NAME" 2>/dev/null
+
+    # Wait for shutdown (max 60 seconds)
+    local WAIT_COUNT=0
+    while [[ $WAIT_COUNT -lt 12 ]]; do
+        sleep 5
+        CURRENT_STATE=$(virsh domstate "$VM_NAME" 2>/dev/null | tr -d '[:space:]')
+        if [[ "$CURRENT_STATE" != "running" ]]; then
+            echo "  ✅ VM shut down gracefully"
+            rm -f "$STATE_FILE"
+            return 0
+        fi
+        ((WAIT_COUNT++))
+        echo "    Waiting... ($((WAIT_COUNT * 5))s)"
+    done
+
+    # Force stop if graceful didn't work
+    echo "  ⚠️ Graceful shutdown timeout - forcing stop..."
+    sudo virsh destroy "$VM_NAME" 2>/dev/null
+
+    if [[ $? -eq 0 ]]; then
+        echo "  ✅ VM force stopped"
+    else
+        echo "  ❌ Failed to stop VM - may need manual intervention"
+        echo "     Run: sudo virsh destroy $VM_NAME"
+    fi
+
+    # Clean up state file
+    rm -f "$STATE_FILE"
+    echo ""
+    echo "  📝 Removed state file: $STATE_FILE"
+
+    echo ""
+    echo "VM Cleanup Complete:"
+    echo "  - VM $VM_NAME stopped"
+    echo "  - System resources freed (4GB RAM, 4 vCPUs)"
+}
+
+shutdown_test_vm
+```
+
+### 3b. Disable Auto-Enabled MCP Servers
 
 Restore MCP servers to their pre-test state:
 
@@ -167,6 +267,10 @@ Removed:
 Environment:
   ✅ Test env vars unset
   ✅ Services stopped
+
+VM Lifecycle:
+  🖥️ test-vm-cachyos shutdown
+  ✅ System resources freed (4GB RAM, 4 vCPUs)
 
 MCP Servers:
   🔌 Disabled playwright (was auto-enabled)
