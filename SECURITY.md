@@ -18,18 +18,53 @@ If you discover a security vulnerability in this project, please report it respo
    - Potential impact
    - Suggested fix (if any)
 
-## Security Measures
+## GitHub Security Features
 
-This project has the following security measures enabled:
+| Feature | Status |
+|---------|--------|
+| Dependabot vulnerability alerts | ✅ Enabled |
+| Dependabot security updates | ✅ Enabled |
+| Secret scanning | ✅ Enabled |
 
-- **Dependabot vulnerability alerts** - Monitors dependencies for known vulnerabilities
-- **Dependabot security updates** - Automatically creates PRs to fix vulnerable dependencies
-- **Secret scanning** - Detects accidentally committed secrets
+## Security Audit Tools
+
+This project uses the following tools for security auditing:
+
+### Shell Scripts (12 files)
+
+| Tool | Purpose | Command |
+|------|---------|---------|
+| **shellcheck** | Static analysis for shell scripts | `shellcheck skills/test-phases/*.sh` |
+| **shfmt** | Shell script formatting | `shfmt -d skills/test-phases/*.sh` |
+
+### Markdown Documentation (157 files)
+
+| Tool | Purpose | Command |
+|------|---------|---------|
+| **markdownlint** | Markdown linting | `markdownlint '**/*.md'` |
+| **codespell** | Spell checking | `codespell --skip='.git'` |
+
+### Running a Full Security Audit
+
+```bash
+# Shell script analysis
+find . -name "*.sh" -exec shellcheck {} \;
+
+# Markdown linting
+markdownlint '**/*.md' --ignore node_modules
+
+# Spell check
+codespell --skip='.git,.snapshots'
+
+# Check for secrets (manual review)
+grep -rE "(password|secret|api[_-]?key|token)" --include="*.sh" --include="*.md" .
+```
 
 ## Scope
 
-This project contains Claude Code skill definitions (Markdown files) and shell scripts. The security scope includes:
+This project contains Claude Code skill definitions (Markdown files) and shell scripts. Security concerns include:
 
 - Shell script injection vulnerabilities
 - Exposed secrets or credentials in configuration
 - Unsafe file operations in scripts
+- Command injection in user-provided arguments
