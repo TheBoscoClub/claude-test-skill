@@ -102,7 +102,7 @@ Projects can specify VM testing requirements:
 
     "ssh_config": {
       "user": "testuser",
-      "key": "~/.ssh/id_ed25519",
+      "key": "~/.ssh/vm_test_key",
       "port": 22
     },
 
@@ -386,7 +386,7 @@ deploy_to_vm() {
     local VM_NAME="$1"
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
     local SSH_USER="${VM_SSH_USER:-testuser}"
-    local SSH_KEY="${VM_SSH_KEY:-~/.ssh/id_ed25519}"
+    local SSH_KEY="${VM_SSH_KEY:-~/.ssh/vm_test_key}"
 
     echo "───────────────────────────────────────────────────────────────────"
     echo "  Deploying to VM: $VM_NAME"
@@ -749,6 +749,155 @@ run_phase_V() {
     fi
 }
 ```
+
+## Step 8: GUI/VNC Automation Testing
+
+For tests requiring graphical sessions (login screens, desktop apps), use VNC automation:
+
+```python
+#!/usr/bin/env python3
+"""
+GUI Test Automation via VNC
+Requires: pip install vncdotool service-identity
+"""
+from vncdotool import api
+import time
+
+def test_graphical_login(vnc_host="127.0.0.1", vnc_port=5901, username="testuser", password=None):
+    """Automate graphical login and verify desktop loads."""
+    client = api.connect(f'{vnc_host}::{vnc_port}')
+
+    try:
+        # Click on user to select
+        client.mouseMove(640, 350)  # Adjust for your login screen
+        client.mousePress(1)
+        time.sleep(1)
+
+        # Type password
+        for char in password:
+            if char.isupper():
+                client.keyDown('shift')
+                client.keyPress(char.lower())
+                client.keyUp('shift')
+            elif char == '@':
+                client.keyDown('shift')
+                client.keyPress('2')
+                client.keyUp('shift')
+            elif char == '!':
+                client.keyDown('shift')
+                client.keyPress('1')
+                client.keyUp('shift')
+            else:
+                client.keyPress(char)
+            time.sleep(0.05)
+
+        # Submit login
+        client.keyPress('enter')
+        time.sleep(15)  # Wait for desktop
+
+        # Capture result
+        client.captureScreen('/tmp/gui-test-result.png')
+        return True
+
+    finally:
+        client.disconnect()
+
+def capture_vm_screenshot(vm_name, output_path="/tmp/vm-screenshot.png"):
+    """Capture screenshot from VM's VNC/SPICE display."""
+    import subprocess
+
+    # Get display URL
+    result = subprocess.run(
+        ["sudo", "virsh", "domdisplay", vm_name],
+        capture_output=True, text=True
+    )
+    display_url = result.stdout.strip()
+
+    if display_url.startswith("vnc://"):
+        # Parse VNC URL: vnc://127.0.0.1:1 -> port 5901
+        parts = display_url.replace("vnc://", "").split(":")
+        host = parts[0]
+        display = int(parts[1]) if len(parts) > 1 else 0
+        port = 5900 + display
+
+        client = api.connect(f'{host}::{port}')
+        client.captureScreen(output_path)
+        client.disconnect()
+        return output_path
+    else:
+        print(f"SPICE display - use virt-viewer for {vm_name}")
+        return None
+```
+
+### GUI Test Helpers
+
+```bash
+# Get VNC port for a VM
+get_vnc_port() {
+    local VM_NAME="$1"
+    local DISPLAY_URL=$(sudo virsh domdisplay "$VM_NAME" 2>/dev/null)
+
+    if [[ "$DISPLAY_URL" == vnc://* ]]; then
+        local DISPLAY_NUM=$(echo "$DISPLAY_URL" | sed 's/vnc:\/\/[^:]*://')
+        echo $((5900 + DISPLAY_NUM))
+    else
+        echo "SPICE" # Not VNC
+    fi
+}
+
+# Capture screenshot from VM
+capture_vm_screen() {
+    local VM_NAME="$1"
+    local OUTPUT="${2:-/tmp/${VM_NAME}-screenshot.png}"
+
+    local PORT=$(get_vnc_port "$VM_NAME")
+    if [[ "$PORT" == "SPICE" ]]; then
+        echo "VM uses SPICE, use virt-viewer for manual access"
+        return 1
+    fi
+
+    python3 -c "
+from vncdotool import api
+client = api.connect('127.0.0.1::$PORT')
+client.captureScreen('$OUTPUT')
+client.disconnect()
+print('Screenshot saved to $OUTPUT')
+"
+}
+
+# Available test VMs with display info
+list_test_vms() {
+    echo "Available Test VMs:"
+    echo "─────────────────────────────────────────"
+    for vm in $(sudo virsh list --all --name 2>/dev/null | grep -v "^$"); do
+        local STATE=$(sudo virsh domstate "$vm" 2>/dev/null)
+        local DISPLAY=$(sudo virsh domdisplay "$vm" 2>/dev/null)
+        local IP=$(sudo virsh domifaddr "$vm" 2>/dev/null | grep -oP '\d+\.\d+\.\d+\.\d+' | head -1)
+        printf "  %-25s %-10s %-25s %s\n" "$vm" "$STATE" "${DISPLAY:-N/A}" "${IP:-no-ip}"
+    done
+}
+```
+
+### Test VM Credentials
+
+Configure your test VM credentials in your local environment:
+
+| Setting | Environment Variable | Default |
+|---------|---------------------|---------|
+| Username | `VM_SSH_USER` | `testuser` |
+| SSH Key | `VM_SSH_KEY` | `~/.ssh/vm_test_key` |
+
+**Setup:**
+1. Create a dedicated SSH key for VM testing: `ssh-keygen -t ed25519 -f ~/.ssh/vm_test_key`
+2. Add the public key to your test VMs' `~/.ssh/authorized_keys`
+3. Use consistent credentials across all test VMs for simplicity
+
+| VM Example | Description |
+|------------|-------------|
+| arch-test | Arch Linux / CachyOS testing |
+| debian-test | Debian testing |
+| fedora-test | Fedora testing |
+| ubuntu-test | Ubuntu/Kubuntu testing |
 
 ## Quick Commands
 
