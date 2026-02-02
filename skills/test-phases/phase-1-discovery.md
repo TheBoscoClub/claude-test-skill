@@ -555,11 +555,14 @@ detect_pytest_options() {
     # Extract addoption flags and their help text
     # Handles both single-line and multi-line addoption() calls
     # Uses Python for reliable parsing since conftest.py is Python
-    while IFS='|' read -r flag help; do
+    local CUSTOM_RESOURCE=()
+
+    while IFS='|' read -r flag help resource; do
         if [ -n "$flag" ]; then
             CUSTOM_FLAGS+=("$flag")
             CUSTOM_HELP+=("${help:-No description}")
-            echo "    Found: $flag — ${help:-No description}"
+            CUSTOM_RESOURCE+=("${resource:-other}")
+            echo "    Found: $flag — ${help:-No description} [${resource:-other}]"
         fi
     done < <(python3 - "$CONFTEST" <<'PYEOF'
 import re, sys
@@ -573,7 +576,20 @@ for match in pattern.finditer(content):
     flag = match.group(1)
     help_match = re.search(r'help\s*=\s*["\x27]([^"\x27]+)["\x27]', block)
     help_text = help_match.group(1) if help_match else "No description"
-    print(f"{flag}|{help_text}")
+    # Classify flag as resource type based on name and help text
+    # vm|hardware flags require physical resources or human presence
+    flag_lower = flag.lower()
+    help_lower = help_text.lower()
+    if any(kw in flag_lower or kw in help_lower for kw in ["vm", "virtual machine", "integration"]):
+        resource = "vm"
+    elif any(kw in flag_lower or kw in help_lower for kw in [
+        "hardware", "fido", "fido2", "yubikey", "webauthn", "passkey",
+        "security key", "authenticator", "biometric", "touch"
+    ]):
+        resource = "hardware"
+    else:
+        resource = "other"
+    print(f"{flag}|{help_text}|{resource}")
 PYEOF
 )
 
@@ -591,8 +607,10 @@ PYEOF
     export PYTEST_CUSTOM_HELP="${CUSTOM_HELP[*]}"
 
     # Output flag details for the dispatcher to parse
+    # Format: Pytest Custom Option: --flag | help text | resource-type
+    # resource-type is: vm, hardware, or other
     for i in "${!CUSTOM_FLAGS[@]}"; do
-        echo "Pytest Custom Option: ${CUSTOM_FLAGS[$i]} | ${CUSTOM_HELP[$i]}"
+        echo "Pytest Custom Option: ${CUSTOM_FLAGS[$i]} | ${CUSTOM_HELP[$i]} | ${CUSTOM_RESOURCE[$i]}"
     done
 }
 
@@ -601,14 +619,26 @@ detect_pytest_options
 
 **Dispatcher Interaction (after this step completes):**
 
-If custom pytest options were detected (`Pytest Custom Option:` lines in output), the dispatcher should:
+Each detected flag has a resource type: `vm`, `hardware`, or `other`.
 
-1. **Interactive mode** (`--interactive`): Use `AskUserQuestion` to ask the user:
-   - **Question**: "This project has optional pytest scopes. Which should be included in this test run?"
-   - **Options** (multiSelect: true): One option per detected flag, using the help text as description
-   - Record selected flags as `Pytest Extra Flags: --flag1 --flag2`
+**Resource flags (`vm`, `hardware`) ALWAYS prompt — even in autonomous mode.**
+These require physical resources or human presence that cannot be automated:
+- `vm` — needs test VM running, takes longer, deliberate resource allocation
+- `hardware` — needs physical human action (touch security key, approve passkey)
 
-2. **Autonomous mode** (default): Skip the question and default to no extra flags (safest default — unit tests only). Output `Pytest Extra Flags: (none)`.
+**Other flags** follow normal mode rules (prompt in interactive, skip in autonomous).
+
+**Prompt behavior:**
+
+1. **Resource flags detected** (any mode): Use `AskUserQuestion` to ask the user:
+   - **Question**: "This project has tests requiring VM or hardware resources. Which should be included?"
+   - **Options** (multiSelect: true): One option per `vm`/`hardware` flag
+   - If `--hardware` is selected, append a reminder:
+     "Hardware tests will require manual action (e.g., touch your security key when it flashes, or approve on your passkey device). Stay attentive during Phase 2."
+
+2. **Only `other` flags detected + autonomous mode**: Skip the question, default to no extra flags.
+
+3. **Only `other` flags detected + interactive mode**: Prompt as normal.
 
 The dispatcher records the final selection in the discovery output as:
 ```
