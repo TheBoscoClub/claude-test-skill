@@ -17,6 +17,18 @@ Identify project type, test framework, and testable components.
 | `Makefile` | Make-based | `make test` |
 | `pom.xml` | Java/Maven | `mvn test` |
 | `build.gradle` | Java/Gradle | `gradle test` |
+| `Dockerfile` | Docker | `docker build` |
+| `docker-compose.yml` | Docker Compose | `docker compose up` |
+
+**IMPORTANT: Docker Detection**
+
+Check for Docker files in the project root. This is MANDATORY — do not skip:
+```bash
+# Check project root for Docker files — ALWAYS report these
+ls -la Dockerfile docker-compose.yml .dockerignore compose.yml 2>/dev/null
+```
+If `Dockerfile` exists, report `Docker Status: exists` in the output.
+If `docker-compose.yml` or `compose.yml` exists, report the image name from it.
 
 ### 2. Find Test Files
 
