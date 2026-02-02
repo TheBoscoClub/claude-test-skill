@@ -219,7 +219,103 @@ check_version_sync() {
 check_version_sync
 ```
 
-### 5. Docker Compose Validation (if exists)
+### 5. Verify Image Contains Current Application Version and Code
+
+**CRITICAL**: After a successful build, verify the Docker image has the correct
+version and current code installed. This catches stale COPY instructions, missing
+files, and version mismatches.
+
+```bash
+verify_image_contents() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local PROJECT_NAME=$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')
+    local TEST_TAG="test-verify-$$"
+    local ISSUES=0
+
+    echo "Verifying image contains current application code..."
+
+    # Build a fresh image for verification
+    if ! docker buildx build --tag "${PROJECT_NAME}:${TEST_TAG}" --load "$PROJECT_DIR" &>/dev/null; then
+        echo "❌ Cannot build image for verification"
+        return 1
+    fi
+
+    # Get expected version from project
+    local EXPECTED_VERSION=""
+    if [ -f "$PROJECT_DIR/VERSION" ]; then
+        EXPECTED_VERSION=$(cat "$PROJECT_DIR/VERSION" | tr -d '[:space:]')
+    fi
+
+    # Check VERSION file inside container
+    CONTAINER_VERSION=$(docker run --rm "${PROJECT_NAME}:${TEST_TAG}" \
+        cat /app/VERSION 2>/dev/null | tr -d '[:space:]')
+    if [ -n "$EXPECTED_VERSION" ]; then
+        if [ "$CONTAINER_VERSION" = "$EXPECTED_VERSION" ]; then
+            echo "✅ VERSION file in image: $CONTAINER_VERSION (matches project)"
+        else
+            echo "❌ VERSION mismatch: image has '$CONTAINER_VERSION', project has '$EXPECTED_VERSION'"
+            ((ISSUES++))
+        fi
+    fi
+
+    # Check that key application files exist in the image
+    # Detect key files from project structure
+    MISSING_FILES=0
+    for check_file in "VERSION" "library/backend/app.py" "library/config.py" "library/requirements.txt"; do
+        if [ -f "$PROJECT_DIR/$check_file" ]; then
+            if docker run --rm "${PROJECT_NAME}:${TEST_TAG}" test -f "/app/$check_file" 2>/dev/null; then
+                echo "  ✅ /app/$check_file exists"
+            else
+                echo "  ❌ /app/$check_file MISSING from image"
+                ((MISSING_FILES++))
+            fi
+        fi
+    done
+    if [ $MISSING_FILES -gt 0 ]; then
+        echo "❌ $MISSING_FILES expected file(s) missing from image"
+        ((ISSUES++))
+    fi
+
+    # Check Python dependencies are installed
+    DEPS_OK=$(docker run --rm "${PROJECT_NAME}:${TEST_TAG}" \
+        python3 -c "import flask; print('ok')" 2>/dev/null)
+    if [ "$DEPS_OK" = "ok" ]; then
+        echo "✅ Python dependencies installed (flask importable)"
+    else
+        echo "❌ Python dependencies NOT properly installed"
+        ((ISSUES++))
+    fi
+
+    # Check that the API can at least start (basic smoke test)
+    # Run container briefly and check if it responds
+    CONTAINER_ID=$(docker run -d --name "test-smoke-$$" \
+        -e "DATABASE_PATH=/tmp/test.db" \
+        "${PROJECT_NAME}:${TEST_TAG}" sleep 30 2>/dev/null)
+    if [ -n "$CONTAINER_ID" ]; then
+        # Try importing the app module
+        IMPORT_OK=$(docker exec "$CONTAINER_ID" \
+            python3 -c "import sys; sys.path.insert(0, '/app'); from library.backend.app import app; print('ok')" 2>/dev/null)
+        if [ "$IMPORT_OK" = "ok" ]; then
+            echo "✅ Application module imports successfully"
+        else
+            echo "⚠️ Application module import failed (may need runtime deps)"
+        fi
+        docker rm -f "$CONTAINER_ID" &>/dev/null
+    fi
+
+    # Cleanup
+    docker rmi "${PROJECT_NAME}:${TEST_TAG}" &>/dev/null
+
+    echo ""
+    echo "Image Content Verification: $([ $ISSUES -eq 0 ] && echo '✅ PASS' || echo '❌ ISSUES')"
+    echo "Issues: $ISSUES"
+    return $ISSUES
+}
+
+verify_image_contents
+```
+
+### 6. Docker Compose Validation (if exists)
 
 ```bash
 validate_compose() {
