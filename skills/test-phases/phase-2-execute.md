@@ -7,10 +7,18 @@ Run the project's test suite and capture results.
 ### 1. Run Tests Based on Project Type
 
 **Python:**
+
+**Note:** If Phase 1 discovery detected custom pytest options and the user selected
+any (interactive mode) or the dispatcher set them, they will be available in
+`PYTEST_EXTRA_FLAGS`. The dispatcher sets this from the "Pytest Extra Flags" line
+in the Phase 1 output. In autonomous mode, this defaults to empty (unit tests only).
+
 ```bash
 # Prefer pytest
+# PYTEST_EXTRA_FLAGS is set by the dispatcher from Phase 1 discovery results
+# Example: "--vm --hardware" or empty
 if command -v pytest &>/dev/null; then
-  pytest -v --tb=short 2>&1 | tee test-output.log
+  pytest -v --tb=short ${PYTEST_EXTRA_FLAGS:-} 2>&1 | tee test-output.log
 else
   python -m unittest discover -v 2>&1 | tee test-output.log
 fi

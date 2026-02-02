@@ -518,6 +518,104 @@ detect_github_repo() {
 detect_github_repo
 ```
 
+### 4d. Detect Custom Pytest Options
+
+Check if the project registers custom pytest command-line options that gate optional test categories:
+
+```bash
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  Custom Pytest Options"
+echo "───────────────────────────────────────────────────────────────────"
+
+detect_pytest_options() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local CONFTEST=""
+    local CUSTOM_FLAGS=()
+    local CUSTOM_HELP=()
+
+    # Find conftest.py (check common locations)
+    for f in "$PROJECT_DIR/conftest.py" \
+             "$PROJECT_DIR/tests/conftest.py" \
+             "$PROJECT_DIR/library/tests/conftest.py"; do
+        if [ -f "$f" ]; then
+            CONFTEST="$f"
+            break
+        fi
+    done
+
+    if [ -z "$CONFTEST" ]; then
+        echo "  ⚪ No conftest.py found"
+        echo "Pytest Extra Flags: (none)"
+        return 0
+    fi
+
+    echo "  Scanning: $CONFTEST"
+
+    # Extract addoption flags and their help text
+    # Handles both single-line and multi-line addoption() calls
+    # Uses Python for reliable parsing since conftest.py is Python
+    while IFS='|' read -r flag help; do
+        if [ -n "$flag" ]; then
+            CUSTOM_FLAGS+=("$flag")
+            CUSTOM_HELP+=("${help:-No description}")
+            echo "    Found: $flag — ${help:-No description}"
+        fi
+    done < <(python3 - "$CONFTEST" <<'PYEOF'
+import re, sys
+with open(sys.argv[1]) as f:
+    content = f.read()
+# Match addoption() blocks spanning multiple lines
+# Uses \n\s*\) to find the closing paren on its own line (Python style)
+pattern = re.compile(r'addoption\s*\(\s*["\x27](--[^"\x27]+)["\x27](.*?)\n\s*\)', re.DOTALL)
+for match in pattern.finditer(content):
+    block = match.group(0)
+    flag = match.group(1)
+    help_match = re.search(r'help\s*=\s*["\x27]([^"\x27]+)["\x27]', block)
+    help_text = help_match.group(1) if help_match else "No description"
+    print(f"{flag}|{help_text}")
+PYEOF
+)
+
+    if [ ${#CUSTOM_FLAGS[@]} -eq 0 ]; then
+        echo "  ⚪ No custom pytest options found"
+        echo "Pytest Extra Flags: (none)"
+        return 0
+    fi
+
+    echo ""
+    echo "  Detected ${#CUSTOM_FLAGS[@]} custom pytest option(s)"
+
+    # Export for dispatcher to use with AskUserQuestion
+    export PYTEST_CUSTOM_FLAGS="${CUSTOM_FLAGS[*]}"
+    export PYTEST_CUSTOM_HELP="${CUSTOM_HELP[*]}"
+
+    # Output flag details for the dispatcher to parse
+    for i in "${!CUSTOM_FLAGS[@]}"; do
+        echo "Pytest Custom Option: ${CUSTOM_FLAGS[$i]} | ${CUSTOM_HELP[$i]}"
+    done
+}
+
+detect_pytest_options
+```
+
+**Dispatcher Interaction (after this step completes):**
+
+If custom pytest options were detected (`Pytest Custom Option:` lines in output), the dispatcher should:
+
+1. **Interactive mode** (`--interactive`): Use `AskUserQuestion` to ask the user:
+   - **Question**: "This project has optional pytest scopes. Which should be included in this test run?"
+   - **Options** (multiSelect: true): One option per detected flag, using the help text as description
+   - Record selected flags as `Pytest Extra Flags: --flag1 --flag2`
+
+2. **Autonomous mode** (default): Skip the question and default to no extra flags (safest default — unit tests only). Output `Pytest Extra Flags: (none)`.
+
+The dispatcher records the final selection in the discovery output as:
+```
+Pytest Extra Flags: --vm --hardware
+```
+(or `Pytest Extra Flags: (none)` if no flags selected or no custom options found)
+
 ### 5. Detect Installable Application
 
 Determine if this project produces an installable/deployable application:
@@ -782,6 +880,12 @@ Sync Status: [In sync|X local commits not pushed|X remote commits not pulled]
 Phase G Recommendation: [SKIP|RUN]
   - SKIP: No GitHub repo or not authenticated
   - RUN: GitHub repo detected with authenticated access
+
+─────────────────────────────────────────────────────────────────
+  PYTEST CUSTOM OPTIONS
+─────────────────────────────────────────────────────────────────
+
+Pytest Extra Flags: [--flag1 --flag2 | (none)]
 
 ─────────────────────────────────────────────────────────────────
   PRODUCTION APP DETECTION

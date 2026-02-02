@@ -755,9 +755,21 @@ ELSE (Autonomous - DEFAULT):
       - Installable App: [type or "none"]
       - Production Status: [installed|not-installed|installed-not-running]
       - Phase P Recommendation: [SKIP|RUN|PROMPT]
+   📋 Extract custom pytest options from output:
+      - Parse `Pytest Custom Option: --flag | help text` lines
+      - If custom options found AND `--interactive` mode:
+        Use AskUserQuestion (multiSelect: true) to ask which to enable
+        Set PYTEST_EXTRA_FLAGS from user's selections
+      - If custom options found AND autonomous mode (default):
+        Set PYTEST_EXTRA_FLAGS="" (safest default — unit tests only)
+      - If no custom options: Set PYTEST_EXTRA_FLAGS=""
+      - Pass PYTEST_EXTRA_FLAGS as context to Phase 2 subagent
 
    TIER 2: Test Execution [2, 2a] - Run in PARALLEL
    ──────────────────────────────────────────────────────────────────
+   📋 Pass PYTEST_EXTRA_FLAGS to Phase 2 subagent context:
+      "Set PYTEST_EXTRA_FLAGS to: [flags from Discovery]"
+      (empty string if no flags selected)
    Wait for all to complete → GATE 3: Tests Complete
 
    TIER 3: Analysis [3,4,5,6,7,8,9,11] - Run in PARALLEL
