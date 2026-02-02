@@ -756,13 +756,18 @@ ELSE (Autonomous - DEFAULT):
       - Production Status: [installed|not-installed|installed-not-running]
       - Phase P Recommendation: [SKIP|RUN|PROMPT]
    📋 Extract custom pytest options from output:
-      - Parse `Pytest Custom Option: --flag | help text` lines
-      - If custom options found AND `--interactive` mode:
-        Use AskUserQuestion (multiSelect: true) to ask which to enable
-        Set PYTEST_EXTRA_FLAGS from user's selections
-      - If custom options found AND autonomous mode (default):
-        Set PYTEST_EXTRA_FLAGS="" (safest default — unit tests only)
-      - If no custom options: Set PYTEST_EXTRA_FLAGS=""
+      - Parse `Pytest Custom Option: --flag | help text | resource-type` lines
+      - Resource types: vm, hardware, other
+      - **ALWAYS prompt for vm/hardware flags** (even in autonomous mode):
+        These require physical resources or human action that can't be automated.
+        Use AskUserQuestion (multiSelect: true) with only the vm/hardware flags.
+        This is the sole autonomous-mode exception for pytest flag prompting.
+      - If user selects --hardware, show reminder:
+        "Hardware tests require manual action (e.g., touch your security key
+        when it flashes, or approve on your passkey device). Stay attentive
+        during Phase 2."
+      - For `other` flags: only prompt in --interactive mode, skip in autonomous
+      - If no resource flags and autonomous: Set PYTEST_EXTRA_FLAGS=""
       - Pass PYTEST_EXTRA_FLAGS as context to Phase 2 subagent
 
    TIER 2: Test Execution [2, 2a] - Run in PARALLEL
