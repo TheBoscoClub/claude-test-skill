@@ -1,14 +1,16 @@
-# Phase S: BTRFS Snapshot
+# Phase S: Safety Snapshots (BTRFS + VM)
 
-Create a read-only safety snapshot before making changes.
+Create read-only safety snapshots before making changes.
 
 ## Prerequisites
 
 - Project must be on a BTRFS filesystem
-- User must have sudo access for btrfs commands
+- User must have sudo access for btrfs and virsh commands
 - Snapshot directory must exist: `/snapshots/audit/`
 
 ## Execution
+
+### BTRFS Project Snapshot
 
 ```bash
 PROJECT_DIR="$(pwd)"
@@ -23,23 +25,43 @@ FSTYPE=$(stat -f -c %T "$PROJECT_DIR" 2>/dev/null || echo "unknown")
 if [[ "$FSTYPE" != "btrfs" ]]; then
   # Fallback: check if btrfs subvolume show succeeds
   if ! sudo btrfs subvolume show "$PROJECT_DIR" &>/dev/null; then
-    echo "⚠️ Not a BTRFS filesystem ($FSTYPE) - skipping snapshot"
-    exit 0
+    echo "Not a BTRFS filesystem ($FSTYPE) - skipping BTRFS snapshot"
+    SNAPSHOT_PATH=""
   fi
 fi
 
-# Create snapshot directory if needed
-sudo mkdir -p "$SNAPSHOT_DIR"
+if [[ -n "$SNAPSHOT_PATH" ]]; then
+  # Create snapshot directory if needed
+  sudo mkdir -p "$SNAPSHOT_DIR"
 
-# Create read-only snapshot
-sudo btrfs subvolume snapshot -r "$PROJECT_DIR" "$SNAPSHOT_PATH"
+  # Create read-only snapshot
+  sudo btrfs subvolume snapshot -r "$PROJECT_DIR" "$SNAPSHOT_PATH"
 
-echo "✅ Snapshot created: $SNAPSHOT_PATH"
+  echo "BTRFS snapshot created: $SNAPSHOT_PATH"
+fi
+```
+
+### VM Snapshot (example-test-vm)
+
+```bash
+if command -v virsh &>/dev/null && sudo virsh dominfo example-test-vm &>/dev/null 2>&1; then
+  VM_STATE=$(sudo virsh domstate example-test-vm 2>/dev/null | tr -d '[:space:]')
+  SNAP_NAME="pre-test-$TIMESTAMP"
+  SNAP_DESC="Pre-test snapshot for ${PROJECT_NAME} v$(cat VERSION 2>/dev/null || echo 'unknown')"
+
+  if sudo virsh snapshot-create-as example-test-vm "$SNAP_NAME" "$SNAP_DESC"; then
+    echo "VM snapshot created: $SNAP_NAME (state: $VM_STATE)"
+  else
+    echo "VM snapshot failed (non-fatal) - continuing"
+  fi
+else
+  echo "virsh not available or example-test-vm not found - skipping VM snapshot"
+fi
 ```
 
 ## Recovery
 
-To restore from snapshot:
+### Restore BTRFS Snapshot
 ```bash
 # Delete current (if needed)
 sudo btrfs subvolume delete "$PROJECT_DIR"
@@ -48,9 +70,21 @@ sudo btrfs subvolume delete "$PROJECT_DIR"
 sudo btrfs subvolume snapshot "$SNAPSHOT_PATH" "$PROJECT_DIR"
 ```
 
+### Restore VM Snapshot
+```bash
+# List available snapshots
+sudo virsh snapshot-list example-test-vm
+
+# Revert to a specific snapshot
+sudo virsh snapshot-revert example-test-vm "pre-test-YYYYMMDD-HHMMSS"
+
+# Delete a snapshot (optional cleanup)
+sudo virsh snapshot-delete example-test-vm "pre-test-YYYYMMDD-HHMMSS"
+```
+
 ## Output
 
 Report:
-- Snapshot path created
-- Snapshot size
-- Command to restore if needed
+- BTRFS snapshot path created
+- VM snapshot name and VM state at time of snapshot
+- Commands to restore if needed
