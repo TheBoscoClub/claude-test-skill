@@ -168,6 +168,20 @@ EOF
         echo "vnc_port=$VNC_ACTUAL" >> "$STATE_FILE"
     fi
 
+    # Create pre-test snapshot (MANDATORY)
+    # This captures the VM state BEFORE tests run, so we can restore afterward
+    local PRE_TEST_SNAPSHOT="pre-test-$(date +%Y%m%d-%H%M%S)"
+    echo ""
+    echo "  📸 Creating pre-test snapshot: $PRE_TEST_SNAPSHOT"
+    if sudo virsh snapshot-create-as "$VM_NAME" "$PRE_TEST_SNAPSHOT" \
+        --description "Pre-test state before /test run" --atomic 2>/dev/null; then
+        echo "  ✅ Pre-test snapshot created"
+        echo "pre_test_snapshot=$PRE_TEST_SNAPSHOT" >> "$STATE_FILE"
+    else
+        echo "  ⚠️ Failed to create pre-test snapshot (VM may be running)"
+        echo "     Tests will proceed but VM state won't be auto-restored"
+    fi
+
     echo ""
     echo "───────────────────────────────────────────────────────────────────"
     echo "  VM READY FOR TESTING"
@@ -208,11 +222,37 @@ shutdown_test_vm() {
     local VM_NAME=$(grep "^vm_name=" "$STATE_FILE" | cut -d= -f2)
     local STARTED_BY_TEST=$(grep "^started_by_test=" "$STATE_FILE" | cut -d= -f2)
     local ORIGINAL_STATE=$(grep "^original_state=" "$STATE_FILE" | cut -d= -f2)
+    local PRE_TEST_SNAPSHOT=$(grep "^pre_test_snapshot=" "$STATE_FILE" | cut -d= -f2)
 
     echo "  VM: $VM_NAME"
     echo "  Started by /test: $STARTED_BY_TEST"
     echo "  Original State: $ORIGINAL_STATE"
+    echo "  Pre-test Snapshot: ${PRE_TEST_SNAPSHOT:-none}"
     echo ""
+
+    # Revert to pre-test snapshot if it exists (MANDATORY for pristine state)
+    if [[ -n "$PRE_TEST_SNAPSHOT" ]]; then
+        echo "  📸 Reverting to pre-test snapshot: $PRE_TEST_SNAPSHOT"
+
+        # Must destroy running VM before reverting
+        sudo virsh destroy "$VM_NAME" 2>/dev/null || true
+
+        if sudo virsh snapshot-revert "$VM_NAME" "$PRE_TEST_SNAPSHOT" 2>/dev/null; then
+            echo "  ✅ Reverted to pre-test state"
+
+            # Delete the temporary pre-test snapshot
+            echo "  🗑️  Deleting temporary snapshot..."
+            if sudo virsh snapshot-delete "$VM_NAME" "$PRE_TEST_SNAPSHOT" 2>/dev/null; then
+                echo "  ✅ Pre-test snapshot deleted"
+            else
+                echo "  ⚠️ Failed to delete snapshot (cleanup manually)"
+            fi
+        else
+            echo "  ❌ Failed to revert to pre-test snapshot"
+            echo "     VM may have accumulated test artifacts"
+        fi
+        echo ""
+    fi
 
     # Only shutdown if we started it
     if [[ "$STARTED_BY_TEST" != "true" ]]; then
@@ -313,6 +353,7 @@ isolation_level=vm-required
 start_time=2024-01-18T15:30:00-05:00
 vm_ip=192.0.2.45
 vnc_port=5900
+pre_test_snapshot=pre-test-20240118-153000
 ```
 
 ## Report Format
@@ -337,6 +378,9 @@ vnc_port=5900
   🌐 VM IP: 192.0.2.45
   🖥️  VNC: 127.0.0.1:5900
 
+  📸 Creating pre-test snapshot: pre-test-20240118-153000
+  ✅ Pre-test snapshot created
+
 ───────────────────────────────────────────────────────────────────
   VM READY FOR TESTING
 ───────────────────────────────────────────────────────────────────
@@ -344,6 +388,7 @@ vnc_port=5900
 VM Name: example-test-vm
 Started by /test: true
 State File: .test-vm-state
+Pre-test Snapshot: pre-test-20240118-153000
 ```
 
 ### Cleanup Report
@@ -355,6 +400,12 @@ State File: .test-vm-state
   VM: example-test-vm
   Started by /test: true
   Original State: shutoff
+  Pre-test Snapshot: pre-test-20240118-153000
+
+  📸 Reverting to pre-test snapshot: pre-test-20240118-153000
+  ✅ Reverted to pre-test state
+  🗑️  Deleting temporary snapshot...
+  ✅ Pre-test snapshot deleted
 
   Shutting down VM to preserve system resources...
   Attempting graceful shutdown...
@@ -365,6 +416,7 @@ State File: .test-vm-state
   📝 Removed state file: .test-vm-state
 
 VM Cleanup Complete:
+  - VM example-test-vm restored to pre-test state
   - VM example-test-vm stopped
   - System resources freed (the VM's RAM and vCPUs)
 ```
