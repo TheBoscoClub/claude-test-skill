@@ -90,13 +90,13 @@ For full autonomous execution with all 21 phases:
 
 ```bash
 # Clone and symlink
-git clone https://github.com/greogory/test-skill.git ~/test-skill
+git clone https://github.com/TheBoscoClub/test-skill.git ~/test-skill
 ln -s ~/test-skill/commands/test.md ~/.claude/commands/test.md
 ln -s ~/test-skill/skills/test-phases ~/.claude/skills/test-phases
 ```
 
 ## More Information
 
-- **Repository**: https://github.com/greogory/test-skill
+- **Repository**: https://github.com/TheBoscoClub/test-skill
 - **Full Documentation**: See README.md
 - **Version**: 1.0.1.2
