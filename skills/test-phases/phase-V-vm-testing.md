@@ -39,7 +39,7 @@ Test applications, releases, and system-level changes in fully isolated virtual 
 
 **ISO Library** (for creating new VMs):
 ```
-/raid0/ISOs/
+/hddRaid1/ISOs/
 ├── archlinux-*.iso
 ├── cachyos-*.iso
 ├── ubuntu-*.iso
@@ -125,7 +125,7 @@ Projects can specify VM testing requirements:
 ```bash
 detect_vm_environment() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local ISO_DIR="/raid0/ISOs"
+    local ISO_DIR="/hddRaid1/ISOs"
 
     echo "═══════════════════════════════════════════════════════════════════"
     echo "  PHASE V: VM TESTING (HEAVY ISOLATION)"
@@ -202,7 +202,7 @@ create_test_vm() {
     local DISK_GB="${4:-40}"
     local UEFI="${5:-false}"
 
-    local ISO_DIR="/raid0/ISOs"
+    local ISO_DIR="/hddRaid1/ISOs"
     local VM_DISK="/var/lib/libvirt/images/${VM_NAME}.qcow2"
 
     echo "───────────────────────────────────────────────────────────────────"

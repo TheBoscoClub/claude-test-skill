@@ -27,7 +27,7 @@ TOTAL_CHECKS=0
 PASSED_CHECKS=0
 FAILED_CHECKS=0
 
-TEST_SKILL_PROJECT="/raid0/ClaudeCodeProjects/test-skill"
+TEST_SKILL_PROJECT="/hddRaid1/ClaudeCodeProjects/test-skill"
 SKILLS_DIR="$HOME/.claude/skills/test-phases"
 COMMANDS_DIR="$HOME/.claude/commands"
 

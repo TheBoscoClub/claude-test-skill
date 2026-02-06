@@ -88,7 +88,7 @@ start_test_vm() {
             echo "  ⛔ ABORT: VM isolation required but no VM available"
             echo ""
             echo "  To create a test VM:"
-            echo "    1. Ensure ISO exists: /raid0/ISOs/cachyos-*.iso"
+            echo "    1. Ensure ISO exists: /hddRaid1/ISOs/cachyos-*.iso"
             echo "    2. Use libvirt-vm-manager or virt-install"
             echo "    3. Name it with 'test' in the name (e.g., test-vm-cachyos)"
             return 1

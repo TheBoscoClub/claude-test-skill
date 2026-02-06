@@ -191,7 +191,7 @@ The audit automatically creates an output file:
 ```
 Location: <project-dir>/audit-YYYYMMDD-HHMMSS.log
 
-Example: /raid0/ClaudeCodeProjects/<ProjectName>/audit-YYYYMMDD-HHMMSS.log
+Example: /hddRaid1/ClaudeCodeProjects/<ProjectName>/audit-YYYYMMDD-HHMMSS.log
 ```
 
 The output file contains:
@@ -1341,8 +1341,8 @@ for SERVICE in $PROJECT_SERVICES; do
         "/tmp/${PROJECT_NAME}*"
         "$(pwd)/output"
         "$(pwd)/data"
-        "/raid0/${PROJECT_NAME}*/output"
-        "/raid0/${PROJECT_NAME}*/staging"
+        "/hddRaid1/${PROJECT_NAME}*/output"
+        "/hddRaid1/${PROJECT_NAME}*/staging"
     )
 
     echo "Checking for recent output file creation..."
@@ -1703,7 +1703,7 @@ find "$PROJECT_DIR" -type f \( -name "*.sh" -o -name "*.py" -o -name "*.service"
     BASENAME=$(basename "$SRC_FILE")
 
     # Look for same filename in other common locations
-    for CHECK_DIR in /usr/local/bin /opt /etc/systemd/system /raid0; do
+    for CHECK_DIR in /usr/local/bin /opt /etc/systemd/system /hddRaid1; do
         FOUND=$(find "$CHECK_DIR" -name "$BASENAME" -type f 2>/dev/null | head -5)
         for FOUND_FILE in $FOUND; do
             if [ -f "$FOUND_FILE" ] && [ "$FOUND_FILE" != "$SRC_FILE" ]; then
@@ -3303,7 +3303,7 @@ Key changes:
 45. **DO** check all symlinks resolve to existing, correct targets
 46. **DO** verify systemd service files match project source
 47. **DO** detect orphaned deployment files from previous installs
-48. **DO** check for same-named files in different paths (e.g., /raid0/Project vs /raid0/ClaudeCodeProjects/Project)
+48. **DO** check for same-named files in different paths (e.g., /hddRaid1/Project vs /hddRaid1/ClaudeCodeProjects/Project)
 49. **DO** report canonical source location when mismatches found
 50. **DO** run `systemctl daemon-reload` recommendation when service files updated
 51. **DO** flag any script installed from non-project-source locations

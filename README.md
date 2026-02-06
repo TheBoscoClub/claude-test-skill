@@ -2,9 +2,8 @@
 
 A comprehensive 25-phase autonomous project audit system for Claude Code with full GitHub integration.
 
-[![CodeFactor](https://www.codefactor.io/repository/github/theboscoclub/claude-test-skill/badge)](https://www.codefactor.io/repository/github/theboscoclub/claude-test-skill)
-[![Security Scan](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml/badge.svg)](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml)
-[![GitHub Release](https://img.shields.io/github/v/release/TheBoscoClub/claude-test-skill)](https://github.com/TheBoscoClub/claude-test-skill/releases)
+[![Security Scan](https://github.com/TheBoscoClub/test-skill/actions/workflows/security.yml/badge.svg)](https://github.com/TheBoscoClub/test-skill/actions/workflows/security.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/TheBoscoClub/claude-test-skill)](https://github.com/TheBoscoClub/test-skill/releases)
 
 ### Version History
 

@@ -188,7 +188,7 @@ principles:
 **Symptom**: Works in development, breaks in production
 **Check**: Search for absolute paths that should be configurable
 ```bash
-grep -rn "/opt/audiobooks\|/raid0/Audiobooks\|/var/lib/audiobooks" --include="*.py" --include="*.sh" --include="*.js"
+grep -rn "/opt/audiobooks\|/hddRaid1/Audiobooks\|/var/lib/audiobooks" --include="*.py" --include="*.sh" --include="*.js"
 ```
 **Fix**: Use configuration variables consistently
 

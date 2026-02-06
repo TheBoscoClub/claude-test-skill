@@ -779,7 +779,7 @@ validate_prod_dev_separation() {
 
     # Define development paths that should NEVER appear in production
     local DEV_PATTERNS=(
-        "/raid0/ClaudeCodeProjects/"
+        "/hddRaid1/ClaudeCodeProjects/"
         "/home/.*/ClaudeCodeProjects/"
         "/home/.*/Projects/"
         "/home/.*/dev/"

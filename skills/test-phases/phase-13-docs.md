@@ -68,7 +68,7 @@ grep -rn "version.*[0-9]\+\.[0-9]\+\.[0-9]\+" --include="*.md" --include="*.json
 
 ```bash
 # Find hardcoded development paths
-grep -rn "/raid0/ClaudeCodeProjects" --include="*.md" --include="*.sh"
+grep -rn "/hddRaid1/ClaudeCodeProjects" --include="*.md" --include="*.sh"
 
 # Find obsolete paths (old repo names, deleted directories)
 # Compare documented paths against actual filesystem
