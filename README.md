@@ -2,17 +2,18 @@
 
 A comprehensive 25-phase autonomous project audit system for Claude Code with full GitHub integration.
 
-[![Security Scan](https://github.com/greogory/test-skill/actions/workflows/security.yml/badge.svg)](https://github.com/greogory/test-skill/actions/workflows/security.yml)
-[![GitHub Release](https://img.shields.io/github/v/release/greogory/test-skill)](https://github.com/greogory/test-skill/releases)
+[![CodeFactor](https://www.codefactor.io/repository/github/theboscoclub/claude-test-skill/badge)](https://www.codefactor.io/repository/github/theboscoclub/claude-test-skill)
+[![Security Scan](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml/badge.svg)](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/TheBoscoClub/claude-test-skill)](https://github.com/TheBoscoClub/claude-test-skill/releases)
 
 ### Version History
 
 | Version | Status | Release |
 |---------|--------|---------|
-| ![1](https://img.shields.io/badge/1-brightgreen)![0](https://img.shields.io/badge/0-darkgreen)![5](https://img.shields.io/badge/5-green) | Latest patch | [v1.0.5](https://github.com/greogory/test-skill/releases/tag/v1.0.5) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![4](https://img.shields.io/badge/4-red) | Prior patch | [v1.0.4](https://github.com/greogory/test-skill/releases/tag/v1.0.4) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![3](https://img.shields.io/badge/3-red)![1](https://img.shields.io/badge/1-orange) | Prior tweak | [v1.0.3.1](https://github.com/greogory/test-skill/releases/tag/v1.0.3.1) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![3](https://img.shields.io/badge/3-red) | Prior patch | [v1.0.3](https://github.com/greogory/test-skill/releases/tag/v1.0.3) |
+| ![1](https://img.shields.io/badge/1-brightgreen)![0](https://img.shields.io/badge/0-darkgreen)![5](https://img.shields.io/badge/5-green) | Latest patch | [v1.0.5](https://github.com/TheBoscoClub/test-skill/releases/tag/v1.0.5) |
+| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![4](https://img.shields.io/badge/4-red) | Prior patch | [v1.0.4](https://github.com/TheBoscoClub/test-skill/releases/tag/v1.0.4) |
+| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![3](https://img.shields.io/badge/3-red)![1](https://img.shields.io/badge/1-orange) | Prior tweak | [v1.0.3.1](https://github.com/TheBoscoClub/test-skill/releases/tag/v1.0.3.1) |
+| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![3](https://img.shields.io/badge/3-red) | Prior patch | [v1.0.3](https://github.com/TheBoscoClub/test-skill/releases/tag/v1.0.3) |
 
 <details>
 <summary>Badge Color Convention</summary>
@@ -129,7 +130,7 @@ Symlinks allow edits in this project to be immediately live in Claude Code:
 
 ```bash
 # Clone the repository
-git clone https://github.com/greogory/test-skill.git ~/ClaudeCodeProjects/test-skill
+git clone https://github.com/TheBoscoClub/test-skill.git ~/ClaudeCodeProjects/test-skill
 
 # Remove existing files (if any)
 rm -f ~/.claude/commands/test.md
@@ -144,7 +145,7 @@ ln -s ~/ClaudeCodeProjects/test-skill/skills/test-phases ~/.claude/skills/test-p
 
 ```bash
 # Clone and copy
-git clone https://github.com/greogory/test-skill.git /tmp/test-skill
+git clone https://github.com/TheBoscoClub/test-skill.git /tmp/test-skill
 cp /tmp/test-skill/commands/test.md ~/.claude/commands/
 cp -r /tmp/test-skill/skills/test-phases ~/.claude/skills/
 rm -rf /tmp/test-skill
