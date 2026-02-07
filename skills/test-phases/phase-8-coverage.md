@@ -1,5 +1,9 @@
 # Phase 8: Test Coverage
 
+> **Model**: `sonnet` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for coverage tools, `Read` for coverage reports. Use `NotebookEdit` if project contains Jupyter notebooks that need coverage. Parallelize with other Tier 3 phases.
+
 Measure and analyze test coverage.
 
 ## Target

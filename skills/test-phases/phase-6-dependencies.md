@@ -1,5 +1,9 @@
 # Phase 6: Dependency Health
 
+> **Model**: `sonnet` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for audit commands. Use `WebSearch` to look up CVE details for flagged vulnerabilities. Parallelize with other Tier 3 phases.
+
 Check package health, outdated deps, and vulnerabilities.
 
 ## Execution Steps

@@ -1,5 +1,9 @@
 # Phase 9: Debug Analysis
 
+> **Model**: `sonnet` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash`, `Read`, `Grep` for failure analysis. Use `WebSearch` to look up error messages or stack traces. Parallelize with other Tier 3 phases.
+
 Analyze test failures and identify root causes.
 
 ## Purpose

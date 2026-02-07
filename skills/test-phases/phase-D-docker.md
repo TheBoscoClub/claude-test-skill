@@ -1,5 +1,9 @@
 # Phase D: Docker Validation
 
+> **Model**: `opus` | **Tier**: 5 (Post-fix, Conditional) | **Modifies Files**: No (validates registry)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for docker/buildx commands. Use `KillShell` to terminate hung Docker builds. Use `WebSearch` to check for base image vulnerabilities or updated tags.
+
 Validate Docker image builds and registry package synchronization.
 
 ## Prerequisites

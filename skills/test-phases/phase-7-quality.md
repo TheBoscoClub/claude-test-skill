@@ -1,5 +1,9 @@
 # Phase 7: Code Quality
 
+> **Model**: `opus` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for linters/formatters. Use `NotebookEdit` for Jupyter notebook quality checks. Use `WebSearch` to look up linter rule explanations for unfamiliar warnings. Parallelize with other Tier 3 phases.
+
 Comprehensive linting, formatting, complexity analysis, and style checks using all available tools.
 
 ## MCP/LSP Server Integration

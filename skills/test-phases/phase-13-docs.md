@@ -1,5 +1,9 @@
 # Phase 13: Documentation
 
+> **Model**: `sonnet` | **Tier**: 7 (Docs) | **Modifies Files**: YES (fixes docs)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Read`, `Edit`, `Write` for doc fixes. Use `NotebookEdit` for Jupyter notebook documentation. Use `WebSearch` to verify external URLs still resolve. In `--interactive` mode, use `AskUserQuestion` for doc style decisions.
+
 ## Execution Mode
 
 This phase behaves differently based on execution mode:

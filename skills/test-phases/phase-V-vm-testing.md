@@ -1,5 +1,9 @@
 # Phase V: VM Testing (Heavy Isolation)
 
+> **Model**: `sonnet` | **Tier**: Special (Conditional) | **Modifies Files**: VM only
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for virsh/SSH commands. Use `KillShell` to terminate hung VM operations. Use `AskUserQuestion` if VM connectivity fails and user input is needed.
+
 ## Purpose
 
 Test applications, releases, and system-level changes in fully isolated virtual machines. This phase provides the highest level of isolation for testing operations that could brick the host system.

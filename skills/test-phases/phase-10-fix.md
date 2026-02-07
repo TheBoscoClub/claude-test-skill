@@ -1,5 +1,9 @@
 # Phase 10: Fix Issues
 
+> **Model**: `opus` | **Tier**: 4 (Fix — BLOCKING) | **Modifies Files**: YES
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done. This phase blocks ALL subsequent phases.
+> **Key Tools**: `Edit`, `Write`, `Bash` for fixes. Use `AskUserQuestion` in `--interactive` mode for architectural decisions. Use `WebSearch` to research best-practice fix patterns. Use `NotebookEdit` if fixes affect Jupyter notebooks.
+
 ## Execution Mode
 
 This phase behaves differently based on execution mode:

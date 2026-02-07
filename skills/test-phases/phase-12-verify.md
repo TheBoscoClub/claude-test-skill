@@ -1,5 +1,9 @@
 # Phase 12: Final Verification
 
+> **Model**: `sonnet` | **Tier**: 6 (Verify) | **Modifies Files**: No (re-tests)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for re-running tests. Use `KillShell` if verification tests hang.
+
 End-to-end verification that all fixes work.
 
 ## Purpose

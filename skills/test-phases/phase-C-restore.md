@@ -1,5 +1,9 @@
 # Phase C: Cleanup/Restore
 
+> **Model**: `haiku` | **Tier**: 8 (Final) | **Modifies Files**: Cleans up
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for cleanup. Use `KillShell` to terminate any lingering test processes.
+
 Clean up test artifacts and optionally restore from snapshot.
 
 ## Purpose

@@ -1,5 +1,9 @@
 # Phase 3: Test Results Report
 
+> **Model**: `haiku` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash`, `Read`, `Grep`. Parallelize with other Tier 3 phases.
+
 Generate comprehensive test results report.
 
 ## Purpose

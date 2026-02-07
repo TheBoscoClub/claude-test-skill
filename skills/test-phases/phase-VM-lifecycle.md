@@ -1,5 +1,9 @@
 # VM Lifecycle Management Module
 
+> **Model**: `sonnet` | **Tier**: Support (VM infrastructure) | **Modifies Files**: No (manages VMs)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for virsh commands. Use `KillShell` to terminate hung VM operations. Use `AskUserQuestion` if VM fails to start and user needs to choose alternative.
+
 Manages automatic VM startup and shutdown for isolated testing.
 
 ## Purpose

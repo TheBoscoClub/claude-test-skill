@@ -1,5 +1,9 @@
 # Phase M: Mocking/Sandbox Environment
 
+> **Model**: `haiku` | **Tier**: 0 (Pre-test) | **Modifies Files**: Creates sandbox
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for sandbox setup. Use `KillShell` if sandbox creation hangs.
+
 Set up isolated environment for safe testing.
 
 ## Purpose

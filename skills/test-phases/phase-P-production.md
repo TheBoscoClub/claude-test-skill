@@ -1,5 +1,9 @@
 # Phase P: Production Validation
 
+> **Model**: `opus` | **Tier**: 5 (Post-fix, Conditional) | **Modifies Files**: No (validates live)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for system validation. Use `KillShell` to terminate hung service checks. Use `AskUserQuestion` in `--interactive` mode for production remediation decisions. Use `WebSearch` to verify expected service behavior.
+
 ## Purpose
 
 Validate that a project's **installed production application** is running correctly on the system. This phase compares the expected installation state (from manifest + install script analysis) against the actual system state.

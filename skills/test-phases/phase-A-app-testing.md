@@ -1,5 +1,9 @@
 # Phase A: Deployable Application Testing
 
+> **Model**: `opus` | **Tier**: Special | **Modifies Files**: Sandbox only
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for install/test commands. Use `KillShell` to terminate hung install processes. Use `AskUserQuestion` in `--interactive` mode if install paths or config choices are needed. Can parallel with Tier 3 phases.
+
 ## Purpose
 
 Test the project's **deployable/installable application** separately from the source code. This ensures end users have a smooth experience with installation, updates, and migrations.

@@ -1,5 +1,9 @@
 # Phase H: Holistic Full-Stack Analysis
 
+> **Model**: `opus` | **Tier**: 3 (Analysis) | **Modifies Files**: YES (fixes cross-component)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Glob`, `Grep`, `Read` for cross-component analysis. Use `WebSearch` to research design patterns for cross-layer issues. Use `AskUserQuestion` in `--interactive` mode for architectural decisions. Parallelize with Phases 7, 5 (after Discovery).
+
 A comprehensive analysis that views the entire codebase as an interconnected system - understanding how shell scripts, Python backend, web frontend, and services relate to and depend on each other.
 
 ## Philosophy

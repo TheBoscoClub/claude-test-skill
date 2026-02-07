@@ -1,5 +1,9 @@
 # Phase S: Safety Snapshots (BTRFS + VM)
 
+> **Model**: `haiku` | **Tier**: 0 (Pre-test) | **Modifies Files**: No (creates snapshot)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for btrfs/virsh commands. Use `KillShell` if a snapshot command hangs.
+
 Create read-only safety snapshots before making changes.
 
 ## Prerequisites

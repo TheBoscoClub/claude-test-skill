@@ -1,5 +1,9 @@
 # Phase 5: Comprehensive Security Testing & Mitigation
 
+> **Model**: `opus` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for security scanners, `WebSearch` to look up CVE details and check for known exploits for flagged vulnerabilities. Use `AskUserQuestion` in `--interactive` mode for security remediation decisions (e.g., breaking change vs. patching). Parallelize with other Tier 3 phases.
+
 **THE security phase** - tests and mitigates all security issues across:
 - **GitHub** - Repository security settings, alerts, workflows
 - **Local Project** - Code vulnerabilities, secrets, dependencies, SAST

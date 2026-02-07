@@ -1,5 +1,9 @@
 # Phase 0: Pre-Flight Environment Validation
 
+> **Model**: `sonnet` | **Tier**: 0 (Pre-test) | **Modifies Files**: No
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for environment checks. Use `WebSearch` to verify tool version compatibility if needed.
+
 Validate the environment is ready before running any tests. Fail fast on environment issues.
 
 ## Step 1: Dependency Verification

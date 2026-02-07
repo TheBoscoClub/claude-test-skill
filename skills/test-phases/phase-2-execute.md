@@ -1,5 +1,9 @@
 # Phase 2: Execute Tests
 
+> **Model**: `sonnet` | **Tier**: 2 (Execute) | **Modifies Files**: No (runs tests)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for test execution. Use `KillShell` to terminate hung test processes. Can parallel with Phase 2a.
+
 Run the project's test suite and capture results.
 
 ## Execution Steps

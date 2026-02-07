@@ -1,5 +1,9 @@
 # Phase G: GitHub Repository Audit
 
+> **Model**: `opus` | **Tier**: 5 (Post-fix, Conditional) | **Modifies Files**: No (audits GitHub)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for `gh` CLI commands. Use `WebSearch` to look up GitHub API changes or new security features. Use `AskUserQuestion` in `--interactive` mode for security remediation decisions (e.g., enabling features that may affect CI).
+
 Comprehensive audit of the project's GitHub repository, including security features, alerts, workflows, and compliance.
 
 **Prerequisite**: Phase 1 (Discovery) must have detected a GitHub repository with authenticated access.

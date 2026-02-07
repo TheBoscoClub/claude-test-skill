@@ -1,5 +1,9 @@
 # Phase 2a: Runtime Health Checks
 
+> **Model**: `sonnet` | **Tier**: 2 (Execute) | **Modifies Files**: No
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for service checks. Use `KillShell` to terminate unresponsive health checks. Can parallel with Phase 2.
+
 Verify running services and runtime dependencies.
 
 ## When to Run

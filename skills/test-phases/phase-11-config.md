@@ -1,5 +1,9 @@
 # Phase 11: Configuration Audit
 
+> **Model**: `sonnet` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Read`, `Glob`, `Grep` for config analysis. Parallelize with other Tier 3 phases.
+
 Validate project configuration files.
 
 ## Files to Check

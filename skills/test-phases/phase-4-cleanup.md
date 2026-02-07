@@ -1,5 +1,9 @@
 # Phase 4: Code Cleanup
 
+> **Model**: `haiku` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash`, `Grep`, `Glob`. Parallelize with other Tier 3 phases.
+
 Identify dead code, deprecations, and cleanup opportunities.
 
 ## Execution Steps

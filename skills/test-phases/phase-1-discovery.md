@@ -1,5 +1,9 @@
 # Phase 1: Discovery
 
+> **Model**: `opus` | **Tier**: 1 (Discovery — GATE) | **Modifies Files**: No
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done. All subsequent phases depend on this — use `addBlocks` to express downstream dependencies.
+> **Key Tools**: `Bash`, `Glob`, `Grep`, `Read` for project analysis. Use `WebSearch` to identify framework conventions if an unfamiliar project type is detected.
+
 Identify project type, test framework, and testable components.
 
 ## Execution Steps

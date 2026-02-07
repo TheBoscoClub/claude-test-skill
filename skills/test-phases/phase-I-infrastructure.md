@@ -1,5 +1,9 @@
 # Phase I: Infrastructure & Runtime Issues
 
+> **Model**: `sonnet` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash` for system checks. Use `WebSearch` to research infrastructure error patterns. Use `KillShell` for hung service probes. Parallelize with other Tier 3 phases.
+
 ## Purpose
 
 Detect common infrastructure, permission, and runtime configuration issues that cause silent failures in production applications. These issues often manifest as:

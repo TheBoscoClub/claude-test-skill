@@ -1,5 +1,9 @@
 # Phase ST: Test-Skill Self-Test
 
+> **Model**: `opus` | **Tier**: Special (Isolated) | **Modifies Files**: No (read-only)
+> **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
+> **Key Tools**: `Bash`, `Read`, `Glob`, `Grep` for framework validation. Verify all 22 allowed tools are accessible. Validate model tiering configuration matches dispatcher.
+
 **Meta-testing phase** - validates the test-skill framework itself.
 
 This phase only runs when explicitly called: `/test --phase=ST`
@@ -27,7 +31,7 @@ TOTAL_CHECKS=0
 PASSED_CHECKS=0
 FAILED_CHECKS=0
 
-TEST_SKILL_PROJECT="/path/to/projects/test-skill"
+TEST_SKILL_PROJECT="/path/to/projects/claude-test-skill"
 SKILLS_DIR="$HOME/.claude/skills/test-phases"
 COMMANDS_DIR="$HOME/.claude/commands"
 
@@ -74,6 +78,8 @@ EXPECTED_PHASES=(
     "phase-P-production.md"
     "phase-S-snapshot.md"
     "phase-ST-self-test.md"
+    "phase-V-vm-testing.md"
+    "phase-VM-lifecycle.md"
 )
 
 echo "───────────────────────────────────────────────────────────────────"
@@ -344,6 +350,136 @@ for phase_file in "$SKILLS_DIR"/phase-*.md; do
 done
 
 echo "  ✅ All phase files contain valid markdown structure"
+```
+
+---
+
+## Section 6: Opus 4.6 Integration Validation
+
+```bash
+echo ""
+echo "╔═══════════════════════════════════════════════════════════════════╗"
+echo "║  SECTION 6: OPUS 4.6 INTEGRATION                                 ║"
+echo "╚═══════════════════════════════════════════════════════════════════╝"
+echo ""
+
+echo "───────────────────────────────────────────────────────────────────"
+echo "  6.1 Phase File Configuration Headers"
+echo "───────────────────────────────────────────────────────────────────"
+
+MISSING_HEADERS=0
+for phase_file in "$SKILLS_DIR"/phase-*.md; do
+    PHASE_NAME=$(basename "$phase_file")
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    if grep -q '> \*\*Model\*\*:' "$phase_file" 2>/dev/null && \
+       grep -q '> \*\*Task Tracking\*\*:' "$phase_file" 2>/dev/null && \
+       grep -q '> \*\*Key Tools\*\*:' "$phase_file" 2>/dev/null; then
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    else
+        echo "  ❌ $PHASE_NAME missing Opus 4.6 configuration header"
+        FAILED_CHECKS=$((FAILED_CHECKS + 1))
+        MISSING_HEADERS=$((MISSING_HEADERS + 1))
+    fi
+done
+
+if [[ "$MISSING_HEADERS" -eq 0 ]]; then
+    echo "  ✅ All phase files have Opus 4.6 configuration headers"
+fi
+
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  6.2 Model Tiering Validation"
+echo "───────────────────────────────────────────────────────────────────"
+
+# Validate expected model assignments
+declare -A EXPECTED_MODELS=(
+    ["phase-1-discovery.md"]="opus"
+    ["phase-5-security.md"]="opus"
+    ["phase-7-quality.md"]="opus"
+    ["phase-10-fix.md"]="opus"
+    ["phase-A-app-testing.md"]="opus"
+    ["phase-P-production.md"]="opus"
+    ["phase-D-docker.md"]="opus"
+    ["phase-G-github.md"]="opus"
+    ["phase-H-holistic.md"]="opus"
+    ["phase-ST-self-test.md"]="opus"
+    ["phase-0-preflight.md"]="sonnet"
+    ["phase-2-execute.md"]="sonnet"
+    ["phase-2a-runtime.md"]="sonnet"
+    ["phase-6-dependencies.md"]="sonnet"
+    ["phase-8-coverage.md"]="sonnet"
+    ["phase-9-debug.md"]="sonnet"
+    ["phase-11-config.md"]="sonnet"
+    ["phase-12-verify.md"]="sonnet"
+    ["phase-13-docs.md"]="sonnet"
+    ["phase-V-vm-testing.md"]="sonnet"
+    ["phase-S-snapshot.md"]="haiku"
+    ["phase-M-mocking.md"]="haiku"
+    ["phase-3-report.md"]="haiku"
+    ["phase-4-cleanup.md"]="haiku"
+    ["phase-C-restore.md"]="haiku"
+)
+
+MODEL_MISMATCHES=0
+for phase_file in "${!EXPECTED_MODELS[@]}"; do
+    EXPECTED="${EXPECTED_MODELS[$phase_file]}"
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    if grep -q "Model.*\`$EXPECTED\`" "$SKILLS_DIR/$phase_file" 2>/dev/null; then
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    else
+        ACTUAL=$(grep -oP 'Model.*`\K[a-z]+' "$SKILLS_DIR/$phase_file" 2>/dev/null || echo "none")
+        echo "  ❌ $phase_file: expected $EXPECTED, found $ACTUAL"
+        FAILED_CHECKS=$((FAILED_CHECKS + 1))
+        MODEL_MISMATCHES=$((MODEL_MISMATCHES + 1))
+    fi
+done
+
+if [[ "$MODEL_MISMATCHES" -eq 0 ]]; then
+    echo "  ✅ All model tier assignments match dispatcher specification"
+fi
+
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  6.3 Dispatcher Allowed Tools (22 expected)"
+echo "───────────────────────────────────────────────────────────────────"
+
+EXPECTED_TOOLS=("Bash" "Read" "Write" "Edit" "Glob" "Grep" "Task" "TaskOutput" "TaskStop" "TaskCreate" "TaskUpdate" "TaskList" "AskUserQuestion" "KillShell" "NotebookEdit" "WebSearch")
+TOOLS_FOUND=0
+for tool in "${EXPECTED_TOOLS[@]}"; do
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    if grep -q "- $tool" "$DISPATCHER" 2>/dev/null; then
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+        TOOLS_FOUND=$((TOOLS_FOUND + 1))
+    else
+        echo "  ❌ Dispatcher missing allowed tool: $tool"
+        FAILED_CHECKS=$((FAILED_CHECKS + 1))
+    fi
+done
+
+echo "  ✅ Dispatcher declares $TOOLS_FOUND/16 core allowed tools"
+
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  6.4 Dispatcher Model Selection Table"
+echo "───────────────────────────────────────────────────────────────────"
+
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+if grep -q 'Subagent Model Selection' "$DISPATCHER" 2>/dev/null; then
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    echo "  ✅ Model selection table present in dispatcher"
+else
+    echo "  ❌ Model selection table missing from dispatcher"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+fi
+
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+if grep -q 'Task Progress Tracking' "$DISPATCHER" 2>/dev/null; then
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    echo "  ✅ Task progress tracking section present in dispatcher"
+else
+    echo "  ❌ Task progress tracking section missing from dispatcher"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+fi
 ```
 
 ---
