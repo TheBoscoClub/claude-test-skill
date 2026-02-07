@@ -90,9 +90,9 @@ For full autonomous execution with all 21 phases:
 
 ```bash
 # Clone and symlink
-git clone https://github.com/TheBoscoClub/test-skill.git ~/test-skill
-ln -s ~/test-skill/commands/test.md ~/.claude/commands/test.md
-ln -s ~/test-skill/skills/test-phases ~/.claude/skills/test-phases
+git clone https://github.com/TheBoscoClub/claude-test-skill.git ~/claude-test-skill
+ln -s ~/claude-test-skill/commands/test.md ~/.claude/commands/test.md
+ln -s ~/claude-test-skill/skills/test-phases ~/.claude/skills/test-phases
 ```
 
 ## More Information

@@ -1,7 +1,7 @@
 {
   "name": "test-skill",
   "description": "Modular project audit system with 25 phases for testing, security, debugging, and code quality. Context-efficient design loads phases on-demand via subagents.",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "author": {
     "name": "TheBoscoClub"
   },

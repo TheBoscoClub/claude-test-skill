@@ -1064,4 +1064,4 @@ To skip auto-enable behavior, use:
 
 ---
 
-*Document Version: 1.1.0 — Updated for Opus 4.6: model selection, YAML allowed-tools, task tracking*
+*Document Version: 2.0.0 — Updated for Opus 4.6: model selection, YAML allowed-tools, task tracking*

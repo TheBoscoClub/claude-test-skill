@@ -13,6 +13,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.0] - 2026-02-06
+
+### Added
+- **Opus 4.6 model pinning**: Frontmatter `model: opus` ensures test skill always runs on Opus
+- **Subagent model tiering**: Per-phase model selection (opus/sonnet/haiku) based on complexity:
+  - Opus: Phases 1, 5, 7, 10, A, P, D, G, H, ST (complex analysis, security, architecture)
+  - Sonnet: Phases 0, 2, 2a, 6, 8, 9, 11, 12, 13, V (standard testing, coverage, linting)
+  - Haiku: Phases S, M, 3, 4, C (snapshots, file checks, simple validation)
+- **Task progress tracking**: Integration with TaskCreate/TaskUpdate/TaskList for real-time phase tracking with dependency chains
+- **9 new allowed tools**: TaskOutput, TaskStop, TaskCreate, TaskUpdate, TaskList, AskUserQuestion, KillShell, NotebookEdit, WebSearch
+- **Background phase execution**: `run_in_background: true` guidance for independent phases
+
+### Changed
+- **BREAKING**: `allowed-tools` converted from CSV to YAML list syntax (requires Claude Code 2.1+)
+- **BREAKING**: Tool count expanded from 13 to 22 tools — older Claude Code versions may reject unknown tools
+- All GitHub URLs updated from `greogory` to `TheBoscoClub` organization
+- CodeFactor badge added to README
+- GitHub Actions pinned to commit SHAs for supply chain security
+
 ## [1.0.5] - 2026-01-14
 
 ### Added
@@ -133,14 +152,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Converted to modular plugin architecture (93% context reduction)
 - All phases load on-demand via subagents
 
-[Unreleased]: https://github.com/TheBoscoClub/test-skill/compare/v1.0.5...HEAD
-[1.0.5]: https://github.com/TheBoscoClub/test-skill/compare/v1.0.4...v1.0.5
-[1.0.4]: https://github.com/TheBoscoClub/test-skill/compare/v1.0.3.1...v1.0.4
-[1.0.3.1]: https://github.com/TheBoscoClub/test-skill/compare/v1.0.3...v1.0.3.1
-[1.0.3]: https://github.com/TheBoscoClub/test-skill/compare/v1.0.2.1...v1.0.3
-[1.0.2.1]: https://github.com/TheBoscoClub/test-skill/compare/v1.0.2...v1.0.2.1
-[1.0.2]: https://github.com/TheBoscoClub/test-skill/compare/v1.0.1.2...v1.0.2
-[1.0.1.2]: https://github.com/TheBoscoClub/test-skill/compare/v1.0.1.1...v1.0.1.2
-[1.0.1.1]: https://github.com/TheBoscoClub/test-skill/compare/v1.0.1...v1.0.1.1
-[1.0.1]: https://github.com/TheBoscoClub/test-skill/compare/v1.0.0...v1.0.1
-[1.0.0]: https://github.com/TheBoscoClub/test-skill/releases/tag/v1.0.0
+[Unreleased]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.5...v2.0.0
+[1.0.5]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.4...v1.0.5
+[1.0.4]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.3.1...v1.0.4
+[1.0.3.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.3...v1.0.3.1
+[1.0.3]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.2.1...v1.0.3
+[1.0.2.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.2...v1.0.2.1
+[1.0.2]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.1.2...v1.0.2
+[1.0.1.2]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.1.1...v1.0.1.2
+[1.0.1.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.1...v1.0.1.1
+[1.0.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v1.0.0
