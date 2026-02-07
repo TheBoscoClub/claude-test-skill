@@ -1,6 +1,23 @@
 ---
 description: Modular project audit - testing, security, debugging, fixing (phase-based loading for context efficiency) (user)
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task
+model: opus
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Glob
+  - Grep
+  - Task
+  - TaskOutput
+  - TaskStop
+  - TaskCreate
+  - TaskUpdate
+  - TaskList
+  - AskUserQuestion
+  - KillShell
+  - NotebookEdit
+  - WebSearch
 argument-hint: "[help] [prodapp] [docker] [security] [holistic] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
 ---
 
@@ -550,11 +567,38 @@ This skill uses **phase subagents** to minimize context consumption:
 
 1. **Dispatcher** (this file) - parses args, enforces dependencies
 2. **Phase Files** - `~/.claude/skills/test-phases/phase-*.md`
-3. **Subagents** - Load phase files on-demand via Task tool
+3. **Subagents** - Load phase files on-demand via Task tool with model selection
 4. **Gates** - Tier completion checkpoints before next tier
+5. **Task tracking** - Use TaskCreate/TaskUpdate for phase progress visibility
 
 Each phase runs in its own subagent context, then returns a summary.
 **Phases within a tier may run in parallel. Tiers run sequentially.**
+
+### Subagent Model Selection
+
+When spawning Task subagents for phases, specify the `model` parameter based on phase complexity:
+
+| Model | Phases | Rationale |
+|-------|--------|-----------|
+| **opus** | 1, 5, 7, 10, A, P, D, G, H, ST | Complex analysis, multi-step fixes, security audit, cross-component reasoning |
+| **sonnet** | 0, 2, 2a, 6, 8, 9, 11, 12, 13, V | Moderate complexity: test execution, dependency checks, verification |
+| **haiku** | S, M, 3, 4, C | Lightweight: snapshots, sandbox setup, reporting, cleanup |
+
+**Example Task call with model:**
+```
+Task(subagent_type="general-purpose", model="opus", prompt="Read phase file and execute...")
+Task(subagent_type="general-purpose", model="haiku", prompt="Read phase file and execute...")
+```
+
+### Task Progress Tracking
+
+Use TaskCreate at the start of the audit to create a task for each phase being run.
+Update task status as phases execute:
+- `pending` → `in_progress` when a phase subagent is spawned
+- `in_progress` → `completed` when the phase returns successfully
+- Use `addBlockedBy` to express tier dependencies between tasks
+
+This gives the user real-time visibility into audit progress.
 
 ---
 
@@ -565,7 +609,7 @@ When running phases, spawn a Task subagent for each phase:
 ```
 For each requested phase:
   1. Read the phase file from ~/.claude/skills/test-phases/phase-{X}.md
-  2. If file exists, execute the phase instructions
+  2. If file exists, execute the phase instructions via Task tool with appropriate model
   3. If no file, use inline fallback instructions below
   4. Collect results and continue to next phase
 ```
@@ -823,11 +867,16 @@ ELSE (Autonomous - DEFAULT):
    Always runs regardless of prior failures (cleanup is mandatory)
    ```
 
-6. **For each tier, spawn Task subagent(s):**
+6. **For each tier, spawn Task subagent(s) with model selection:**
    - **Parallel tier**: Multiple Task tool calls in SINGLE message
    - **Sequential tier**: Single Task tool call, wait for result
    - Each subagent reads `~/.claude/skills/test-phases/phase-{X}-{name}.md`
    - Each returns summary with Status, Issue count, Key findings
+   - **Model selection per phase** (use `model` parameter on Task tool):
+     - `opus`: Phases 1, 5, 7, 10, A, P, D, G, H, ST
+     - `sonnet`: Phases 0, 2, 2a, 6, 8, 9, 11, 12, 13, V
+     - `haiku`: Phases S, M, 3, 4, C
+   - Use `run_in_background: true` for long-running phases where appropriate
 
 7. **Gate validation between tiers:**
    - Collect all results from current tier
@@ -1015,4 +1064,4 @@ To skip auto-enable behavior, use:
 
 ---
 
-*Document Version: 1.0.2.0*
+*Document Version: 1.1.0 — Updated for Opus 4.6: model selection, YAML allowed-tools, task tracking*
