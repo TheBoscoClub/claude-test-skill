@@ -1,11 +1,11 @@
 ---
 name: project-audit
-description: Autonomous 21-phase project audit with testing, security scanning, code quality, GitHub auditing, and auto-fixing
+description: Autonomous 27-phase project audit with testing, security scanning, code quality, GitHub auditing, and auto-fixing
 ---
 
 # /test - Modular Project Audit
 
-A comprehensive 21-phase autonomous project audit system with full GitHub integration.
+A comprehensive 27-phase autonomous project audit system with full GitHub integration.
 
 ## Quick Reference
 
@@ -24,7 +24,7 @@ A comprehensive 21-phase autonomous project audit system with full GitHub integr
 ## Key Features
 
 - **Autonomous**: Fixes ALL issues without prompting, loops until clean
-- **21 Phases**: Complete coverage from safety snapshots to documentation sync
+- **27 Phases**: Complete coverage from safety snapshots to documentation sync
 - **Multi-Language**: Python, Node.js, Go, Rust, Shell, Docker, YAML
 - **20+ Tools**: ruff, pylint, bandit, shellcheck, trivy, CodeQL, and more
 - **GitHub Integration**: Dependabot, CodeQL workflows, branch protection audit
@@ -86,7 +86,7 @@ Upload this `SKILL.md` file directly to your Claude.ai account:
 
 ### Claude Code (CLI)
 
-For full autonomous execution with all 21 phases:
+For full autonomous execution with all 27 phases:
 
 ```bash
 # Clone and symlink
@@ -97,6 +97,6 @@ ln -s ~/claude-test-skill/skills/test-phases ~/.claude/skills/test-phases
 
 ## More Information
 
-- **Repository**: https://github.com/TheBoscoClub/test-skill
-- **Full Documentation**: See README.md
-- **Version**: 1.0.1.2
+- **Repository**: https://github.com/TheBoscoClub/claude-test-skill
+- **Full Documentation**: See README.md and INSTALL.md
+- **Version**: 2.0.1

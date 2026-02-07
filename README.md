@@ -1,6 +1,6 @@
 # Claude Code Test Skill
 
-A comprehensive 25-phase autonomous project audit system for Claude Code with full GitHub integration.
+A comprehensive 27-phase autonomous project audit system for Claude Code with full GitHub integration.
 
 [![Security Scan](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml/badge.svg)](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/TheBoscoClub/claude-test-skill)](https://github.com/TheBoscoClub/claude-test-skill/releases)
@@ -123,43 +123,35 @@ The `/test` skill performs a complete autonomous audit of any software project -
 
 ## Installation
 
-### Option 1: Symlinks (Recommended for Development)
+> **Full installation guide:** See [INSTALL.md](INSTALL.md) for detailed instructions including prerequisites, verification, updating, and troubleshooting.
 
-Symlinks allow edits in this project to be immediately live in Claude Code:
-
-```bash
-# Clone the repository
-git clone https://github.com/TheBoscoClub/claude-test-skill.git ~/ClaudeCodeProjects/test-skill
-
-# Remove existing files (if any)
-rm -f ~/.claude/commands/test.md
-rm -rf ~/.claude/skills/test-phases
-
-# Create symlinks
-ln -s ~/ClaudeCodeProjects/test-skill/commands/test.md ~/.claude/commands/test.md
-ln -s ~/ClaudeCodeProjects/test-skill/skills/test-phases ~/.claude/skills/test-phases
-```
-
-### Option 2: Copy (Standalone Installation)
+### Quick Install (Symlinks)
 
 ```bash
-# Clone and copy
-git clone https://github.com/TheBoscoClub/claude-test-skill.git /tmp/test-skill
-cp /tmp/test-skill/commands/test.md ~/.claude/commands/
-cp -r /tmp/test-skill/skills/test-phases ~/.claude/skills/
-rm -rf /tmp/test-skill
+git clone https://github.com/TheBoscoClub/claude-test-skill.git ~/claude-test-skill
+mkdir -p ~/.claude/commands ~/.claude/skills
+ln -s ~/claude-test-skill/commands/test.md ~/.claude/commands/test.md
+ln -s ~/claude-test-skill/skills/test-phases ~/.claude/skills/test-phases
 ```
 
-### Option 3: Claude.ai Web Upload
+### Quick Install (Copy)
 
-You can upload this skill directly to your Claude.ai account for use in the web interface:
+```bash
+git clone https://github.com/TheBoscoClub/claude-test-skill.git /tmp/claude-test-skill
+mkdir -p ~/.claude/commands ~/.claude/skills
+cp /tmp/claude-test-skill/commands/test.md ~/.claude/commands/
+cp -r /tmp/claude-test-skill/skills/test-phases ~/.claude/skills/
+rm -rf /tmp/claude-test-skill
+```
 
-1. Download the `SKILL.md` file from this repository
-2. Go to [claude.ai](https://claude.ai) → Settings → Skills
-3. Click "Upload skill" and select the `SKILL.md` file
-4. The skill will be available in your Claude.ai projects
+### Verify Installation
 
-**Note**: The Claude.ai version provides the skill reference and instructions. For full autonomous execution with all 21 phases, use Claude Code (Options 1 or 2).
+```bash
+# In Claude Code:
+/test --phase=ST
+```
+
+**Requires:** Claude Code 2.1.0+ (for YAML `allowed-tools` syntax). See [INSTALL.md](INSTALL.md) for full prerequisites.
 
 ---
 
@@ -313,49 +305,51 @@ Phase G performs a comprehensive GitHub repository audit:
 ## Architecture
 
 ```
-test-skill/
+claude-test-skill/
 ├── commands/
-│   ├── test.md              # Main dispatcher (~800 lines)
+│   ├── test.md              # Main dispatcher (~1,000 lines)
 │   └── test-legacy.md       # Original monolithic version (backup)
 ├── skills/
-│   └── test-phases/
-│       ├── phase-S-snapshot.md
-│       ├── phase-M-mocking.md
-│       ├── phase-0-preflight.md
-│       ├── phase-1-discovery.md
-│       ├── phase-2-execute.md
-│       ├── phase-2a-runtime.md
-│       ├── phase-3-report.md
-│       ├── phase-4-cleanup.md
-│       ├── phase-5-security.md
-│       ├── phase-6-dependencies.md
-│       ├── phase-7-quality.md
-│       ├── phase-8-coverage.md
-│       ├── phase-9-debug.md
-│       ├── phase-10-fix.md
-│       ├── phase-11-config.md
-│       ├── phase-12-verify.md
-│       ├── phase-13-docs.md
-│       ├── phase-A-app-testing.md
-│       ├── phase-P-production.md
-│       ├── phase-D-docker.md
-│       ├── phase-G-github.md
-│       ├── phase-H-holistic.md
-│       ├── phase-I-infrastructure.md
-│       ├── phase-ST-self-test.md
-│       └── phase-C-restore.md
+│   └── test-phases/         # 27 phase files (each with Opus 4.6 config header)
+│       ├── phase-S-snapshot.md       # [haiku]
+│       ├── phase-M-mocking.md        # [haiku]
+│       ├── phase-0-preflight.md      # [sonnet]
+│       ├── phase-1-discovery.md      # [opus]
+│       ├── phase-2-execute.md        # [sonnet]
+│       ├── phase-2a-runtime.md       # [sonnet]
+│       ├── phase-3-report.md         # [haiku]
+│       ├── phase-4-cleanup.md        # [haiku]
+│       ├── phase-5-security.md       # [opus]
+│       ├── phase-6-dependencies.md   # [sonnet]
+│       ├── phase-7-quality.md        # [opus]
+│       ├── phase-8-coverage.md       # [sonnet]
+│       ├── phase-9-debug.md          # [sonnet]
+│       ├── phase-10-fix.md           # [opus]
+│       ├── phase-11-config.md        # [sonnet]
+│       ├── phase-12-verify.md        # [sonnet]
+│       ├── phase-13-docs.md          # [sonnet]
+│       ├── phase-A-app-testing.md    # [opus]
+│       ├── phase-P-production.md     # [opus]
+│       ├── phase-D-docker.md         # [opus]
+│       ├── phase-G-github.md         # [opus]
+│       ├── phase-H-holistic.md       # [opus]
+│       ├── phase-I-infrastructure.md # [sonnet]
+│       ├── phase-C-restore.md        # [haiku]
+│       ├── phase-ST-self-test.md     # [opus]
+│       ├── phase-V-vm-testing.md     # [sonnet]
+│       └── phase-VM-lifecycle.md     # [sonnet]
 ├── agents/
 │   ├── coverage-reviewer.md
 │   ├── security-scanner.md
 │   └── test-analyzer.md
-├── examples/
-│   └── test-skill.local.md
+├── docs/
+│   └── ARCHITECTURE.md      # System architecture
 ├── .github/
 │   └── workflows/
 │       └── security.yml     # Daily security scanning
 ├── plugin.json
-├── .gitignore
-├── .yamllint.yml
+├── INSTALL.md               # Third-party installation guide
+├── SKILL.md                 # Claude.ai web upload version
 └── README.md
 ```
 
@@ -494,11 +488,11 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
 ### Recent Releases
 
-- **v1.0.5** - Consolidated security phases (5+SEC→5), added Phase ST (self-test), 8-tool security suite
-- **v1.0.4** - Added Phase SEC (standalone security), Phase P enhancements
-- **v1.0.3** - Multi-segment version badges, documentation improvements
-- **v1.0.2** - Added Phase H (holistic), Phase I (infrastructure)
-- **v1.0.0** - Initial public release with GitHub integration
+- **v2.0.1** - Opus 4.6 phase configuration headers, Phase ST integration validation
+- **v2.0.0** - Opus 4.6 model pinning, subagent tiering, 22 tools, task tracking (BREAKING)
+- **v1.0.5** - Consolidated security phases, Phase ST (self-test), 8-tool security suite
+- **v1.0.4** - Phase SEC (standalone security), Phase P enhancements
+- **v1.0.2** - Phase H (holistic), Phase I (infrastructure)
 
 ---
 
