@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.1] - 2026-02-07
+
+### Added
+- **Opus 4.6 configuration headers**: All 27 phase files now include standardized metadata block with model tier, task tracking instructions, and phase-specific tool guidance
+- **Phase ST Section 6**: New Opus 4.6 integration validation — verifies headers, model tiering assignments, 22-tool declaration, and dispatcher consistency
+- **Phase ST**: Added `phase-V-vm-testing.md` and `phase-VM-lifecycle.md` to expected phases list
+
+### Fixed
+- **Phase ST**: Corrected project path from `test-skill` to `claude-test-skill`
+
 ## [2.0.0] - 2026-02-06
 
 ### Added
@@ -152,7 +162,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Converted to modular plugin architecture (93% context reduction)
 - All phases load on-demand via subagents
 
-[Unreleased]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.5...v2.0.0
 [1.0.5]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.3.1...v1.0.4

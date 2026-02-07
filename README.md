@@ -9,10 +9,10 @@ A comprehensive 25-phase autonomous project audit system for Claude Code with fu
 
 | Version | Status | Release |
 |---------|--------|---------|
-| ![2](https://img.shields.io/badge/2-brightgreen)![0](https://img.shields.io/badge/0-darkgreen)![0](https://img.shields.io/badge/0-green) | Latest major | [v2.0.0](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v2.0.0) |
+| ![2](https://img.shields.io/badge/2-brightgreen)![0](https://img.shields.io/badge/0-darkgreen)![1](https://img.shields.io/badge/1-green) | Latest patch | [v2.0.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v2.0.1) |
+| ![2](https://img.shields.io/badge/2-brightred)![0](https://img.shields.io/badge/0-darkred)![0](https://img.shields.io/badge/0-red) | Prior major | [v2.0.0](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v2.0.0) |
 | ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![5](https://img.shields.io/badge/5-red) | Prior patch | [v1.0.5](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v1.0.5) |
 | ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![4](https://img.shields.io/badge/4-red) | Prior patch | [v1.0.4](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v1.0.4) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![3](https://img.shields.io/badge/3-red)![1](https://img.shields.io/badge/1-orange) | Prior tweak | [v1.0.3.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v1.0.3.1) |
 
 <details>
 <summary>Badge Color Convention</summary>
