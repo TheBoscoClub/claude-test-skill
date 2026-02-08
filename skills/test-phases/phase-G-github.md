@@ -171,14 +171,6 @@ case "$PRIMARY_LANG" in
             ISSUES_FOUND=$((ISSUES_FOUND + 1))
         fi
         ;;
-    Shell)
-        if echo "$WORKFLOWS" | grep -qi "shellcheck"; then
-            echo "  ✅ ShellCheck workflow: Found"
-        else
-            echo "  ⚠️ ShellCheck workflow: Missing (recommended for Shell)"
-            ISSUES_FOUND=$((ISSUES_FOUND + 1))
-        fi
-        ;;
     Go)
         if echo "$WORKFLOWS" | grep -qiE "codeql|govulncheck"; then
             echo "  ✅ Go security workflow: Found"
@@ -200,7 +192,7 @@ esac
 # Check workflow schedule (should be daily)
 echo ""
 echo "Checking workflow schedules..."
-for workflow in codeql security shellcheck; do
+for workflow in codeql security; do
     WF_FILE=$(echo "$WORKFLOWS" | grep -i "$workflow" | head -1)
     if [[ -n "$WF_FILE" ]]; then
         SCHEDULE=$(gh api "repos/$GITHUB_REPO/contents/.github/workflows/$WF_FILE" 2>/dev/null | \
@@ -463,11 +455,6 @@ create_security_workflow() {
         Python)
             # Create CodeQL workflow for Python
             echo "Creating CodeQL workflow..."
-            # ... workflow creation code
-            ;;
-        Shell)
-            # Create ShellCheck workflow
-            echo "Creating ShellCheck workflow..."
             # ... workflow creation code
             ;;
     esac

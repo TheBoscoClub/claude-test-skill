@@ -287,7 +287,7 @@ echo "────────────────────────�
 echo "  4.1 Security Tools"
 echo "───────────────────────────────────────────────────────────────────"
 
-SECURITY_TOOLS=("bandit" "semgrep" "shellcheck" "codeql" "trivy" "grype" "pip-audit" "checkov")
+SECURITY_TOOLS=("bandit" "semgrep" "codeql" "trivy" "grype" "pip-audit" "checkov")
 for tool in "${SECURITY_TOOLS[@]}"; do
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     if command -v "$tool" &>/dev/null; then

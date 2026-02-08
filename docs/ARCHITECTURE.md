@@ -350,7 +350,7 @@ Phase configuration headers tell each subagent which tools are most relevant for
 
 ## Security Toolchain (Phase 5)
 
-Phase 5 integrates **8 security tools** in a comprehensive audit:
+Phase 5 integrates **7 security tools** in a comprehensive audit:
 
 ### Static Analysis (SAST)
 
@@ -358,7 +358,6 @@ Phase 5 integrates **8 security tools** in a comprehensive audit:
 |------|-----------|---------|
 | bandit | Python | Security vulnerability detection |
 | semgrep | Multi | Pattern-based security scanning |
-| shellcheck | Shell | Shell script analysis |
 | CodeQL | Multi | Deep semantic analysis |
 
 ### Dependency Scanning

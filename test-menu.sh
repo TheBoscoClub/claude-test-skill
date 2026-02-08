@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # Interactive launcher for /test skill
 # Install: ln -s /path/to/projects/test-skill/test-menu.sh ~/.local/bin/tm
 

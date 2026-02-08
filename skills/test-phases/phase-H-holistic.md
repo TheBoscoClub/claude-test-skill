@@ -29,7 +29,7 @@ analyze:
   - Exit code propagation and signal handling
   - Logging consistency (format, destinations, verbosity levels)
   - Inter-script dependencies (which scripts call which)
-  - Shellcheck compliance with project-specific exclusions
+  - Shell script best practices and project-specific conventions
 
 cross_reference:
   - Do shell scripts match Python expectations for file paths, formats?

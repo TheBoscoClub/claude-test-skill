@@ -111,8 +111,6 @@ if command -v shfmt &>/dev/null; then
     find . -name "*.sh" -not -path "./.snapshots/*" -exec shfmt -w {} \; 2>&1
 fi
 
-# Note: ShellCheck doesn't auto-fix, but we can apply common fixes
-# ShellCheck issues must be fixed manually or by Claude
 ```
 
 **JavaScript/TypeScript Formatting & Linting:**

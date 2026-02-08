@@ -34,7 +34,6 @@ This project uses the following tools for security auditing:
 
 | Tool | Purpose | Command |
 |------|---------|---------|
-| **shellcheck** | Static analysis for shell scripts | `shellcheck skills/test-phases/*.sh` |
 | **shfmt** | Shell script formatting | `shfmt -d skills/test-phases/*.sh` |
 
 ### Markdown Documentation (157 files)
@@ -47,9 +46,6 @@ This project uses the following tools for security auditing:
 ### Running a Full Security Audit
 
 ```bash
-# Shell script analysis
-find . -name "*.sh" -exec shellcheck {} \;
-
 # Markdown linting
 markdownlint '**/*.md' --ignore node_modules
 
@@ -64,7 +60,7 @@ grep -rE "(password|secret|api[_-]?key|token)" --include="*.sh" --include="*.md"
 
 This project contains Claude Code skill definitions (Markdown files) and shell scripts. Security concerns include:
 
-- Shell script injection vulnerabilities
+- Shell script security vulnerabilities
 - Exposed secrets or credentials in configuration
 - Unsafe file operations in scripts
 - Command injection in user-provided arguments

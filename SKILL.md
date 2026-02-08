@@ -26,7 +26,7 @@ A comprehensive 27-phase autonomous project audit system with full GitHub integr
 - **Autonomous**: Fixes ALL issues without prompting, loops until clean
 - **27 Phases**: Complete coverage from safety snapshots to documentation sync
 - **Multi-Language**: Python, Node.js, Go, Rust, Shell, Docker, YAML
-- **20+ Tools**: ruff, pylint, bandit, shellcheck, trivy, CodeQL, and more
+- **20+ Tools**: ruff, pylint, bandit, trivy, CodeQL, and more
 - **GitHub Integration**: Dependabot, CodeQL workflows, branch protection audit
 - **Context Efficient**: 93% reduction via on-demand phase loading
 
@@ -69,7 +69,7 @@ The skill operates **entirely non-interactively**:
 
 Phase 1 automatically detects installed tools:
 
-**Code Quality**: ruff, pylint, mypy, black, isort, eslint, prettier, hadolint, yamllint, shellcheck, shfmt, markdownlint, codespell
+**Code Quality**: ruff, pylint, mypy, black, isort, eslint, prettier, hadolint, yamllint, shfmt, markdownlint, codespell
 
 **Security**: pip-audit, bandit, npm audit, cargo audit, trivy, CodeQL
 

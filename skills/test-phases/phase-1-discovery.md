@@ -111,7 +111,6 @@ check_tool "pydocstyle" "pydocstyle"
 
 echo ""
 echo "Shell:"
-check_tool "shellcheck" "shellcheck"
 check_tool "shfmt" "shfmt"
 
 echo ""
@@ -475,7 +474,7 @@ detect_github_repo() {
 
     # Check for security workflows
     WORKFLOWS=$(gh api "repos/$GITHUB_REPO/contents/.github/workflows" 2>/dev/null | jq -r '.[].name' 2>/dev/null)
-    if echo "$WORKFLOWS" | grep -qiE "codeql|security|shellcheck"; then
+    if echo "$WORKFLOWS" | grep -qiE "codeql|security"; then
         echo "    ✅ Security workflows: Found"
         SECURITY_WORKFLOWS=true
     else

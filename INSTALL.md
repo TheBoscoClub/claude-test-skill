@@ -18,7 +18,6 @@ These tools are detected automatically by Phase 1 (Discovery) and used when avai
 | Tool | Install | Used By |
 |------|---------|---------|
 | [ruff](https://docs.astral.sh/ruff/) | `pip install ruff` | Phase 7 (lint), Phase 10 (auto-fix) |
-| [shellcheck](https://www.shellcheck.net/) | OS package manager | Phase 5 (security), Phase 7 (quality) |
 | [markdownlint-cli](https://github.com/igorshubovych/markdownlint-cli) | `npm install -g markdownlint-cli` | Phase 7, Phase 13 |
 | [codespell](https://github.com/codespell-project/codespell) | `pip install codespell` | Phase 7, Phase 10 |
 
@@ -39,7 +38,7 @@ These tools are detected automatically by Phase 1 (Discovery) and used when avai
 |------|---------|---------|
 | [gh](https://cli.github.com/) | OS package manager | Phase G (GitHub audit) |
 
-> **Note:** You don't need ALL of these. The skill gracefully skips tools that aren't installed and reports what it found. Start with `ruff`, `shellcheck`, and `bandit` for the best coverage-to-effort ratio.
+> **Note:** You don't need ALL of these. The skill gracefully skips tools that aren't installed and reports what it found. Start with `ruff` and `bandit` for the best coverage-to-effort ratio.
 
 ---
 

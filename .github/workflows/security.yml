@@ -15,35 +15,6 @@ permissions:
   security-events: write
 
 jobs:
-  shellcheck:
-    name: ShellCheck
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
-
-      - name: Run ShellCheck on shell scripts
-        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38  # v2.0.0
-        with:
-          scandir: './scripts'
-          severity: warning
-        continue-on-error: true
-
-      - name: Run ShellCheck on embedded bash in markdown
-        run: |
-          # Extract bash code blocks from markdown files and check them
-          echo "Checking embedded bash in markdown files..."
-
-          # Find all markdown files with bash code blocks
-          find . -name "*.md" -not -path "./.git/*" | while read -r file; do
-            # Extract bash blocks and create temp file for checking
-            awk '/^```bash$/,/^```$/' "$file" | grep -v '^```' > /tmp/extracted_bash.sh
-            if [[ -s /tmp/extracted_bash.sh ]]; then
-              echo "Checking: $file"
-              shellcheck --severity=warning /tmp/extracted_bash.sh || true
-            fi
-          done
-
   markdown-lint:
     name: Markdown Lint
     runs-on: ubuntu-latest

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # Demo: whiptail checklist menu for /test phase selection
 
 SELECTED=$(whiptail --title "/test Phase Selection" \

@@ -78,7 +78,7 @@ The `/test` skill performs a complete autonomous audit of any software project -
 | 3 | Report | Detailed test results and failure analysis |
 | **Analysis** |||
 | 4 | Cleanup | Deprecation detection, dead code removal |
-| 5 | Security | Comprehensive security (8 tools: bandit, semgrep, shellcheck, CodeQL, pip-audit, trivy, grype, checkov) |
+| 5 | Security | Comprehensive security (7 tools: bandit, semgrep, CodeQL, pip-audit, trivy, grype, checkov) |
 | 6 | Dependencies | Package health, outdated/unused/vulnerable packages |
 | 7 | Quality | Linting, complexity analysis (ruff, pylint, eslint, hadolint, yamllint) |
 | 8 | Coverage | Test coverage enforcement (85% default) |
@@ -172,7 +172,6 @@ Phase 1 (Discovery) automatically detects which tools are installed on your syst
 | prettier | JS/TS/JSON/MD | Formatting | `npm install -g prettier` |
 | hadolint | Docker | Dockerfile linting | OS package manager |
 | yamllint | YAML | YAML validation | `pip install yamllint` |
-| shellcheck | Shell | Shell script analysis | OS package manager |
 | shfmt | Shell | Shell formatting | OS package manager |
 | markdownlint-cli | Markdown | Markdown linting | `npm install -g markdownlint-cli` |
 | codespell | All | Spelling errors | `pip install codespell` |
@@ -184,7 +183,6 @@ Phase 1 (Discovery) automatically detects which tools are installed on your syst
 | pip-audit | Python CVE scanning | `pip install pip-audit` |
 | bandit | Python security analysis | `pip install bandit` |
 | semgrep | Multi-language SAST | `pipx install semgrep` |
-| shellcheck | Shell script analysis | OS package manager |
 | npm audit | Node.js CVE scanning | (built-in) |
 | cargo audit | Rust CVE scanning | `cargo install cargo-audit` |
 | trivy | Container/filesystem scanning | OS package manager |
@@ -288,7 +286,7 @@ Phase G performs a comprehensive GitHub repository audit:
 - ✅ Dependabot vulnerability alerts
 - ✅ Dependabot security updates
 - ✅ Secret scanning (if available)
-- ✅ Code scanning (CodeQL/ShellCheck workflows)
+- ✅ Code scanning (CodeQL workflows)
 - ✅ Branch protection rules
 
 ### Automatic Remediation
@@ -469,7 +467,6 @@ Phase P validates production installations. If the app isn't installed on this s
 6. Submit a pull request
 
 ### Code Quality Standards
-- All shell scripts must pass ShellCheck
 - All markdown must pass markdownlint
 - All YAML must pass yamllint
 - No hardcoded secrets or credentials

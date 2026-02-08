@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 # Demo: fzf interactive phase selector for /test skill
 
 PHASES="S|Snapshot|BTRFS safety backup before modifications

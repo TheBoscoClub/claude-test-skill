@@ -126,16 +126,6 @@ if [[ -n "$SHELL_FILES" ]]; then
     echo "  Shell Script Analysis"
     echo "───────────────────────────────────────────────────────────────────"
 
-    # ShellCheck - Linting
-    if command -v shellcheck &>/dev/null; then
-        echo ""
-        echo "Running ShellCheck..."
-        find . -name "*.sh" -not -path "./.snapshots/*" -exec shellcheck -f gcc {} \; 2>/dev/null | head -30
-        echo ""
-        SHELL_ISSUES=$(find . -name "*.sh" -not -path "./.snapshots/*" -exec shellcheck -f gcc {} \; 2>/dev/null | wc -l)
-        echo "ShellCheck issues: $SHELL_ISSUES"
-    fi
-
     # shfmt - Format check
     if command -v shfmt &>/dev/null; then
         echo ""
@@ -339,7 +329,6 @@ Language Analysis:
     Complexity:   2 functions above threshold (CC > 10)
 
   Shell:
-    ShellCheck:   15 issues
     shfmt:        4 files need formatting
 
   JavaScript:
@@ -361,7 +350,6 @@ File                          Issue                           Tool
 ────────────────────────────────────────────────────────────────────
 src/api/handlers.py:45        Cyclomatic complexity 15        radon
 src/utils/parser.py:23        Type error: incompatible type   mypy
-scripts/deploy.sh:12          SC2086: Quote to prevent glob   shellcheck
 Dockerfile:15                 DL3008: Pin versions in apt-get hadolint
 
 AUTO-FIXABLE:
@@ -398,12 +386,6 @@ collect_quality_issues() {
                 file=$(echo "$line" | sed 's/would reformat //')
                 echo "{\"tool\": \"black\", \"file\": \"$file\", \"fixable\": true}" >> "$QUALITY_ISSUES_FILE.tmp"
             done
-    fi
-
-    # ShellCheck issues
-    if command -v shellcheck &>/dev/null; then
-        find . -name "*.sh" -not -path "./.snapshots/*" -exec shellcheck -f json {} \; 2>/dev/null | \
-            jq '.[] | {tool: "shellcheck", file: .file, line: .line, code: .code, message: .message, fixable: false}' >> "$QUALITY_ISSUES_FILE.tmp"
     fi
 
     # Combine all issues

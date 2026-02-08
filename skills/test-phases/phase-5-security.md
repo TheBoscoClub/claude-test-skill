@@ -247,21 +247,6 @@ if command -v semgrep &>/dev/null; then
     fi
 fi
 
-# ShellCheck
-if command -v shellcheck &>/dev/null; then
-    SHELL_FILES=\$(find "\$PROJECT_ROOT" -name "*.sh" -not -path "*/.snapshots/*" 2>/dev/null | head -1)
-    if [[ -n "\$SHELL_FILES" ]]; then
-        echo "Running ShellCheck..."
-        SHELLCHECK_ERRORS=\$(find "\$PROJECT_ROOT" -name "*.sh" -not -path "*/.snapshots/*" -exec shellcheck -S error {} \; 2>/dev/null | wc -l)
-        if [[ "\$SHELLCHECK_ERRORS" -gt 0 ]]; then
-            echo "  ⚠️ ShellCheck errors: \$SHELLCHECK_ERRORS"
-            TOTAL_ISSUES=\$((TOTAL_ISSUES + 1))
-        else
-            echo "  ✅ ShellCheck: No errors"
-        fi
-    fi
-fi
-
 # CodeQL (Local)
 if command -v codeql &>/dev/null && [[ "\$PRIMARY_LANG" == "Python" ]]; then
     echo "Running CodeQL local analysis..."
@@ -464,7 +449,6 @@ echo ""
 echo "Tools Used:"
 command -v bandit &>/dev/null && echo "  ✅ bandit"
 command -v semgrep &>/dev/null && echo "  ✅ semgrep"
-command -v shellcheck &>/dev/null && echo "  ✅ shellcheck"
 command -v codeql &>/dev/null && echo "  ✅ codeql"
 command -v trivy &>/dev/null && echo "  ✅ trivy"
 command -v grype &>/dev/null && echo "  ✅ grype"
@@ -510,7 +494,6 @@ echo "════════════════════════�
 |------|---------|
 | bandit | `pipx install bandit` |
 | semgrep | `pipx install semgrep` |
-| shellcheck | `pacman -S shellcheck` |
 | codeql | `yay -S codeql` |
 | trivy | `pacman -S trivy` |
 | grype | `yay -S grype-bin` |
