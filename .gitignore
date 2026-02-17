@@ -154,6 +154,9 @@ exit.*
 # Project-specific Claude instructions (local)
 CLAUDE.md
 
+# CLAUDE.md version history (zstd-compressed snapshots, managed by session-start hook)
+.claude-md-history/
+
 # Claude ignore patterns
 .claudeignore
 
