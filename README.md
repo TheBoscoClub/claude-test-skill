@@ -91,11 +91,14 @@ The `/test` skill performs a complete autonomous audit of any software project -
 | P | Production | Validate live installed application |
 | D | Docker | Validate Docker image and registry package |
 | G | GitHub | Audit GitHub repo security (Dependabot, CodeQL, branch protection) |
+| H | Holistic | Full-stack cross-component analysis |
+| I | Infrastructure | Infrastructure and runtime issue detection |
 | 12 | Verify | Re-run tests, confirm no regressions |
 | **Finalization** |||
 | 13 | Docs | Update documentation to match codebase |
 | C | Restore | Cleanup temp files, restore environment |
 | **Special** |||
+| V | VM Testing | Heavy isolation testing in libvirt/QEMU VMs |
 | ST | Self-Test | Validate test-skill framework (explicit only: `--phase=ST`) |
 
 ---
@@ -242,7 +245,7 @@ TIER 1: Discovery [1] ───────────────────�
 TIER 2: Testing [2, 2a] ────────────────── Can run in parallel
            │
            ▼
-TIER 3: Analysis [3-9, 11] ─────────────── Can run in parallel (read-only)
+TIER 3: Analysis [3-9, 11, H, I] ──────── Can run in parallel (read-only)
            │
            ▼
 TIER 4: Fix [10] ───────────────────────── MODIFIES FILES (sequential)
@@ -357,7 +360,7 @@ The modular architecture significantly reduces context consumption:
 
 | Component | Lines | When Loaded |
 |-----------|-------|-------------|
-| Dispatcher | ~800 | Always |
+| Dispatcher | ~1,000 | Always |
 | Each Phase | 50-300 | On-demand via subagent |
 | **Typical audit** | ~1,500 | vs 3,652 monolithic |
 
@@ -486,7 +489,7 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 ### Recent Releases
 
 - **v2.0.1** - Opus 4.6 phase configuration headers, Phase ST integration validation
-- **v2.0.0** - Opus 4.6 model pinning, subagent tiering, 22 tools, task tracking (BREAKING)
+- **v2.0.0** - Opus 4.6 model pinning, subagent tiering, 16 tools, task tracking (BREAKING)
 - **v1.0.5** - Consolidated security phases, Phase ST (self-test), 8-tool security suite
 - **v1.0.4** - Phase SEC (standalone security), Phase P enhancements
 - **v1.0.2** - Phase H (holistic), Phase I (infrastructure)

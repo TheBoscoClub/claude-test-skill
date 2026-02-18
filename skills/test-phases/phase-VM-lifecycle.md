@@ -354,10 +354,10 @@ vm_name=example-test-vm
 started_by_test=true
 original_state=shutoff
 isolation_level=vm-required
-start_time=2024-01-18T15:30:00-05:00
+start_time=2026-02-18T15:30:00-05:00
 vm_ip=192.0.2.45
 vnc_port=5900
-pre_test_snapshot=pre-test-20240118-153000
+pre_test_snapshot=pre-test-20260218-153000
 ```
 
 ## Report Format
@@ -382,7 +382,7 @@ pre_test_snapshot=pre-test-20240118-153000
   🌐 VM IP: 192.0.2.45
   🖥️  VNC: 127.0.0.1:5900
 
-  📸 Creating pre-test snapshot: pre-test-20240118-153000
+  📸 Creating pre-test snapshot: pre-test-20260218-153000
   ✅ Pre-test snapshot created
 
 ───────────────────────────────────────────────────────────────────
@@ -392,7 +392,7 @@ pre_test_snapshot=pre-test-20240118-153000
 VM Name: example-test-vm
 Started by /test: true
 State File: .test-vm-state
-Pre-test Snapshot: pre-test-20240118-153000
+Pre-test Snapshot: pre-test-20260218-153000
 ```
 
 ### Cleanup Report
@@ -404,9 +404,9 @@ Pre-test Snapshot: pre-test-20240118-153000
   VM: example-test-vm
   Started by /test: true
   Original State: shutoff
-  Pre-test Snapshot: pre-test-20240118-153000
+  Pre-test Snapshot: pre-test-20260218-153000
 
-  📸 Reverting to pre-test snapshot: pre-test-20240118-153000
+  📸 Reverting to pre-test snapshot: pre-test-20260218-153000
   ✅ Reverted to pre-test state
   🗑️  Deleting temporary snapshot...
   ✅ Pre-test snapshot deleted

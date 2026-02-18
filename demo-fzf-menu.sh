@@ -9,17 +9,23 @@ M|Mocking|Safe sandbox for dangerous commands
 2a|Runtime|Service health checks
 3|Report|Test results summary
 A|App Testing|Deployable application testing ★
-4|Cleanup|Deprecation, dead code removal
+4|Dead Code|Deprecation, unused imports
 5|Security|Vulnerability scan ★
 6|Dependencies|Package health check
 7|Quality|Linting, complexity analysis
 8|Coverage|85% minimum enforcement
 9|Debug|Failure analysis
+H|Holistic|Full-stack cross-component analysis
+I|Infrastructure|Runtime issue detection
 10|Fix|Auto-fixing issues
+P|Production|Validate installed app ★
+D|Docker|Validate image and registry ★
+G|GitHub|Repository security audit ★
 11|Config|Configuration audit
 12|Verify|Final verification
 13|Docs|Documentation review
-C|Cleanup|Restore environment"
+V|VM Testing|Heavy isolation testing ★
+C|Restore|Clean up environment"
 
 SELECTED=$(echo "$PHASES" | column -t -s'|' | fzf --multi \
     --layout=reverse \

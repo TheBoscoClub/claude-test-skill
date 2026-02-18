@@ -260,7 +260,7 @@ Phases execute in **9 tiers** with strict dependencies:
 │  TIER 2   [2] [2a]  ───────────────────────────────────  PARALLEL  │
 │              │                                                      │
 │              ▼ GATE 3: Tests Complete                              │
-│  TIER 3   [3][4][5][6][7][8][9][11][H][I]  ────────────  PARALLEL  │
+│  TIER 3   [3][4][5][6][7][8][9][11][H][I] ─────────────  PARALLEL  │
 │              │                                                      │
 │              ▼ GATE 4: Analysis Complete                           │
 │  TIER 4   [10] Fix  ───────────────────────────────────  BLOCKING  │
@@ -291,7 +291,7 @@ Phases execute in **9 tiers** with strict dependencies:
 | 0 | S, M, 0 | Parallel | haiku, haiku, sonnet | Independent safety setup |
 | 1 | 1 | Sequential | opus | Everything depends on discovery |
 | 2 | 2, 2a | Parallel | sonnet, sonnet | Independent test execution |
-| 3 | 3-9, 11, H, I | Parallel | mixed | All read-only analysis |
+| 3 | 3-9,11,H,I | Parallel | mixed | All read-only analysis |
 | 4 | 10 | Sequential | opus | Modifies files — must be isolated |
 | 5 | A, P, D, G | Conditional | opus | Based on discovery results |
 | 6 | 12 | Sequential | sonnet | Final verification |
@@ -330,9 +330,9 @@ This gives the user real-time visibility:
 
 ---
 
-## Allowed Tools (22 total)
+## Allowed Tools (16 total)
 
-The dispatcher declares 22 tools available to all subagents:
+The dispatcher declares 16 tools available to all subagents:
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
@@ -393,7 +393,7 @@ Phase ST is a **meta-testing** phase that validates the test-skill framework its
 3. Dispatcher contains all phase references and shortcuts
 4. All security and core tools are installed
 5. All phase files have valid bash blocks
-6. **Opus 4.6 integration** — configuration headers present, model tier assignments match dispatcher, all 22 tools declared
+6. **Opus 4.6 integration** — configuration headers present, model tier assignments match dispatcher, all 16 tools declared
 
 ### Phase V (VM Testing) — Conditional
 
@@ -507,9 +507,10 @@ With tiering:    10 × opus + 12 × sonnet + 5 × haiku = ~40% cost reduction
 2. Add to Available Phases table in `commands/test.md`
 3. Add to Quick Dependency Reference with tier and model assignment
 4. Add to Subagent Model Selection table
-5. Update Phase ST expected phases list
-6. Document in this ARCHITECTURE.md
-7. Update README.md phase count and table
+5. Add to tier execution algorithm lists (e.g., Tier 3 parallel array in dispatcher)
+6. Update Phase ST expected phases list (EXPECTED_MODELS map)
+7. Document in this ARCHITECTURE.md
+8. Update README.md, SKILL.md, and CHANGELOG.md phase tables
 
 ### Adding a New Agent
 
@@ -531,7 +532,7 @@ In `commands/test.md`, add to the shortcuts parsing section:
 | Version | Key Changes |
 |---------|-------------|
 | 2.0.1 | Opus 4.6 phase config headers, Phase ST Section 6 validation |
-| 2.0.0 | Opus 4.6 model pinning, subagent tiering, 22 tools, task tracking |
+| 2.0.0 | Opus 4.6 model pinning, subagent tiering, 16 tools, task tracking |
 | 1.0.5 | Phase ST (self-test), consolidated Phase 5 security |
 | 1.0.4 | Phase SEC added (now consolidated into Phase 5) |
 | 1.0.3 | Multi-segment version badges |

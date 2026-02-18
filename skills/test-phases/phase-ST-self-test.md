@@ -2,7 +2,7 @@
 
 > **Model**: `opus` | **Tier**: Special (Isolated) | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash`, `Read`, `Glob`, `Grep` for framework validation. Verify all 22 allowed tools are accessible. Validate model tiering configuration matches dispatcher.
+> **Key Tools**: `Bash`, `Read`, `Glob`, `Grep` for framework validation. Verify all 16 allowed tools are accessible. Validate model tiering configuration matches dispatcher.
 
 **Meta-testing phase** - validates the test-skill framework itself.
 
@@ -251,7 +251,13 @@ for key in "${KEY_PHASES[@]}"; do
     fi
 done
 
-echo "  ✅ Key phase references found in dispatcher"
+MISSING_KEYS=0
+for key in "${KEY_PHASES[@]}"; do
+    grep -qi "$key" "$DISPATCHER" 2>/dev/null || MISSING_KEYS=$((MISSING_KEYS + 1))
+done
+if [[ "$MISSING_KEYS" -eq 0 ]]; then
+    echo "  ✅ Key phase references found in dispatcher"
+fi
 
 echo ""
 echo "───────────────────────────────────────────────────────────────────"
@@ -259,6 +265,7 @@ echo "  3.3 Shortcut Definitions"
 echo "───────────────────────────────────────────────────────────────────"
 
 SHORTCUTS=("prodapp" "docker" "security" "github" "holistic")
+MISSING_SHORTCUTS=0
 for shortcut in "${SHORTCUTS[@]}"; do
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     if grep -q "$shortcut" "$DISPATCHER" 2>/dev/null; then
@@ -266,10 +273,13 @@ for shortcut in "${SHORTCUTS[@]}"; do
     else
         echo "  ❌ Missing shortcut: $shortcut"
         FAILED_CHECKS=$((FAILED_CHECKS + 1))
+        MISSING_SHORTCUTS=$((MISSING_SHORTCUTS + 1))
     fi
 done
 
-echo "  ✅ All shortcuts defined in dispatcher"
+if [[ "$MISSING_SHORTCUTS" -eq 0 ]]; then
+    echo "  ✅ All shortcuts defined in dispatcher"
+fi
 ```
 
 ---
@@ -413,6 +423,8 @@ declare -A EXPECTED_MODELS=(
     ["phase-12-verify.md"]="sonnet"
     ["phase-13-docs.md"]="sonnet"
     ["phase-V-vm-testing.md"]="sonnet"
+    ["phase-I-infrastructure.md"]="sonnet"
+    ["phase-VM-lifecycle.md"]="sonnet"
     ["phase-S-snapshot.md"]="haiku"
     ["phase-M-mocking.md"]="haiku"
     ["phase-3-report.md"]="haiku"
@@ -440,7 +452,7 @@ fi
 
 echo ""
 echo "───────────────────────────────────────────────────────────────────"
-echo "  6.3 Dispatcher Allowed Tools (22 expected)"
+echo "  6.3 Dispatcher Allowed Tools (16 expected)"
 echo "───────────────────────────────────────────────────────────────────"
 
 EXPECTED_TOOLS=("Bash" "Read" "Write" "Edit" "Glob" "Grep" "Task" "TaskOutput" "TaskStop" "TaskCreate" "TaskUpdate" "TaskList" "AskUserQuestion" "KillShell" "NotebookEdit" "WebSearch")
