@@ -1157,4 +1157,4 @@ To skip auto-enable behavior, use:
 
 ---
 
-*Document Version: 3.0.0 — Dispatcher execution fixes, Phase I/H integration, documentation consistency audit*
+*Document Version: 3.0.1 — Canonical help block, Phase ST grep fix, argument-hint update*

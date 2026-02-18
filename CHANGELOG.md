@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [3.0.1] - 2026-02-18
+
+### Fixed
+- **Phase ST grep option parsing** — Section 6.3 `grep -q "- $tool"` misinterpreted leading dash as option flag; changed to `grep -qF -- "- $tool"`
+
+### Added
+- **Canonical help block** — `/test help` now displays a verbatim 90-line ASCII help with all 27 phases organized by tier, shortcuts, special phases (A, V, VM, ST), and behavioral notes
+- **`github` shortcut in argument-hint** — Was missing from dispatcher frontmatter
+
 ## [3.0.0] - 2026-02-18
 
 ### Fixed
@@ -181,7 +190,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Converted to modular plugin architecture (93% context reduction)
 - All phases load on-demand via subagents
 
-[Unreleased]: https://github.com/TheBoscoClub/claude-test-skill/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/TheBoscoClub/claude-test-skill/compare/v3.0.1...HEAD
+[3.0.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.1...v3.0.0
 [2.0.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.5...v2.0.0
