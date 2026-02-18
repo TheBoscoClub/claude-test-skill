@@ -53,8 +53,11 @@ A comprehensive 27-phase autonomous project audit system with full GitHub integr
 | P | Production | Live app validation |
 | D | Docker | Image validation |
 | G | GitHub | Repo security audit |
+| H | Holistic | Cross-component analysis |
+| I | Infrastructure | Runtime issue detection |
 | 12 | Verify | Re-run tests |
 | 13 | Docs | Documentation sync |
+| V | VM Testing | Heavy isolation testing |
 | C | Restore | Cleanup |
 
 ## Autonomous Behavior

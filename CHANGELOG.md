@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Opus 4.6 configuration headers**: All 27 phase files now include standardized metadata block with model tier, task tracking instructions, and phase-specific tool guidance
-- **Phase ST Section 6**: New Opus 4.6 integration validation — verifies headers, model tiering assignments, 22-tool declaration, and dispatcher consistency
+- **Phase ST Section 6**: New Opus 4.6 integration validation — verifies headers, model tiering assignments, 16-tool declaration, and dispatcher consistency
 - **Phase ST**: Added `phase-V-vm-testing.md` and `phase-VM-lifecycle.md` to expected phases list
 
 ### Fixed
@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Opus 4.6 model pinning**: Frontmatter `model: opus` ensures test skill always runs on Opus
 - **Subagent model tiering**: Per-phase model selection (opus/sonnet/haiku) based on complexity:
   - Opus: Phases 1, 5, 7, 10, A, P, D, G, H, ST (complex analysis, security, architecture)
-  - Sonnet: Phases 0, 2, 2a, 6, 8, 9, 11, 12, 13, V (standard testing, coverage, linting)
+  - Sonnet: Phases 0, 2, 2a, 6, 8, 9, 11, 12, 13, I, V, VM (standard testing, coverage, linting)
   - Haiku: Phases S, M, 3, 4, C (snapshots, file checks, simple validation)
 - **Task progress tracking**: Integration with TaskCreate/TaskUpdate/TaskList for real-time phase tracking with dependency chains
 - **9 new allowed tools**: TaskOutput, TaskStop, TaskCreate, TaskUpdate, TaskList, AskUserQuestion, KillShell, NotebookEdit, WebSearch
@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **BREAKING**: `allowed-tools` converted from CSV to YAML list syntax (requires Claude Code 2.1+)
-- **BREAKING**: Tool count expanded from 13 to 22 tools — older Claude Code versions may reject unknown tools
+- **BREAKING**: Tool count expanded from 7 to 16 tools — older Claude Code versions may reject unknown tools
 - All GitHub URLs updated from `greogory` to `TheBoscoClub` organization
 - CodeFactor badge added to README
 - GitHub Actions pinned to commit SHAs for supply chain security

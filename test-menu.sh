@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 # Interactive launcher for /test skill
-# Install: ln -s /hddRaid1/ClaudeCodeProjects/test-skill/test-menu.sh ~/.local/bin/tm
+# Install: ln -s /hddRaid1/ClaudeCodeProjects/claude-test-skill/test-menu.sh ~/.local/bin/tm
 
 # High-contrast dark theme for whiptail
 export NEWT_COLORS='
@@ -31,7 +31,7 @@ fullscale=cyan
 
 SELECTED=$(whiptail --title "/test Phase Selection" \
     --checklist "↑↓ navigate  |  SPACE toggle  |  TAB to buttons  |  ENTER confirm" \
-    28 76 20 \
+    30 76 24 \
     "S"  "BTRFS Snapshot - Safety backup before modifications" OFF \
     "M"  "Safe Mocking - Sandbox dangerous commands" OFF \
     "0"  "Pre-Flight - Environment validation" ON \
@@ -40,17 +40,23 @@ SELECTED=$(whiptail --title "/test Phase Selection" \
     "2a" "Runtime - Service health checks" OFF \
     "3"  "Report - Test results" ON \
     "A"  "App Testing - Deployable application testing" OFF \
-    "4"  "Cleanup - Deprecation, dead code" OFF \
+    "4"  "Dead Code - Deprecation, unused imports" OFF \
     "5"  "Security - Vulnerability scan" OFF \
     "6"  "Dependencies - Package health" OFF \
     "7"  "Quality - Linting, complexity" OFF \
     "8"  "Coverage - 85% minimum enforcement" OFF \
     "9"  "Debug - Failure analysis" OFF \
+    "H"  "Holistic - Full-stack cross-component analysis" OFF \
+    "I"  "Infrastructure - Runtime issue detection" OFF \
     "10" "Fix - Auto-fixing" OFF \
+    "P"  "Production - Validate installed app" OFF \
+    "D"  "Docker - Validate image and registry" OFF \
+    "G"  "GitHub - Repository security audit" OFF \
     "11" "Config - Configuration audit" OFF \
     "12" "Verify - Final verification" OFF \
     "13" "Docs - Documentation review" OFF \
-    "C"  "Cleanup - Restore environment" OFF \
+    "V"  "VM Testing - Heavy isolation testing" OFF \
+    "C"  "Restore - Clean up environment" OFF \
     3>&1 1>&2 2>&3)
 
 EXIT_STATUS=$?

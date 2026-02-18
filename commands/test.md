@@ -106,6 +106,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **D** | **Docker** | **Validate Docker image and registry package** |
 | **G** | **GitHub** | **Audit GitHub repository security and settings** |
 | **H** | **Holistic** | **Full-stack cross-component analysis** |
+| **I** | **Infrastructure** | **Infrastructure & runtime issue detection** |
 | **V** | **VM Testing** | **Heavy isolation testing in libvirt/QEMU VM** |
 | 4 | Cleanup | Deprecation, dead code |
 | **5/SEC** | **Security** | **Comprehensive security (GitHub + Local + Installed)** |
@@ -135,7 +136,8 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **P** | **5** | **10 + Discovery** | **No (validates live)** | **None (CONDITIONAL)** |
 | **D** | **5** | **10 + Discovery** | **No (validates registry)** | **P (CONDITIONAL)** |
 | **G** | **5** | **10 + Discovery** | **No (audits GitHub)** | **P, D (CONDITIONAL)** |
-| **H** | **3** | **1** | **YES (fixes cross-component)** | **7, 5 (after Discovery)** |
+| **H** | **3** | **1** | **YES (fixes cross-component)** | **7, 5, I (after Discovery)** |
+| **I** | **3** | **1** | **No (read-only)** | **H, 7, 5 (after Discovery)** |
 | 12 | 6 | P (or 10 if P skipped) | No (re-tests) | None |
 | **13** | **7** | **12** | **YES (fixes docs)** | **None (ALWAYS RUNS)** |
 | **C** | **8** | **ALL** | **Cleans up** | **None (LAST)** |
@@ -279,7 +281,7 @@ invalidated rollback points.
 │  TIER 3: READ-ONLY ANALYSIS (Can parallelize - no file modifications)      │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │ These phases ONLY READ files - safe to run in parallel:             │   │
-│  │ [3, 4, 5, 6, 7, 8, 9, 11]  ← Note: 13 moved to Tier 7               │   │
+│  │ [3, 4, 5, 6, 7, 8, 9, 11, H, I]  ← Note: 13 moved to Tier 7        │   │
 │  │                                                                      │   │
 │  │ ⚠️  Phase 8 (Coverage) needs test results from Phase 2              │   │
 │  │ ⚠️  Phase 9 (Debug) needs failure data from Phase 2                 │   │
@@ -361,7 +363,7 @@ invalidated rollback points.
 | 0 | S, M, 0 | ✅ Yes | All three complete |
 | 1 | 1 | ❌ No (single) | Discovery complete (+ P decision made) |
 | 2 | 2, 2a | ✅ Yes | Tests complete |
-| 3 | 3,4,5,6,7,8,9,11 | ✅ Yes | All analysis complete |
+| 3 | 3,4,5,6,7,8,9,11,H,I | ✅ Yes | All analysis complete |
 | 4 | 10 | ❌ No | Fixes complete |
 | 5 | P, D, G | ❌ No (conditional) | Production/Docker/GitHub validated OR skipped |
 | 6 | 12 | ❌ No | Verification complete |
@@ -399,7 +401,7 @@ function executeAudit(requestedPhases):
         executionPlan.append({phases: tier2, parallel: true, gate: "TESTS"})
 
     # TIER 3: Analysis (parallel - all read-only, EXCLUDES 13)
-    tier3 = intersection(requestedPhases, [3,4,5,6,7,8,9,11])
+    tier3 = intersection(requestedPhases, [3,4,5,6,7,8,9,11,H,I])
     if tier3:
         executionPlan.append({phases: tier3, parallel: true, gate: "ANALYSIS"})
 
@@ -553,7 +555,7 @@ To proceed:
 ✅ S, M, 0 complete → snapshot is clean baseline
 ✅ 1 completes → all phases know project type
 ✅ 2, 2a complete → test results available
-✅ 3-9, 11, 13 run parallel (read-only) → safe
+✅ 3-9, 11, H, I run parallel (read-only) → safe
 ✅ 10 runs alone → no race conditions
 ✅ 12 verifies → confirms fixes work
 ✅ C runs last → clean exit
@@ -581,7 +583,7 @@ When spawning Task subagents for phases, specify the `model` parameter based on 
 | Model | Phases | Rationale |
 |-------|--------|-----------|
 | **opus** | 1, 5, 7, 10, A, P, D, G, H, ST | Complex analysis, multi-step fixes, security audit, cross-component reasoning |
-| **sonnet** | 0, 2, 2a, 6, 8, 9, 11, 12, 13, V | Moderate complexity: test execution, dependency checks, verification |
+| **sonnet** | 0, 2, 2a, 6, 8, 9, 11, 12, 13, I, V | Moderate complexity: test execution, dependency checks, verification |
 | **haiku** | S, M, 3, 4, C | Lightweight: snapshots, sandbox setup, reporting, cleanup |
 
 **Example Task call with model:**
@@ -821,7 +823,7 @@ ELSE (Autonomous - DEFAULT):
       (empty string if no flags selected)
    Wait for all to complete → GATE 3: Tests Complete
 
-   TIER 3: Analysis [3,4,5,6,7,8,9,11] - Run in PARALLEL
+   TIER 3: Analysis [3,4,5,6,7,8,9,11,H,I] - Run in PARALLEL
    ──────────────────────────────────────────────────────────────────
    All are READ-ONLY, safe to parallelize
    ⚠️ Phase 13 is NOT in this tier (moved to Tier 7)

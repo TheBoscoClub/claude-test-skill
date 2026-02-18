@@ -30,13 +30,13 @@ If you discover a security vulnerability in this project, please report it respo
 
 This project uses the following tools for security auditing:
 
-### Shell Scripts (12 files)
+### Shell Scripts (3 files)
 
 | Tool | Purpose | Command |
 |------|---------|---------|
-| **shfmt** | Shell script formatting | `shfmt -d skills/test-phases/*.sh` |
+| **shfmt** | Shell script formatting | `shfmt -d *.sh` |
 
-### Markdown Documentation (157 files)
+### Markdown Documentation (45 files)
 
 | Tool | Purpose | Command |
 |------|---------|---------|
