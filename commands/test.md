@@ -18,7 +18,7 @@ allowed-tools:
   - KillShell
   - NotebookEdit
   - WebSearch
-argument-hint: "[help] [prodapp] [docker] [security] [holistic] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
+argument-hint: "[help] [prodapp] [docker] [security] [github] [holistic] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
 ---
 
 # Modular Project Audit (/test)
@@ -756,7 +756,98 @@ When `/test` is invoked:
 1. **Parse arguments**
    - Check for `--interactive` flag → set `INTERACTIVE_MODE=true` (default: false)
    - All other flags work the same in both modes
-2. If `help` or `--list-phases`: show help and exit
+2. If `help` or `--list-phases`: display the canonical help block below **verbatim** and exit. Do not summarize or rephrase — output the block exactly as written:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  /test — Modular Project Audit                                              │
+│  Autonomous, context-efficient project testing with 27 phases in 9 tiers    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  USAGE                                                                      │
+│  ─────                                                                      │
+│  /test                           Full audit (autonomous — fixes everything) │
+│  /test --phase=0-3               Quick check (safety + discovery + tests)   │
+│  /test --phase=X                 Run single phase (e.g., --phase=5)         │
+│  /test --phase=X,Y,Z             Run multiple phases                        │
+│  /test --interactive             Enable prompts and manual items            │
+│  /test --skip-snapshot           Skip BTRFS snapshot (Phase S)              │
+│  /test --force-sandbox           DANGEROUS: bypass VM requirement           │
+│  /test --no-mcp-enable           Skip auto-enabling MCP servers             │
+│  /test help                      This help                                  │
+│  /test --list-phases             Show all 27 phases                         │
+│                                                                             │
+│  SHORTCUTS                                                                  │
+│  ─────────                                                                  │
+│  /test security                  Comprehensive security audit (Phase 5)     │
+│  /test prodapp                   Validate installed production app (Phase P)│
+│  /test docker                    Validate Docker image & registry (Phase D) │
+│  /test github                    Audit GitHub repo security (Phase G)       │
+│  /test holistic                  Full-stack cross-component analysis (H)    │
+│                                                                             │
+│  ALL PHASES                                                                 │
+│  ──────────                                                                 │
+│  Tier 0 — Safety Gates (parallel)                                           │
+│    S   Snapshot         BTRFS read-only safety snapshot                     │
+│    M   Mocking          Safe sandbox environment setup                      │
+│    0   Pre-Flight       Environment & dependency validation                 │
+│                                                                             │
+│  Tier 1 — Discovery (gate)                                                  │
+│    1   Discovery         Detect project type, tests, isolation level        │
+│                                                                             │
+│  Tier 2 — Test Execution (parallel)                                         │
+│    2   Execute           Run pytest / npm test / go test / cargo test       │
+│    2a  Runtime           Service health checks & connectivity               │
+│                                                                             │
+│  Tier 3 — Read-Only Analysis (parallel)                                     │
+│    3   Report            Summarize test results                             │
+│    4   Cleanup           Detect dead code & deprecations                    │
+│    5   Security          8-tool security suite (SAST + deps + secrets)      │
+│    6   Dependencies      Package health & outdated checks                   │
+│    7   Quality           Linting, complexity, formatting                    │
+│    8   Coverage          Test coverage analysis (85% threshold)             │
+│    9   Debug             Failure root-cause analysis                        │
+│   11   Config            Configuration file audit                           │
+│    H   Holistic          Full-stack cross-component analysis                │
+│    I   Infrastructure    Infrastructure & runtime issue detection           │
+│                                                                             │
+│  Tier 4 — Modifications (blocking)                                          │
+│   10   Fix               Auto-fix ALL issues found in Tier 3                │
+│                                                                             │
+│  Tier 5 — Conditional Validation (sequential)                               │
+│    P   Production        Validate installed production app                  │
+│    D   Docker            Validate Docker image & registry package           │
+│    G   GitHub            Audit repo security: Dependabot, CodeQL, etc.      │
+│                                                                             │
+│  Tier 6 — Verification                                                      │
+│   12   Verify            Re-run tests; loop to Tier 4 if failures           │
+│                                                                             │
+│  Tier 7 — Documentation                                                     │
+│   13   Docs              Sync docs with codebase (always runs)              │
+│                                                                             │
+│  Tier 8 — Cleanup                                                           │
+│    C   Cleanup           Restore environment, remove temp files             │
+│                                                                             │
+│  SPECIAL PHASES (independent tracks)                                        │
+│  ─────────────────────────────────────                                      │
+│    A   App Test          Sandbox installation & deployment testing           │
+│    V   VM Testing        Heavy isolation in libvirt/QEMU VM                 │
+│   VM   VM Lifecycle      VM snapshot create/revert/delete management        │
+│   ST   Self-Test         Validate the test-skill framework itself           │
+│                                                                             │
+│  NOTES                                                                      │
+│  ─────                                                                      │
+│  • Autonomous mode (default): fixes ALL issues, no prompts, loops           │
+│  • Interactive mode (--interactive): single pass, may prompt                │
+│  • Phase P/D/G: auto-skipped when not applicable (no prompts)               │
+│  • Phase V: auto-triggered when isolation level is vm-required              │
+│  • Phase ST: NEVER runs in normal /test — explicit --phase=ST only          │
+│  • Phase 13: ALWAYS runs — docs must stay in sync with code                 │
+│  • Tier dependencies enforced: phases never run before prerequisites        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
 3. **Handle shortcuts:**
    - `prodapp` → `--phase=P` (production validation)
    - `docker` → `--phase=D` (Docker validation)
