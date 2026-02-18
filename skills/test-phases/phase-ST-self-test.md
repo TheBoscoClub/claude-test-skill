@@ -459,7 +459,7 @@ EXPECTED_TOOLS=("Bash" "Read" "Write" "Edit" "Glob" "Grep" "Task" "TaskOutput" "
 TOOLS_FOUND=0
 for tool in "${EXPECTED_TOOLS[@]}"; do
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    if grep -q "- $tool" "$DISPATCHER" 2>/dev/null; then
+    if grep -qF -- "- $tool" "$DISPATCHER" 2>/dev/null; then
         PASSED_CHECKS=$((PASSED_CHECKS + 1))
         TOOLS_FOUND=$((TOOLS_FOUND + 1))
     else
