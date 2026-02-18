@@ -9,7 +9,8 @@ A comprehensive 27-phase autonomous project audit system for Claude Code with fu
 
 | Version | Status | Release |
 |---------|--------|---------|
-| ![2](https://img.shields.io/badge/2-brightgreen)![0](https://img.shields.io/badge/0-darkgreen)![1](https://img.shields.io/badge/1-green) | Latest patch | [v2.0.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v2.0.1) |
+| ![3](https://img.shields.io/badge/3-brightgreen) | Latest major | [v3.0.0](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v3.0.0) |
+| ![2](https://img.shields.io/badge/2-brightred)![0](https://img.shields.io/badge/0-darkred)![1](https://img.shields.io/badge/1-red) | Prior patch | [v2.0.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v2.0.1) |
 | ![2](https://img.shields.io/badge/2-brightred)![0](https://img.shields.io/badge/0-darkred)![0](https://img.shields.io/badge/0-red) | Prior major | [v2.0.0](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v2.0.0) |
 | ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![5](https://img.shields.io/badge/5-red) | Prior patch | [v1.0.5](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v1.0.5) |
 | ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![4](https://img.shields.io/badge/4-red) | Prior patch | [v1.0.4](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v1.0.4) |
@@ -488,11 +489,11 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
 ### Recent Releases
 
+- **v3.0.0** - Dispatcher execution fixes, Phase I/H integration, documentation consistency audit (BREAKING)
 - **v2.0.1** - Opus 4.6 phase configuration headers, Phase ST integration validation
 - **v2.0.0** - Opus 4.6 model pinning, subagent tiering, 16 tools, task tracking (BREAKING)
 - **v1.0.5** - Consolidated security phases, Phase ST (self-test), 8-tool security suite
 - **v1.0.4** - Phase SEC (standalone security), Phase P enhancements
-- **v1.0.2** - Phase H (holistic), Phase I (infrastructure)
 
 ---
 

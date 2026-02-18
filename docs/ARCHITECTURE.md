@@ -1,6 +1,6 @@
 # Test-Skill Architecture
 
-> Version: 2.0.1
+> Version: 3.0.0
 
 This document describes the architecture of the claude-test-skill plugin for Claude Code, a modular 27-phase autonomous project audit system.
 
@@ -531,6 +531,7 @@ In `commands/test.md`, add to the shortcuts parsing section:
 
 | Version | Key Changes |
 |---------|-------------|
+| 3.0.0 | Phase I/H dispatcher fixes, Tier 3 execution lists corrected, documentation audit |
 | 2.0.1 | Opus 4.6 phase config headers, Phase ST Section 6 validation |
 | 2.0.0 | Opus 4.6 model pinning, subagent tiering, 16 tools, task tracking |
 | 1.0.5 | Phase ST (self-test), consolidated Phase 5 security |

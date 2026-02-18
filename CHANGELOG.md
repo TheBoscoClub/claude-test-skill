@@ -13,6 +13,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [3.0.0] - 2026-02-18
+
+### Fixed
+- **BREAKING: Phase I never executed** — Phase I (Infrastructure) was missing from the dispatcher's Available Phases table and Tier 3 execution lists, meaning it was never invoked despite having a complete phase file
+- **Phase H missing from Tier 3** — Phase H (Holistic) was also missing from Tier 3 parallel execution arrays in the dispatcher
+- **Stale tool count** — Multiple docs referenced "22 tools" when the actual count is 16 (README, ARCHITECTURE, CHANGELOG, Phase ST)
+- **Stale Phase 13 in Tier 3** — Dispatcher still listed Phase 13 in Tier 3 analysis; it belongs in Tier 7 (Docs)
+- **Phase ST false positives** — EXPECTED_MODELS map was missing Phase I and Phase VM; unconditional success messages reported "pass" even when earlier checks found failures
+- **SECURITY.md stale counts** — File counts inflated by BTRFS snapshots: "12 shell scripts" → 3, "157 markdown files" → 45
+- **Menu scripts missing phases** — test-menu.sh, demo-fzf-menu.sh, and demo-whiptail-menu.sh were missing phases P, D, G, H, I, V
+
+### Added
+- Phase H, I, V added to README Phase Overview table and SKILL.md Available Phases table
+- ARCHITECTURE.md checklist step: "Add to tier execution algorithm lists" — prevents the class of bug where a phase file exists but is never wired into the dispatcher
+
+### Changed
+- Phase VM-lifecycle example dates updated from 2024 to 2026
+- test-menu.sh symlink path corrected
+
 ## [2.0.1] - 2026-02-07
 
 ### Added
@@ -162,7 +181,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Converted to modular plugin architecture (93% context reduction)
 - All phases load on-demand via subagents
 
-[Unreleased]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/TheBoscoClub/claude-test-skill/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.1...v3.0.0
 [2.0.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.5...v2.0.0
 [1.0.5]: https://github.com/TheBoscoClub/claude-test-skill/compare/v1.0.4...v1.0.5

@@ -1066,4 +1066,4 @@ To skip auto-enable behavior, use:
 
 ---
 
-*Document Version: 2.0.1 — Updated for Opus 4.6: model selection, YAML allowed-tools, task tracking, phase config headers*
+*Document Version: 3.0.0 — Dispatcher execution fixes, Phase I/H integration, documentation consistency audit*
