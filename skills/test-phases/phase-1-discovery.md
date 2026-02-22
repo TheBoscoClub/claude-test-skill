@@ -34,6 +34,100 @@ ls -la Dockerfile docker-compose.yml .dockerignore compose.yml 2>/dev/null
 If `Dockerfile` exists, report `Docker Status: exists` in the output.
 If `docker-compose.yml` or `compose.yml` exists, report the image name from it.
 
+### 1b. Detect Staged Release
+
+Check for a `.staged-release` breadcrumb file (written by `/git-release --local`):
+
+```bash
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  Staged Release Detection"
+echo "───────────────────────────────────────────────────────────────────"
+
+detect_staged_release() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local STAGED_FILE="$PROJECT_DIR/.staged-release"
+    local STAGED_STATUS="none"
+    local STAGED_VERSION=""
+    local STAGED_TAG=""
+    local STAGED_COMMIT=""
+    local DOCKER_STAGING_IMAGES=""
+
+    if [[ -f "$STAGED_FILE" ]]; then
+        # Source the breadcrumb to get version, tag, commit, staged_at
+        source "$STAGED_FILE"
+        STAGED_VERSION="${version:-}"
+        STAGED_TAG="${tag:-}"
+        STAGED_COMMIT="${commit:-}"
+
+        echo "  Staged Release Found:"
+        echo "    Version: ${STAGED_VERSION:-unknown}"
+        echo "    Tag: ${STAGED_TAG:-unknown}"
+        echo "    Commit: ${STAGED_COMMIT:-unknown}"
+        echo "    Staged At: ${staged_at:-unknown}"
+
+        # Verify tag exists and matches
+        if [[ -n "$STAGED_TAG" ]] && git tag -l "$STAGED_TAG" 2>/dev/null | grep -q "$STAGED_TAG"; then
+            # Verify tag points to the right commit
+            local TAG_COMMIT=$(git rev-list -n 1 "$STAGED_TAG" 2>/dev/null)
+            if [[ "$TAG_COMMIT" == "$STAGED_COMMIT"* ]]; then
+                STAGED_STATUS="valid"
+                echo "    Status: ✅ Valid (tag matches commit)"
+            else
+                STAGED_STATUS="invalid"
+                echo "    Status: ❌ Invalid (tag points to wrong commit)"
+                echo "    Tag commit: $TAG_COMMIT"
+                echo "    Expected:   $STAGED_COMMIT"
+            fi
+        else
+            STAGED_STATUS="invalid"
+            echo "    Status: ❌ Invalid (tag '$STAGED_TAG' not found)"
+        fi
+    else
+        echo "  No staged release detected"
+    fi
+
+    # Detect Docker staging images
+    if [[ -f "$PROJECT_DIR/Dockerfile" ]] && command -v docker &>/dev/null; then
+        local PROJECT_NAME=$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')
+        DOCKER_STAGING_IMAGES=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | \
+            grep -iE "${PROJECT_NAME}.*(rc|staging|${STAGED_VERSION:-NOMATCH})" | head -5)
+
+        if [[ -n "$DOCKER_STAGING_IMAGES" ]]; then
+            echo ""
+            echo "  Docker Staging Images:"
+            echo "$DOCKER_STAGING_IMAGES" | sed 's/^/    /'
+        else
+            echo ""
+            echo "  Docker Staging Images: none"
+        fi
+    fi
+
+    # Machine-readable output
+    echo ""
+    echo "Staged Release: $STAGED_STATUS"
+    echo "Staged Version: ${STAGED_VERSION:-}"
+    echo "Staged Tag: ${STAGED_TAG:-}"
+    echo "Staged Commit: ${STAGED_COMMIT:-}"
+    echo "Docker Staging Images: ${DOCKER_STAGING_IMAGES:-none}"
+
+    # Export for other phases
+    export STAGED_RELEASE_STATUS="$STAGED_STATUS"
+    export STAGED_RELEASE_VERSION="$STAGED_VERSION"
+    export STAGED_RELEASE_TAG="$STAGED_TAG"
+    export STAGED_RELEASE_COMMIT="$STAGED_COMMIT"
+}
+
+detect_staged_release
+```
+
+**Dispatcher Integration:**
+
+When Discovery reports `Staged Release: valid`:
+- Phase V is triggered (in addition to isolation-level triggers)
+- Phase V reads `project-vm-map.json` to route to the correct VM
+- Phase V runs the full installation lifecycle (install → upgrade → deploy → verify)
+
 ### 2. Find Test Files
 
 ```bash
@@ -925,6 +1019,18 @@ Sync Status: [In sync|X local commits not pushed|X remote commits not pulled]
 Phase G Recommendation: [SKIP|RUN]
   - SKIP: No GitHub repo or not authenticated
   - RUN: GitHub repo detected with authenticated access
+
+─────────────────────────────────────────────────────────────────
+  STAGED RELEASE
+─────────────────────────────────────────────────────────────────
+
+Staged Release: [valid|invalid|none]
+Staged Version: [X.Y.Z or empty]
+Staged Tag: [vX.Y.Z or empty]
+Staged Commit: [SHA or empty]
+Docker Staging Images: [list or none]
+
+Phase V Trigger: [YES - staged release detected | NO]
 
 ─────────────────────────────────────────────────────────────────
   PYTEST CUSTOM OPTIONS
