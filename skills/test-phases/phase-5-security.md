@@ -307,6 +307,34 @@ if command -v grype &>/dev/null; then
     fi
 fi
 
+# cargo audit (Rust)
+if [[ -f "\$PROJECT_ROOT/Cargo.toml" ]] || [[ -f "\$PROJECT_ROOT/indexer/Cargo.toml" ]]; then
+    CARGO_DIR="\$PROJECT_ROOT"
+    [[ -f "\$PROJECT_ROOT/indexer/Cargo.toml" ]] && CARGO_DIR="\$PROJECT_ROOT/indexer"
+    echo "Running cargo audit..."
+    pushd "\$CARGO_DIR" > /dev/null
+    if cargo audit 2>&1 | grep -q "0 vulnerabilities found"; then
+        echo "  ✅ cargo audit: No vulnerabilities"
+    else
+        echo "  ⚠️  cargo audit found issues (check yanked crates and advisories)"
+        TOTAL_ISSUES=\$((TOTAL_ISSUES + 1))
+        cargo audit 2>&1 | head -20
+    fi
+
+    # cargo deny (license + advisory superset)
+    if command -v cargo-deny &>/dev/null; then
+        echo "Running cargo deny check..."
+        if cargo deny check 2>&1 | grep -q "advisories ok, bans ok, licenses ok, sources ok"; then
+            echo "  ✅ cargo deny: All checks passed"
+        else
+            echo "  ⚠️  cargo deny found issues"
+            TOTAL_ISSUES=\$((TOTAL_ISSUES + 1))
+            cargo deny check 2>&1 | tail -20
+        fi
+    fi
+    popd > /dev/null
+fi
+
 # npm audit
 if [[ -f "\$PROJECT_ROOT/package.json" ]]; then
     echo "Running npm audit..."

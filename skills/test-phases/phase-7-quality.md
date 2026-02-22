@@ -293,13 +293,21 @@ fi
 ### 9. Rust Analysis
 
 ```bash
-if [[ -f Cargo.toml ]]; then
+if [[ -f Cargo.toml ]] || find . -maxdepth 2 -name "Cargo.toml" -print -quit 2>/dev/null | grep -q .; then
+    CARGO_DIR="."
+    # If Cargo.toml is in a subdirectory (e.g., indexer/), find it
+    if [[ ! -f Cargo.toml ]]; then
+        CARGO_DIR=$(find . -maxdepth 2 -name "Cargo.toml" -printf '%h\n' -quit 2>/dev/null)
+    fi
+
     echo ""
     echo "───────────────────────────────────────────────────────────────────"
-    echo "  Rust Analysis"
+    echo "  Rust Analysis (in $CARGO_DIR)"
     echo "───────────────────────────────────────────────────────────────────"
 
-    # Clippy
+    pushd "$CARGO_DIR" > /dev/null
+
+    # Clippy (all warnings as errors)
     echo ""
     echo "Running cargo clippy..."
     cargo clippy -- -D warnings 2>&1 | head -50
@@ -308,6 +316,18 @@ if [[ -f Cargo.toml ]]; then
     echo ""
     echo "Checking Rust formatting..."
     cargo fmt -- --check 2>&1 | head -20
+
+    # cargo deny (license compliance + advisory + bans)
+    if command -v cargo-deny &>/dev/null; then
+        echo ""
+        echo "Running cargo deny check..."
+        cargo deny check 2>&1 | tail -30
+    else
+        echo ""
+        echo "⚠️  cargo-deny not installed (install with: cargo install cargo-deny)"
+    fi
+
+    popd > /dev/null
 fi
 ```
 
