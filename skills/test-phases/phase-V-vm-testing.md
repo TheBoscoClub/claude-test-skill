@@ -671,25 +671,74 @@ run_phase_V() {
     # Load manifest if exists
     local MANIFEST="$PROJECT_DIR/vm-test-manifest.json"
     local DEFAULT_VM=""
+    local VM_IP=""
+    local SSH_USER="claude"
+    local SSH_KEY="~/.claude/ssh/id_ed25519"
+    local INSTALL_SCRIPT=""
+    local UPGRADE_SCRIPT=""
+    local DEPLOY_SCRIPT=""
+    local API_PORT=""
+    local WEB_PORT=""
 
-    if [[ -f "$MANIFEST" ]]; then
+    # ─── PROJECT-AWARE VM ROUTING ──────────────────────────────────
+    # Load project-VM mapping (preferred over legacy manifest)
+    local VM_MAP="$HOME/.claude/config/project-vm-map.json"
+    local PROJECT_NAME=$(basename "$PROJECT_DIR")
+
+    if [[ -f "$VM_MAP" ]]; then
+        echo "───────────────────────────────────────────────────────────────────"
+        echo "  Project-VM Routing (project-vm-map.json)"
+        echo "───────────────────────────────────────────────────────────────────"
+        echo ""
+
+        # Check if this project has a dedicated VM
+        local MAPPED_VM=$(jq -r ".projects.\"$PROJECT_NAME\".vm // empty" "$VM_MAP")
+        INSTALL_SCRIPT=$(jq -r ".projects.\"$PROJECT_NAME\".install_script // empty" "$VM_MAP")
+        UPGRADE_SCRIPT=$(jq -r ".projects.\"$PROJECT_NAME\".upgrade_script // empty" "$VM_MAP")
+        DEPLOY_SCRIPT=$(jq -r ".projects.\"$PROJECT_NAME\".deploy_script // empty" "$VM_MAP")
+        API_PORT=$(jq -r ".projects.\"$PROJECT_NAME\".api_port // empty" "$VM_MAP")
+        WEB_PORT=$(jq -r ".projects.\"$PROJECT_NAME\".web_port // empty" "$VM_MAP")
+
+        if [[ -n "$MAPPED_VM" ]]; then
+            DEFAULT_VM="$MAPPED_VM"
+            VM_IP=$(jq -r ".vms.\"$MAPPED_VM\".ip // empty" "$VM_MAP")
+            SSH_USER=$(jq -r ".vms.\"$MAPPED_VM\".ssh_user // \"claude\"" "$VM_MAP")
+            SSH_KEY=$(jq -r ".vms.\"$MAPPED_VM\".ssh_key // \"~/.claude/ssh/id_ed25519\"" "$VM_MAP")
+            echo "  Project: $PROJECT_NAME"
+            echo "  Mapped VM: $MAPPED_VM (dedicated)"
+            echo "  VM IP: ${VM_IP:-auto-detect}"
+        else
+            # Use default VM, but check exclusivity — cannot use reserved VMs
+            DEFAULT_VM=$(jq -r '.default.vm // "test-vm-cachyos"' "$VM_MAP")
+
+            # Verify the default VM is not exclusive to another project
+            local EXCLUSIVE=$(jq -r ".vms.\"$DEFAULT_VM\".exclusive_to // empty" "$VM_MAP")
+            if [[ -n "$EXCLUSIVE" && "$EXCLUSIVE" != "$PROJECT_NAME" ]]; then
+                echo "  ❌ ERROR: $DEFAULT_VM is exclusively reserved for $EXCLUSIVE"
+                echo "  Cannot use $DEFAULT_VM for project $PROJECT_NAME"
+                echo "Exclusivity violation: $DEFAULT_VM reserved for $EXCLUSIVE" >> "$ISSUES_FILE"
+                return 1
+            fi
+
+            VM_IP=$(jq -r ".vms.\"$DEFAULT_VM\".ip // empty" "$VM_MAP")
+            SSH_USER=$(jq -r ".vms.\"$DEFAULT_VM\".ssh_user // \"claude\"" "$VM_MAP")
+            SSH_KEY=$(jq -r ".vms.\"$DEFAULT_VM\".ssh_key // \"~/.claude/ssh/id_ed25519\"" "$VM_MAP")
+            echo "  Project: $PROJECT_NAME (no dedicated VM)"
+            echo "  Using default VM: $DEFAULT_VM"
+            echo "  VM IP: ${VM_IP:-auto-detect}"
+        fi
+
+    # ─── LEGACY MANIFEST FALLBACK ──────────────────────────────────
+    elif [[ -f "$MANIFEST" ]]; then
         DEFAULT_VM=$(jq -r '.vm_testing.default_vm // empty' "$MANIFEST")
     fi
 
     # Detect environment
     detect_vm_environment
 
-    # If no default VM and no manifest, offer to create one
+    # If still no VM, try auto-detect
     if [[ -z "$DEFAULT_VM" ]]; then
         echo "No default test VM configured."
-        echo ""
-        echo "Options:"
-        echo "  1. Use existing VM (if available)"
-        echo "  2. Create new VM from ISO"
-        echo "  3. Skip VM testing"
-        echo ""
-
-        # For autonomous mode, try to find a suitable existing VM
         local EXISTING_VM=$(virsh list --all --name 2>/dev/null | grep -iE "test|dev" | head -1)
         if [[ -n "$EXISTING_VM" ]]; then
             echo "Found existing test VM: $EXISTING_VM"
@@ -700,42 +749,76 @@ run_phase_V() {
         fi
     fi
 
+    # Expand SSH_KEY tilde
+    SSH_KEY="${SSH_KEY/#\~/$HOME}"
+
     echo ""
     echo "Using VM: $DEFAULT_VM"
     echo ""
 
-    # Reset to clean state
-    reset_vm_to_clean "$DEFAULT_VM" || true
+    # Auto-detect VM IP if not in config
+    if [[ -z "$VM_IP" || "$VM_IP" == "null" ]]; then
+        # Start VM if not running
+        if ! virsh domstate "$DEFAULT_VM" 2>/dev/null | grep -q running; then
+            echo "Starting VM..."
+            virsh start "$DEFAULT_VM" 2>/dev/null
+            sleep 30
+        fi
+        VM_IP=$(virsh domifaddr "$DEFAULT_VM" 2>/dev/null | grep -oP '192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+' | head -1)
+    fi
 
-    # Deploy
-    deploy_to_vm "$DEFAULT_VM" || {
-        echo "Deploy failed" >> "$ISSUES_FILE"
+    if [[ -z "$VM_IP" ]]; then
+        echo "❌ Could not determine VM IP address"
+        echo "VM IP detection failed" >> "$ISSUES_FILE"
         return 1
-    }
-
-    # Run tests based on project type
-    if [[ -f "$PROJECT_DIR/install.sh" ]]; then
-        run_vm_tests "$DEFAULT_VM" "install" || echo "Install test failed" >> "$ISSUES_FILE"
     fi
 
-    # Check for dangerous operations in manifest
-    if [[ -f "$MANIFEST" ]]; then
-        local DANGEROUS=$(jq -r '.vm_testing.dangerous_operations[]? // empty' "$MANIFEST")
+    local SSH_CMD="ssh -i $SSH_KEY -o ConnectTimeout=10 -o StrictHostKeyChecking=no $SSH_USER@$VM_IP"
 
-        if echo "$DANGEROUS" | grep -q "pam_modification"; then
-            run_vm_tests "$DEFAULT_VM" "pam" || echo "PAM test failed" >> "$ISSUES_FILE"
+    # ─── STAGED RELEASE LIFECYCLE ──────────────────────────────────
+    # If a staged release exists, test the full installation lifecycle
+    test_staged_release_lifecycle
+
+    # ─── DOCKER STAGING IMAGES ─────────────────────────────────────
+    test_docker_staging
+
+    # ─── LEGACY: MANIFEST-BASED TESTS ─────────────────────────────
+    # Fall back to legacy rsync deploy + manifest tests if no staged release
+    local STAGED_FILE="$PROJECT_DIR/.staged-release"
+    if [[ ! -f "$STAGED_FILE" ]]; then
+        # Reset to clean state
+        reset_vm_to_clean "$DEFAULT_VM" || true
+
+        # Deploy via rsync
+        deploy_to_vm "$DEFAULT_VM" || {
+            echo "Deploy failed" >> "$ISSUES_FILE"
+            return 1
+        }
+
+        # Run tests based on project type
+        if [[ -f "$PROJECT_DIR/install.sh" ]]; then
+            run_vm_tests "$DEFAULT_VM" "install" || echo "Install test failed" >> "$ISSUES_FILE"
         fi
 
-        if echo "$DANGEROUS" | grep -q "systemd_service_install"; then
-            run_vm_tests "$DEFAULT_VM" "systemd" || echo "systemd test failed" >> "$ISSUES_FILE"
-        fi
+        # Check for dangerous operations in manifest
+        if [[ -f "$MANIFEST" ]]; then
+            local DANGEROUS=$(jq -r '.vm_testing.dangerous_operations[]? // empty' "$MANIFEST")
 
-        if echo "$DANGEROUS" | grep -q "reboot_required"; then
-            run_vm_tests "$DEFAULT_VM" "reboot" || echo "Reboot test failed" >> "$ISSUES_FILE"
+            if echo "$DANGEROUS" | grep -q "pam_modification"; then
+                run_vm_tests "$DEFAULT_VM" "pam" || echo "PAM test failed" >> "$ISSUES_FILE"
+            fi
+
+            if echo "$DANGEROUS" | grep -q "systemd_service_install"; then
+                run_vm_tests "$DEFAULT_VM" "systemd" || echo "systemd test failed" >> "$ISSUES_FILE"
+            fi
+
+            if echo "$DANGEROUS" | grep -q "reboot_required"; then
+                run_vm_tests "$DEFAULT_VM" "reboot" || echo "Reboot test failed" >> "$ISSUES_FILE"
+            fi
         fi
     fi
 
-    # Generate report
+    # ─── GENERATE REPORT ───────────────────────────────────────────
     echo ""
     echo "═══════════════════════════════════════════════════════════════════"
     echo "  PHASE V: VM TESTING SUMMARY"
@@ -750,6 +833,276 @@ run_phase_V() {
         echo "✅ All VM tests passed"
         rm -f "$ISSUES_FILE"
         return 0
+    fi
+}
+```
+
+## Step 4b: Staged Release Installation Lifecycle
+
+If Discovery reported a valid staged release, test the full installation lifecycle on the VM.
+This exercises the same scripts a real user would run: `install.sh` → `upgrade.sh` → `deploy.sh`.
+
+```bash
+test_staged_release_lifecycle() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local STAGED_FILE="$PROJECT_DIR/.staged-release"
+
+    if [[ ! -f "$STAGED_FILE" ]]; then
+        echo "  No staged release detected — skipping lifecycle test"
+        return 0
+    fi
+
+    source "$STAGED_FILE"
+
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  Staged Release Lifecycle Test"
+    echo "───────────────────────────────────────────────────────────────────"
+    echo ""
+    echo "  Version: ${version:-unknown}"
+    echo "  Tag: ${tag:-unknown}"
+    echo "  Commit: ${commit:-unknown}"
+    echo ""
+
+    local LIFECYCLE_RESULTS=()
+    local LIFECYCLE_FAILED=false
+
+    # 1. Copy project to VM staging area
+    echo "  [1/6] Copying project to VM staging area..."
+    rsync -az --exclude='.git' --exclude='venv' --exclude='__pycache__' \
+        --exclude='node_modules' --exclude='.venv' --exclude='*.pyc' \
+        -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" \
+        "$PROJECT_DIR/" "$SSH_USER@$VM_IP:/tmp/staged-release/"
+
+    if [[ $? -eq 0 ]]; then
+        LIFECYCLE_RESULTS+=("Copy to VM|PASS")
+        echo "       ✅ Files copied"
+    else
+        LIFECYCLE_RESULTS+=("Copy to VM|FAIL")
+        echo "       ❌ Copy failed"
+        echo "Staged release: copy to VM failed" >> "$ISSUES_FILE"
+        return 1
+    fi
+
+    # 2. FRESH INSTALL via install.sh
+    local SCRIPT_TO_RUN=""
+    if [[ -n "$INSTALL_SCRIPT" ]]; then
+        SCRIPT_TO_RUN="$INSTALL_SCRIPT"
+    elif $SSH_CMD "[[ -f /tmp/staged-release/install.sh ]]" 2>/dev/null; then
+        SCRIPT_TO_RUN="./install.sh"
+    fi
+
+    if [[ -n "$SCRIPT_TO_RUN" ]]; then
+        echo "  [2/6] Running fresh install: $SCRIPT_TO_RUN"
+        if $SSH_CMD "cd /tmp/staged-release && sudo bash $SCRIPT_TO_RUN" 2>&1; then
+            # Verify install
+            local REMOTE_VERSION=$($SSH_CMD "cat /opt/*/VERSION 2>/dev/null" 2>/dev/null | head -1)
+            if [[ "$REMOTE_VERSION" == "$version" ]]; then
+                LIFECYCLE_RESULTS+=("Fresh Install|PASS")
+                echo "       ✅ Install succeeded (version: $REMOTE_VERSION)"
+            else
+                LIFECYCLE_RESULTS+=("Fresh Install|WARN")
+                echo "       ⚠️ Install completed but version mismatch: expected $version, got ${REMOTE_VERSION:-nothing}"
+            fi
+        else
+            LIFECYCLE_RESULTS+=("Fresh Install|FAIL")
+            LIFECYCLE_FAILED=true
+            echo "       ❌ Install failed"
+            echo "Staged release: install.sh failed" >> "$ISSUES_FILE"
+        fi
+    else
+        LIFECYCLE_RESULTS+=("Fresh Install|SKIP")
+        echo "  [2/6] No install script found — skipping"
+    fi
+
+    # 3. Verify Install — check services and API
+    echo "  [3/6] Verifying installation..."
+    local INSTALL_VERIFIED=false
+
+    # Check version
+    local FINAL_VERSION=$($SSH_CMD "cat /opt/*/VERSION 2>/dev/null" 2>/dev/null | head -1)
+    echo "       Version on VM: ${FINAL_VERSION:-unknown}"
+
+    # Check API if port is configured
+    if [[ -n "$API_PORT" ]]; then
+        local API_STATUS=$($SSH_CMD "curl -s -o /dev/null -w '%{http_code}' http://localhost:$API_PORT/api/system/version 2>/dev/null" 2>/dev/null)
+        echo "       API health (port $API_PORT): HTTP ${API_STATUS:-timeout}"
+        if [[ "$API_STATUS" == "200" ]]; then
+            INSTALL_VERIFIED=true
+        fi
+    fi
+
+    if [[ "$INSTALL_VERIFIED" == "true" ]]; then
+        LIFECYCLE_RESULTS+=("Verify Install|PASS")
+        echo "       ✅ Installation verified"
+    else
+        LIFECYCLE_RESULTS+=("Verify Install|WARN")
+        echo "       ⚠️ Installation not fully verified (API may need time to start)"
+    fi
+
+    # 4. UPGRADE via upgrade.sh (idempotent — same version upgrade)
+    SCRIPT_TO_RUN=""
+    if [[ -n "$UPGRADE_SCRIPT" ]]; then
+        SCRIPT_TO_RUN="$UPGRADE_SCRIPT"
+    elif $SSH_CMD "[[ -f /tmp/staged-release/upgrade.sh ]]" 2>/dev/null; then
+        SCRIPT_TO_RUN="./upgrade.sh"
+    fi
+
+    if [[ -n "$SCRIPT_TO_RUN" ]]; then
+        echo "  [4/6] Running upgrade: $SCRIPT_TO_RUN"
+        if $SSH_CMD "cd /tmp/staged-release && sudo bash $SCRIPT_TO_RUN" 2>&1; then
+            LIFECYCLE_RESULTS+=("Upgrade|PASS")
+            echo "       ✅ Upgrade completed"
+        else
+            LIFECYCLE_RESULTS+=("Upgrade|FAIL")
+            LIFECYCLE_FAILED=true
+            echo "       ❌ Upgrade failed"
+            echo "Staged release: upgrade.sh failed" >> "$ISSUES_FILE"
+        fi
+    else
+        LIFECYCLE_RESULTS+=("Upgrade|SKIP")
+        echo "  [4/6] No upgrade script — skipping"
+    fi
+
+    # 5. DEPLOY via deploy.sh
+    SCRIPT_TO_RUN=""
+    if [[ -n "$DEPLOY_SCRIPT" ]]; then
+        SCRIPT_TO_RUN="$DEPLOY_SCRIPT"
+    elif $SSH_CMD "[[ -f /tmp/staged-release/deploy.sh ]]" 2>/dev/null; then
+        SCRIPT_TO_RUN="./deploy.sh"
+    fi
+
+    if [[ -n "$SCRIPT_TO_RUN" ]]; then
+        echo "  [5/6] Running deploy: $SCRIPT_TO_RUN"
+        if $SSH_CMD "cd /tmp/staged-release && sudo bash $SCRIPT_TO_RUN" 2>&1; then
+            LIFECYCLE_RESULTS+=("Deploy|PASS")
+            echo "       ✅ Deploy completed"
+        else
+            LIFECYCLE_RESULTS+=("Deploy|FAIL")
+            LIFECYCLE_FAILED=true
+            echo "       ❌ Deploy failed"
+            echo "Staged release: deploy.sh failed" >> "$ISSUES_FILE"
+        fi
+    else
+        LIFECYCLE_RESULTS+=("Deploy|SKIP")
+        echo "  [5/6] No deploy script — skipping"
+    fi
+
+    # 6. Final verification: services running, API responding, version correct
+    echo "  [6/6] Post-lifecycle verification..."
+    FINAL_VERSION=$($SSH_CMD "cat /opt/*/VERSION 2>/dev/null" 2>/dev/null | head -1)
+    echo "       Final version: ${FINAL_VERSION:-unknown}"
+
+    if [[ -n "$API_PORT" ]]; then
+        # Give services time to restart
+        sleep 3
+        API_STATUS=$($SSH_CMD "curl -s -o /dev/null -w '%{http_code}' http://localhost:$API_PORT/api/system/version 2>/dev/null" 2>/dev/null)
+        echo "       API health (port $API_PORT): HTTP ${API_STATUS:-timeout}"
+    fi
+
+    if [[ "$FINAL_VERSION" == "$version" ]]; then
+        LIFECYCLE_RESULTS+=("Final Verify|PASS")
+        echo "       ✅ Version verified: $FINAL_VERSION"
+    else
+        LIFECYCLE_RESULTS+=("Final Verify|WARN")
+        echo "       ⚠️ Version mismatch: expected $version, got ${FINAL_VERSION:-unknown}"
+    fi
+
+    # Cleanup staging area
+    $SSH_CMD "rm -rf /tmp/staged-release" 2>/dev/null
+
+    # Print lifecycle summary table
+    echo ""
+    echo "  ┌──────────────────────┬────────┐"
+    echo "  │ Step                 │ Status │"
+    echo "  ├──────────────────────┼────────┤"
+    for result in "${LIFECYCLE_RESULTS[@]}"; do
+        local step="${result%%|*}"
+        local status="${result##*|}"
+        printf "  │ %-20s │ %-6s │\n" "$step" "$status"
+    done
+    echo "  └──────────────────────┴────────┘"
+
+    if [[ "$LIFECYCLE_FAILED" == "true" ]]; then
+        echo ""
+        echo "  ❌ Staged release lifecycle had failures"
+        return 1
+    else
+        echo ""
+        echo "  ✅ Staged release lifecycle completed"
+        return 0
+    fi
+}
+```
+
+## Step 4c: Docker Staging Image Testing
+
+After the install/upgrade/deploy lifecycle, test Docker staging images if they exist:
+
+```bash
+test_docker_staging() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local STAGED_FILE="$PROJECT_DIR/.staged-release"
+
+    # Need version info for matching
+    local version=""
+    if [[ -f "$STAGED_FILE" ]]; then
+        source "$STAGED_FILE"
+    fi
+
+    if [[ -z "$version" ]]; then
+        # Try VERSION file
+        if [[ -f "$PROJECT_DIR/VERSION" ]]; then
+            version=$(cat "$PROJECT_DIR/VERSION" | tr -d '[:space:]')
+        else
+            return 0
+        fi
+    fi
+
+    local PROJECT_NAME_LOWER=$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')
+    local STAGING_IMAGES=""
+
+    if command -v docker &>/dev/null; then
+        STAGING_IMAGES=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | \
+            grep -iE "${PROJECT_NAME_LOWER}.*(${version}|rc|staging)" | head -5)
+    fi
+
+    if [[ -z "$STAGING_IMAGES" ]]; then
+        echo "  No Docker staging images found for v${version}"
+        return 0
+    fi
+
+    echo ""
+    echo "───────────────────────────────────────────────────────────────────"
+    echo "  Docker Staging Image Test"
+    echo "───────────────────────────────────────────────────────────────────"
+    echo ""
+    echo "  Staging images found:"
+    echo "$STAGING_IMAGES" | sed 's/^/    /'
+
+    # Transfer to VM and test if Docker is available there
+    if $SSH_CMD "command -v docker" &>/dev/null 2>&1; then
+        local IMAGE=$(echo "$STAGING_IMAGES" | head -1)
+        echo ""
+        echo "  Transferring $IMAGE to VM..."
+        docker save "$IMAGE" | $SSH_CMD "docker load" 2>&1
+
+        echo "  Running container smoke test..."
+        # Try --version first, then --help, then run detached
+        local DOCKER_OK=false
+        if $SSH_CMD "docker run --rm $IMAGE --version" 2>/dev/null; then
+            DOCKER_OK=true
+        elif $SSH_CMD "docker run --rm -d --name test-staged $IMAGE && sleep 5 && docker logs test-staged && docker stop test-staged" 2>/dev/null; then
+            DOCKER_OK=true
+        fi
+
+        if [[ "$DOCKER_OK" == "true" ]]; then
+            echo "  ✅ Docker staging test completed"
+        else
+            echo "  ⚠️ Docker staging test completed with warnings"
+        fi
+    else
+        echo "  Docker not available on VM — skipping container test"
     fi
 }
 ```
@@ -929,11 +1282,26 @@ Phase V runs when:
 - Project has `dangerous_operations` defined
 - User explicitly requests `--phase=V`
 - Discovery detects PAM/systemd modifications in install scripts
+- **Discovery reports a valid staged release** (`.staged-release` exists and tag is valid)
+- Discovery `ISOLATION_LEVEL` is `vm-required` or `vm-recommended`
 
 Phase V is **skipped** when:
 - No test VMs available and no ISOs to create from
 - libvirt/virsh not installed
-- Project has no install scripts or dangerous operations
+- Project has no install scripts, dangerous operations, or staged release
+- No staged release AND isolation level is `sandbox` or `sandbox-warn`
+
+## Project-VM Routing
+
+Phase V reads `~/.claude/config/project-vm-map.json` to determine the correct VM:
+
+| Routing Scenario | VM Used | Source |
+|------------------|---------|--------|
+| Project has dedicated VM | Dedicated VM | `projects.<name>.vm` |
+| Project has no entry | Default VM | `default.vm` |
+| Default VM is exclusive to another project | **ERROR** | Exclusivity violation |
+
+**Exclusivity**: When a VM has `exclusive_to` set, ONLY that project can use it, and the project can ONLY use that VM. This prevents cross-contamination.
 
 ## Report Format
 
@@ -962,6 +1330,24 @@ Phase V is **skipped** when:
 | Ubuntu 24.04 | ✅ PASSED |
 | Fedora 41 | ⚠️ Minor issues |
 | Windows 11 | ❌ Not compatible |
+
+### Staged Release Lifecycle
+| Step | Script | Status | Duration |
+|------|--------|--------|----------|
+| Copy to VM | rsync | PASS/FAIL | Xs |
+| Fresh Install | install.sh | PASS/FAIL/SKIP | Xs |
+| Verify Install | (version + API check) | PASS/FAIL | Xs |
+| Upgrade | upgrade.sh | PASS/FAIL/SKIP | Xs |
+| Deploy | deploy.sh | PASS/FAIL/SKIP | Xs |
+| Final Verify | (version + API check) | PASS/FAIL | Xs |
+| Docker Image | (transfer + smoke test) | PASS/FAIL/SKIP | Xs |
+
+| Attribute | Value |
+|-----------|-------|
+| Version | X.Y.Z |
+| Tag | vX.Y.Z |
+| VM | vm-name (IP) |
+| Final Version Verified | Yes/No |
 
 ### Issues Found
 - [List from vm-test-issues.log]

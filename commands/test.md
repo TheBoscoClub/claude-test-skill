@@ -194,21 +194,35 @@ When Phase G is skipped, Phase 12 (Verify) proceeds after Phase D (or P if D ski
 
 ### Phase V (VM Testing) Conditional Execution
 
-Phase V execution depends on **both** Discovery (Phase 1) isolation analysis AND Pre-Flight (Phase 0) VM availability:
+Phase V execution depends on **both** Discovery (Phase 1) isolation analysis AND Pre-Flight (Phase 0) VM availability, **plus staged release detection**:
 
-| Discovery: Isolation Level | Pre-Flight: VM Available | Phase V Action |
-|---------------------------|-------------------------|----------------|
-| `sandbox` | Any | **SKIP** - Sandbox (Phase M) sufficient |
-| `sandbox-warn` | Any | **SKIP** - Sandbox with monitoring |
-| `vm-recommended` | `false` | **WARN + SKIP** - Proceed with sandbox (caution) |
-| `vm-recommended` | `true` | **RUN** - Use VM for safer testing |
-| `vm-required` | `false` | **⛔ ABORT** - Cannot safely test this project |
-| `vm-required` | `true` | **RUN** - VM isolation mandatory |
+| Discovery: Isolation Level | Staged Release | Pre-Flight: VM Available | Phase V Action |
+|---------------------------|----------------|-------------------------|----------------|
+| `sandbox` | `none` | Any | **SKIP** - Sandbox (Phase M) sufficient |
+| `sandbox` | `valid` | `true` | **RUN** - Staged release lifecycle test |
+| `sandbox` | `valid` | `false` | **WARN** - Cannot test staged release without VM |
+| `sandbox-warn` | Any | Any | **SKIP** - Sandbox with monitoring (unless staged) |
+| `vm-recommended` | Any | `false` | **WARN + SKIP** - Proceed with sandbox (caution) |
+| `vm-recommended` | Any | `true` | **RUN** - Use VM for safer testing |
+| `vm-required` | Any | `false` | **⛔ ABORT** - Cannot safely test this project |
+| `vm-required` | Any | `true` | **RUN** - VM isolation mandatory |
+
+**Two independent triggers for Phase V:**
+1. **Isolation Level** — project contains dangerous patterns requiring VM isolation
+2. **Staged Release** — `.staged-release` breadcrumb exists and is valid
+
+Either trigger independently activates Phase V when a VM is available.
 
 **Isolation Level Detection** (performed by Discovery):
 - Scans project for dangerous patterns: PAM configs, kernel params, systemd services, bootloader, etc.
 - Calculates `DANGER_SCORE` based on weighted pattern matches
 - Outputs `ISOLATION_LEVEL`: `sandbox`, `sandbox-warn`, `vm-recommended`, or `vm-required`
+
+**Staged Release Detection** (performed by Discovery):
+- Checks for `.staged-release` breadcrumb file written by `/git-release --local`
+- Validates tag exists and points to correct commit
+- Detects Docker staging images matching project name and version
+- Outputs `Staged Release`: `valid`, `invalid`, or `none`
 
 **VM Availability Detection** (performed by Pre-Flight):
 - Checks for libvirt/virsh installation and libvirtd service
@@ -394,6 +408,8 @@ function executeAudit(requestedPhases):
         #   - productionStatus: installation status
         #   - isolationLevel: "sandbox" | "sandbox-warn" | "vm-recommended" | "vm-required"
         #   - dangerScore: numeric score from pattern detection
+        #   - stagedRelease: "valid" | "invalid" | "none"
+        #   - stagedVersion: version string (or empty)
 
     # TIER 2: Test Execution (parallel within tier)
     tier2 = intersection(requestedPhases, [2, 2a])
@@ -526,6 +542,19 @@ To proceed:
             else:  # sandbox
                 log("Standard sandbox isolation sufficient")
                 useVM = false
+
+            # STAGED RELEASE GATE (additional Phase V trigger)
+            # A valid staged release triggers Phase V regardless of isolation level
+            if stagedRelease == "valid" and not useVM:
+                log("Staged release v{stagedVersion} detected — Phase V will deploy and verify")
+                if vmAvailable:
+                    start_test_vm()
+                    useVM = true
+                    stagedReleaseTrigger = true
+                else:
+                    warn("Staged release detected but no VM available")
+                    warn("Cannot run lifecycle tests without VM")
+                    # Not a hard abort — staged release testing is valuable but not safety-critical
 
             # Note: VM shutdown is handled by Phase C cleanup (reads .test-vm-state)
 
@@ -892,6 +921,10 @@ ELSE (Autonomous - DEFAULT):
       - Installable App: [type or "none"]
       - Production Status: [installed|not-installed|installed-not-running]
       - Phase P Recommendation: [SKIP|RUN|PROMPT]
+   📋 Extract staged release status from output:
+      - Staged Release: [valid|invalid|none]
+      - Staged Version: [X.Y.Z or empty]
+      - If "valid": Phase V will be triggered for lifecycle testing
    📋 Extract custom pytest options from output:
       - Parse `Pytest Custom Option: --flag | help text | resource-type` lines
       - Resource types: vm, hardware, other
@@ -1021,20 +1054,29 @@ ELSE (Autonomous - DEFAULT):
 - Always executes regardless of prior failures
 - Cleanup is mandatory for environment hygiene
 
-**Phase V (VM Testing) - Conditional on Isolation Level:**
+**Phase V (VM Testing) - Conditional on Isolation Level OR Staged Release:**
 - Position: Special - replaces Phase M when VM isolation is needed
-- Conditional execution based on Discovery `ISOLATION_LEVEL` output
-- Three possible outcomes:
-  1. **SKIP**: `ISOLATION_LEVEL` is `sandbox` or `sandbox-warn` → use Phase M instead
-  2. **RUN**: `ISOLATION_LEVEL` is `vm-required` or `vm-recommended` AND VM available
+- Conditional execution based on Discovery `ISOLATION_LEVEL` output OR staged release detection
+- Two independent triggers (either activates Phase V):
+  1. **Isolation Level**: `vm-required` or `vm-recommended` with VM available
+  2. **Staged Release**: `.staged-release` exists and is valid
+- Possible outcomes:
+  1. **SKIP**: No trigger active (sandbox isolation, no staged release)
+  2. **RUN**: Either trigger active AND VM available
   3. **ABORT**: `ISOLATION_LEVEL` is `vm-required` AND no VM available
+- Project-VM routing via `~/.claude/config/project-vm-map.json`:
+  - Projects with dedicated VMs are routed automatically (e.g., Audiobook-Manager → test-audiobook-cachyos)
+  - Exclusivity enforced — reserved VMs cannot be used by other projects
+  - Default VM used for projects without explicit mapping
 - Capabilities:
   - Deploy project to existing test VM via SSH
+  - **Staged release lifecycle testing**: install → upgrade → deploy → verify
+  - **Docker staging image testing**: transfer and smoke test on VM
   - Create new VM from ISO library if needed
   - Run tests in full OS isolation
   - Snapshot/restore for rollback after dangerous tests
   - Cross-distro testing (Ubuntu, Fedora, Debian, CachyOS, Windows)
-- Use cases: PAM modifications, kernel params, systemd services, bootloader changes
+- Use cases: PAM modifications, kernel params, systemd services, bootloader changes, **release verification**
 
 **Phase ST (Self-Test) - Explicit Only:**
 - Position: ISOLATED (never part of normal tier execution)
@@ -1157,4 +1199,4 @@ To skip auto-enable behavior, use:
 
 ---
 
-*Document Version: 3.0.1 — Canonical help block, Phase ST grep fix, argument-hint update*
+*Document Version: 3.1.0 — Staged release detection, project-VM routing, installation lifecycle testing*
