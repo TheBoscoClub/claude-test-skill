@@ -13,24 +13,28 @@ After ANY fix applied by /test:
 - Phase P (Production): MUST run wrapper scripts, not just check they exist
 - Phase 12 (Verify): MUST execute actual tests, not just check test files exist
 
-## Future: Project-Specific Test Modules
+## Project-Specific Test Modules
 
-**Status**: Design phase
+**Status**: Partially implemented (QA modules)
+
+**Implemented**: QA module discovery for `qaapp`, `qadocker`, `qaall` shortcuts.
+Dispatcher looks for `test-*-qa-{app,docker,all}.md` in project root.
+First project using this: Audiobook-Manager.
 
 **Architecture**:
 ```
 Project Root (any project using /test)
-├── .test-skill.md              # Untracked index file (gitignored)
-├── test-$project-00.md         # Project-specific test module 00
-└── test-$project-99.md         # Up to 100 modules (00-99)
+├── test-$project-qa-app.md     # QA native app regression module
+├── test-$project-qa-docker.md  # QA Docker regression module
+└── test-$project-qa-all.md     # QA orchestrator (runs both sequentially)
 ```
 
-**Key Design Decisions Needed**:
-1. **Trigger**: When do project-specific tests run? (New phase? Before/after existing? User flag?)
-2. **Timing**: Which tier? Independent track like Phase A? Dependencies?
-3. **Discovery**: How does `.test-skill.md` index the modules?
-4. **Execution**: Each as a subagent? Sequential or parallel?
+**Execution Model**:
+- QA shortcuts are **standalone** — bypass the tier/gate system entirely
+- Each module is loaded as a self-contained subagent instruction file (model=opus)
+- Dispatcher discovers modules via glob: `test-*-qa-{app,docker,all}.md`
+- Modules handle their own VM connectivity, version checks, upgrades, DB sync, regression
 
-**Files to modify when implementing**: `commands/test.md`, `skills/test-phases/`
+**Files modified**: `commands/test.md` (shortcut routing + QA module loading logic)
 
-**Naming Convention**: Index: `.test-skill.md`, Modules: `test-$project-XY.md` (XY = 00-99)
+**Future expansion**: The `test-*-qa-*.md` glob pattern supports additional QA module types beyond app/docker/all.
