@@ -18,7 +18,7 @@ allowed-tools:
   - KillShell
   - NotebookEdit
   - WebSearch
-argument-hint: "[help] [prodapp] [docker] [security] [github] [holistic] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
+argument-hint: "[help] [prodapp] [docker] [qaapp] [qadocker] [qaall] [security] [github] [holistic] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
 ---
 
 # Modular Project Audit (/test)
@@ -50,6 +50,8 @@ This skill operates **entirely non-interactively** except in extremely rare case
 
 5. **Loop Until Clean**: Phase 10 (Fix) and Phase 12 (Verify) form a loop. If verification finds new issues introduced by fixes, fix those too. Continue until all tests pass and all issues are resolved.
 
+6. **Production Data Isolation**: No test VM, QA VM, or test/QA Docker container may have LIVE ACCESS (mounts) to production storage. NFS, CIFS, virtiofs, virtio-9p mounts and Docker `-v` bind-mounts to host production paths are forbidden. Copying production data *into* a test/QA environment is allowed — once on the VM's own disk, it's fully isolated. Test VM libraries should be ≤275GB. This boundary is enforced across all phases (A, D, V, VM-lifecycle).
+
 ---
 
 ## Quick Reference
@@ -58,6 +60,9 @@ This skill operates **entirely non-interactively** except in extremely rare case
 /test                    # Full audit (autonomous - fixes everything)
 /test prodapp            # Validate installed production app (Phase P)
 /test docker             # Validate Docker image and registry (Phase D)
+/test qaapp              # QA VM: regression test native app (auto-upgrade + DB sync)
+/test qadocker           # QA VM: regression test Docker container (auto-upgrade + DB sync)
+/test qaall              # QA VM: regression test both native and Docker sequentially
 /test security           # Comprehensive security audit (Phase 5/SEC)
 /test github             # Audit GitHub repository settings (Phase G)
 /test holistic           # Full-stack cross-component analysis (Phase H)
@@ -811,6 +816,9 @@ When `/test` is invoked:
 │  /test security                  Comprehensive security audit (Phase 5)     │
 │  /test prodapp                   Validate installed production app (Phase P)│
 │  /test docker                    Validate Docker image & registry (Phase D) │
+│  /test qaapp                     QA native app regression (upgrade+DB sync) │
+│  /test qadocker                  QA Docker regression (upgrade+DB sync)     │
+│  /test qaall                     QA native+Docker combined regression       │
 │  /test github                    Audit GitHub repo security (Phase G)       │
 │  /test holistic                  Full-stack cross-component analysis (H)    │
 │                                                                             │
@@ -880,11 +888,60 @@ When `/test` is invoked:
 3. **Handle shortcuts:**
    - `prodapp` → `--phase=P` (production validation)
    - `docker` → `--phase=D` (Docker validation)
+   - `qaapp` → load project QA app module (test-*-qa-app.md from project root)
+   - `qadocker` → load project QA docker module (test-*-qa-docker.md from project root)
+   - `qaall` → load project QA all module (test-*-qa-all.md from project root)
    - `security` → `--phase=5` (comprehensive security audit)
    - `github` → `--phase=G` (GitHub repository audit)
    - `holistic` → `--phase=H` (full-stack cross-component analysis)
    - `--phase=SEC` → `--phase=5` (alias for security phase)
 4. **Build execution plan from requested phases**
+
+### QA Module Loading (Project-Specific)
+
+When the argument is `qaapp`, `qadocker`, or `qaall`:
+
+1. **Map shortcut to file suffix:**
+   - `qaapp` → `app`
+   - `qadocker` → `docker`
+   - `qaall` → `all`
+
+2. **Find module file in project root:**
+   ```bash
+   SUFFIX={app|docker|all}  # based on shortcut
+   MODULE_FILE=$(ls ${PROJECT_DIR}/test-*-qa-${SUFFIX}.md 2>/dev/null | head -1)
+   ```
+
+3. **Validate module exists:**
+   - If no file found:
+     ```
+     ERROR: No QA ${SUFFIX} module found in project root.
+     Expected: test-*-qa-${SUFFIX}.md
+     Create a project-specific QA test module to use this shortcut.
+     ```
+     **ABORT** — do not fall back to any built-in phase.
+
+4. **Read vm-test-manifest.json QA config:**
+   ```bash
+   QA_CONFIG=$(python3 -c "import json; print(json.dumps(json.load(open('${PROJECT_DIR}/vm-test-manifest.json')).get('qa_vm', {})))" 2>/dev/null)
+   ```
+   If no `qa_vm` section found, WARN but continue (module may have inline config).
+
+5. **Execute as standalone subagent:**
+   - Read the module file contents
+   - Spawn a single Task subagent with `model: opus`
+   - Pass the module contents as the subagent's instructions
+   - Include context: `PROJECT_DIR`, QA VM config from manifest, SSH config
+   - **QA modules are STANDALONE** — no tier system, no S/M/0/1 prerequisites
+   - The module handles its own VM connectivity, version checks, upgrades, DB sync
+   - **No other phases run** — qaapp/qadocker/qaall are self-contained
+
+6. **Report results:**
+   - Collect subagent output
+   - Display QA test summary
+   - Return overall PASS/FAIL status
+
+**Key difference from built-in phases:** QA shortcuts bypass the entire tier/gate execution system. They are project-specific, standalone operations that load their own instructions.
 
 ### Mode-Specific Behavior
 
@@ -1130,6 +1187,24 @@ For Docker validation (image and registry):
 /test docker
 ```
 This validates the Docker image builds correctly and the registry package version matches the project VERSION.
+
+For QA native app regression:
+```
+/test qaapp
+```
+Auto-upgrades the QA VM native app to the latest release, syncs the production database, and runs full regression (API, web, auth, services, logs).
+
+For QA Docker regression:
+```
+/test qadocker
+```
+Same as qaapp but for the Docker container. Includes consistency check comparing Docker against native app.
+
+For complete QA regression (both):
+```
+/test qaall
+```
+Runs native regression first, then Docker regression, then cross-validates version agreement, library counts, and API responses.
 
 For GitHub repository audit:
 ```
