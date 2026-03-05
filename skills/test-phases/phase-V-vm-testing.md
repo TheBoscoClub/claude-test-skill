@@ -31,13 +31,21 @@ Test applications, releases, and system-level changes in fully isolated virtual 
 | Windows testing | ✅ Yes - need Windows VM |
 | Reboot cycle testing | ✅ Yes - need isolated system |
 
+## CRITICAL: Production Data Isolation
+
+**Test VMs used by Phase V must NEVER have live mounts to production storage.**
+
+- **NEVER** mount host production paths into the VM via NFS, CIFS, virtiofs, or virtio-9p
+- Copying data *into* the VM (scp, rsync of DBs or library files) is allowed — isolated on VM disk
+- Test VM libraries should be ≤275GB on the VM's own disk
+
 ## VM Configuration
 
 ### VM Sources
 
 **Existing VMs** (detected automatically):
 ```
-/var/lib/libvirt/images/           # libvirt default
+/hddRaid1/VirtualMachines/         # primary VM storage (moved from NVMe to SSD RAID-1)
 ~/.local/share/libvirt/images/     # user libvirt
 ```
 
@@ -72,12 +80,15 @@ Projects can specify VM testing requirements:
       "reboot_required"
     ],
 
+    "pristine_snapshot": "pristine-275g-2026-02-25",
+    "post_test_restore": true,
+
     "test_environments": [
       {
         "name": "cachyos-test",
         "type": "existing",
         "vm_name": "cachyos-kwallet-dev",
-        "snapshot": "clean-install"
+        "snapshot": "pristine-275g-2026-02-25"
       },
       {
         "name": "ubuntu-lts",
@@ -190,7 +201,7 @@ detect_vm_environment() {
     # Also check for qcow2 backup files (manual snapshots)
     echo ""
     echo "  Manual snapshots (.clean-install, .backup):"
-    ls /var/lib/libvirt/images/*.clean-install /var/lib/libvirt/images/*.backup 2>/dev/null | \
+    ls /hddRaid1/VirtualMachines/*.clean-install /hddRaid1/VirtualMachines/*.backup 2>/dev/null | \
         xargs -I{} basename {} | sed 's/^/    /' || echo "    (none)"
     echo ""
 }
@@ -207,7 +218,7 @@ create_test_vm() {
     local UEFI="${5:-false}"
 
     local ISO_DIR="/hddRaid1/ISOs"
-    local VM_DISK="/var/lib/libvirt/images/${VM_NAME}.qcow2"
+    local VM_DISK="/hddRaid1/VirtualMachines/${VM_NAME}.qcow2"
 
     echo "───────────────────────────────────────────────────────────────────"
     echo "  Creating VM: $VM_NAME"
@@ -270,7 +281,7 @@ create_test_vm() {
         echo "Next steps:"
         echo "  1. Open virt-manager to complete OS installation"
         echo "  2. Install SSH server in the VM"
-        echo "  3. Create a clean snapshot: virsh snapshot-create-as $VM_NAME clean-install"
+        echo "  3. Create a pristine snapshot: virsh snapshot-create-as $VM_NAME pristine-<date> --disk-only"
         echo "  4. Add VM to vm-test-manifest.json"
     else
         echo "❌ Failed to create VM"
@@ -361,26 +372,54 @@ manage_vm_snapshot() {
     esac
 }
 
-# Quick reset to clean state
-reset_vm_to_clean() {
+# Quick reset to pristine state
+# Checks vm-test-manifest.json for project-specific pristine snapshot name,
+# falls back to "clean-install" for backward compatibility
+reset_vm_to_pristine() {
     local VM_NAME="$1"
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
 
-    echo "Resetting $VM_NAME to clean state..."
+    echo "Resetting $VM_NAME to pristine state..."
 
-    # Try libvirt snapshot first
-    if virsh snapshot-list "$VM_NAME" --name 2>/dev/null | grep -q "clean-install"; then
-        manage_vm_snapshot "$VM_NAME" restore "clean-install"
-    # Fall back to manual qcow2 backup
-    elif [[ -f "/var/lib/libvirt/images/${VM_NAME}.clean-install" ]]; then
+    # Check vm-test-manifest.json for project-specific pristine snapshot
+    local PRISTINE_SNAP=""
+    if [[ -f "${PROJECT_DIR}/vm-test-manifest.json" ]]; then
+        PRISTINE_SNAP=$(python3 -c "import json; d=json.load(open('${PROJECT_DIR}/vm-test-manifest.json')); print(d.get('vm_testing',{}).get('pristine_snapshot',''))" 2>/dev/null)
+    fi
+
+    # For external snapshots (like pristine-os-deps-*): discard overlay and revert to base
+    # NEVER use qemu-img commit here — that bakes changes INTO the base image.
+    # To revert: delete the overlay, repoint VM to base, recreate snapshot.
+    local OVERLAY="/hddRaid1/VirtualMachines/${VM_NAME}.${PRISTINE_SNAP}"
+    local BASE="/hddRaid1/VirtualMachines/${VM_NAME}.qcow2"
+
+    if [[ -n "$PRISTINE_SNAP" && -f "$OVERLAY" ]]; then
         virsh destroy "$VM_NAME" 2>/dev/null
-        sudo cp "/var/lib/libvirt/images/${VM_NAME}.clean-install" \
-                "/var/lib/libvirt/images/${VM_NAME}.qcow2"
-        echo "✅ Restored from .clean-install backup"
+        sudo virsh snapshot-delete "$VM_NAME" "$PRISTINE_SNAP" --metadata 2>/dev/null
+        sudo virt-xml "$VM_NAME" --edit target=vda --disk path="$BASE"
+        sudo rm -f "$OVERLAY"
+        sudo virsh snapshot-create-as "$VM_NAME" "$PRISTINE_SNAP" \
+            "Pristine OS with dependencies. No application installed." --disk-only
+        echo "✅ Reverted to pristine state ($PRISTINE_SNAP)"
+    # Try internal snapshot (project-specific name)
+    elif [[ -n "$PRISTINE_SNAP" ]] && virsh snapshot-list "$VM_NAME" --name 2>/dev/null | grep -q "$PRISTINE_SNAP"; then
+        manage_vm_snapshot "$VM_NAME" restore "$PRISTINE_SNAP"
+    # Standard pristine snapshot (preferred)
+    elif virsh snapshot-list "$VM_NAME" --name 2>/dev/null | grep -q "^pristine$"; then
+        manage_vm_snapshot "$VM_NAME" restore "pristine"
+    # Legacy fallback: clean-install
+    elif virsh snapshot-list "$VM_NAME" --name 2>/dev/null | grep -q "clean-install"; then
+        manage_vm_snapshot "$VM_NAME" restore "clean-install"
+    # NEVER replace qcow2 files — this destroys all internal snapshots.
+    # If no snapshot exists, the VM needs manual pristine snapshot creation.
     else
-        echo "❌ No clean snapshot found for $VM_NAME"
+        echo "❌ No pristine or clean snapshot found for $VM_NAME"
         return 1
     fi
 }
+
+# Backward-compatible alias
+reset_vm_to_clean() { reset_vm_to_pristine "$@"; }
 ```
 
 ## Step 4: Deploy to VM via SSH
@@ -789,7 +828,37 @@ run_phase_V() {
         # Reset to clean state
         reset_vm_to_clean "$DEFAULT_VM" || true
 
-        # Deploy via rsync
+        # On pristine VMs, install.sh must run before deploy-vm.sh.
+        # deploy-vm.sh assumes the audiobooks user/group, /opt/audiobooks/,
+        # venv, and systemd services already exist.
+        # Phase VM-lifecycle handles this via install_on_pristine_vm(),
+        # but if the VM was already running (not started by us), check here too.
+        if ! $SSH_CMD "getent passwd audiobooks" &>/dev/null 2>&1; then
+            echo "  Pristine VM detected — running fresh install before deploy..."
+            local INSTALL_CMD=""
+            if [[ -f "$MANIFEST" ]]; then
+                INSTALL_CMD=$(jq -r '.vm_testing.install.command // empty' "$MANIFEST" 2>/dev/null)
+            fi
+            if [[ -z "$INSTALL_CMD" && -f "$PROJECT_DIR/install.sh" ]]; then
+                INSTALL_CMD="./install.sh --system"
+            fi
+            if [[ -n "$INSTALL_CMD" ]]; then
+                # Copy project to VM and run install
+                rsync -az --exclude='.git' --exclude='venv' --exclude='__pycache__' \
+                    --exclude='.snapshots' --exclude='*.tar.gz' \
+                    -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" \
+                    "$PROJECT_DIR/" "$SSH_USER@$VM_IP:/tmp/fresh-install/"
+                if $SSH_CMD "cd /tmp/fresh-install && sudo bash -c '$INSTALL_CMD'" 2>&1; then
+                    echo "  ✅ Fresh install completed on pristine VM"
+                else
+                    echo "  ❌ Fresh install failed" >> "$ISSUES_FILE"
+                    return 1
+                fi
+                $SSH_CMD "rm -rf /tmp/fresh-install" 2>/dev/null
+            fi
+        fi
+
+        # Deploy via rsync (updates existing installation)
         deploy_to_vm "$DEFAULT_VM" || {
             echo "Deploy failed" >> "$ISSUES_FILE"
             return 1
@@ -885,16 +954,33 @@ test_staged_release_lifecycle() {
     fi
 
     # 2. FRESH INSTALL via install.sh
+    # On pristine VMs, install.sh must run non-interactively with --system flag.
+    # The audiobooks user/group (no-login service account) is created by install.sh.
     local SCRIPT_TO_RUN=""
+    local INSTALL_FLAGS=""
     if [[ -n "$INSTALL_SCRIPT" ]]; then
         SCRIPT_TO_RUN="$INSTALL_SCRIPT"
     elif $SSH_CMD "[[ -f /tmp/staged-release/install.sh ]]" 2>/dev/null; then
         SCRIPT_TO_RUN="./install.sh"
     fi
 
+    # Read install command from manifest if available (includes --system flag)
+    local MANIFEST="$PROJECT_DIR/vm-test-manifest.json"
+    if [[ -f "$MANIFEST" ]]; then
+        local MANIFEST_INSTALL_CMD=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('vm_testing',{}).get('install',{}).get('command',''))" 2>/dev/null)
+        if [[ -n "$MANIFEST_INSTALL_CMD" ]]; then
+            SCRIPT_TO_RUN="$MANIFEST_INSTALL_CMD"
+        fi
+    fi
+
+    # Fallback: ensure --system flag for non-interactive execution
+    if [[ -n "$SCRIPT_TO_RUN" && "$SCRIPT_TO_RUN" == "./install.sh" ]]; then
+        SCRIPT_TO_RUN="./install.sh --system"
+    fi
+
     if [[ -n "$SCRIPT_TO_RUN" ]]; then
         echo "  [2/6] Running fresh install: $SCRIPT_TO_RUN"
-        if $SSH_CMD "cd /tmp/staged-release && sudo bash $SCRIPT_TO_RUN" 2>&1; then
+        if $SSH_CMD "cd /tmp/staged-release && sudo bash -c '$SCRIPT_TO_RUN'" 2>&1; then
             # Verify install
             local REMOTE_VERSION=$($SSH_CMD "cat /opt/*/VERSION 2>/dev/null" 2>/dev/null | head -1)
             if [[ "$REMOTE_VERSION" == "$version" ]]; then
