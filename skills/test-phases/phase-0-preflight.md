@@ -141,7 +141,7 @@ detect_vm_availability() {
     fi
 
     # Check for ISO library (for creating new VMs)
-    ISO_PATHS=("/path/to/isos" "$HOME/ISOs" "/var/lib/libvirt/images")
+    ISO_PATHS=("/path/to/isos" "$HOME/ISOs" "/path/to/vm-images")
     for path in "${ISO_PATHS[@]}"; do
         if [ -d "$path" ]; then
             ISO_COUNT=$(find "$path" -name "*.iso" -type f 2>/dev/null | wc -l)
