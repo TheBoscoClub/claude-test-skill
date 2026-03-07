@@ -118,21 +118,33 @@ fi
 ### 2. Shell Script Analysis
 
 ```bash
-SHELL_FILES=$(find . -name "*.sh" -not -path "./.snapshots/*" 2>/dev/null | head -1)
+# Note: shfmt only supports POSIX sh, bash, and mksh — NOT zsh.
+# Scripts with #!/usr/bin/env zsh or #!/bin/zsh shebangs must be excluded.
 
-if [[ -n "$SHELL_FILES" ]]; then
+BASH_SCRIPTS=$(find . -name "*.sh" -not -path "./.snapshots/*" -not -path "./.venv/*" -not -path "./node_modules/*" 2>/dev/null | while read -r f; do head -1 "$f" 2>/dev/null | grep -qE '#!/.*(bash|sh)$' && echo "$f"; done)
+ZSH_SCRIPTS=$(find . -name "*.sh" -not -path "./.snapshots/*" -not -path "./.venv/*" -not -path "./node_modules/*" 2>/dev/null | while read -r f; do head -1 "$f" 2>/dev/null | grep -qE '#!/.*zsh' && echo "$f"; done)
+
+if [[ -n "$BASH_SCRIPTS" ]] || [[ -n "$ZSH_SCRIPTS" ]]; then
     echo ""
     echo "───────────────────────────────────────────────────────────────────"
     echo "  Shell Script Analysis"
     echo "───────────────────────────────────────────────────────────────────"
 
-    # shfmt - Format check
-    if command -v shfmt &>/dev/null; then
+    # shfmt - Format check (bash/sh scripts ONLY — shfmt cannot parse zsh)
+    if command -v shfmt &>/dev/null && [[ -n "$BASH_SCRIPTS" ]]; then
         echo ""
-        echo "Checking shell formatting (shfmt)..."
-        shfmt -d . 2>&1 | head -20
-        SHFMT_ISSUES=$(shfmt -d . 2>&1 | grep -c "^---" || echo "0")
+        echo "Checking shell formatting (shfmt, bash/sh scripts only)..."
+        echo "$BASH_SCRIPTS" | xargs shfmt -d 2>&1 | head -20
+        SHFMT_ISSUES=$(echo "$BASH_SCRIPTS" | xargs shfmt -d 2>&1 | grep -c "^---" || echo "0")
         echo "Files needing formatting: $SHFMT_ISSUES"
+    fi
+
+    # Report zsh scripts (skipped by shfmt)
+    if [[ -n "$ZSH_SCRIPTS" ]]; then
+        ZSH_COUNT=$(echo "$ZSH_SCRIPTS" | wc -l)
+        echo ""
+        echo "Skipped $ZSH_COUNT zsh script(s) (shfmt does not support zsh):"
+        echo "$ZSH_SCRIPTS" | while read -r f; do echo "  $f"; done
     fi
 fi
 ```

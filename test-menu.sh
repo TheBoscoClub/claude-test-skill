@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/bin/bash
 # Interactive launcher for /test skill
 # Install: ln -s /hddRaid1/ClaudeCodeProjects/claude-test-skill/test-menu.sh ~/.local/bin/tm
 

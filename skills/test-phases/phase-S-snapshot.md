@@ -45,21 +45,29 @@ if [[ -n "$SNAPSHOT_PATH" ]]; then
 fi
 ```
 
-### VM Snapshot (test-vm-cachyos)
+### VM Snapshot
+
+Detects the project's test VM from `vm-test-manifest.json` or `project-vm-map.json`.
 
 ```bash
-if command -v virsh &>/dev/null && sudo virsh dominfo test-vm-cachyos &>/dev/null 2>&1; then
-  VM_STATE=$(sudo virsh domstate test-vm-cachyos 2>/dev/null | tr -d '[:space:]')
+# Determine the project's test VM
+VM_NAME="test-vm-cachyos"  # default
+if [[ -f "vm-test-manifest.json" ]]; then
+  VM_NAME=$(python3 -c "import json; d=json.load(open('vm-test-manifest.json')); print(d.get('vm_testing',{}).get('default_vm','test-vm-cachyos'))" 2>/dev/null)
+fi
+
+if command -v virsh &>/dev/null && sudo virsh dominfo "$VM_NAME" &>/dev/null 2>&1; then
+  VM_STATE=$(sudo virsh domstate "$VM_NAME" 2>/dev/null | tr -d '[:space:]')
   SNAP_NAME="pre-test-$TIMESTAMP"
   SNAP_DESC="Pre-test snapshot for ${PROJECT_NAME} v$(cat VERSION 2>/dev/null || echo 'unknown')"
 
-  if sudo virsh snapshot-create-as test-vm-cachyos "$SNAP_NAME" "$SNAP_DESC"; then
-    echo "VM snapshot created: $SNAP_NAME (state: $VM_STATE)"
+  if sudo virsh snapshot-create-as "$VM_NAME" "$SNAP_NAME" "$SNAP_DESC"; then
+    echo "VM snapshot created: $SNAP_NAME on $VM_NAME (state: $VM_STATE)"
   else
     echo "VM snapshot failed (non-fatal) - continuing"
   fi
 else
-  echo "virsh not available or test-vm-cachyos not found - skipping VM snapshot"
+  echo "virsh not available or $VM_NAME not found - skipping VM snapshot"
 fi
 ```
 
@@ -77,13 +85,17 @@ sudo btrfs subvolume snapshot "$SNAPSHOT_PATH" "$PROJECT_DIR"
 ### Restore VM Snapshot
 ```bash
 # List available snapshots
-sudo virsh snapshot-list test-vm-cachyos
+sudo virsh snapshot-list $VM_NAME
 
-# Revert to a specific snapshot
-sudo virsh snapshot-revert test-vm-cachyos "pre-test-YYYYMMDD-HHMMSS"
+# Revert to pre-test snapshot
+sudo virsh snapshot-revert $VM_NAME "pre-test-YYYYMMDD-HHMMSS"
 
 # Delete a snapshot (optional cleanup)
-sudo virsh snapshot-delete test-vm-cachyos "pre-test-YYYYMMDD-HHMMSS"
+sudo virsh snapshot-delete $VM_NAME "pre-test-YYYYMMDD-HHMMSS"
+
+# For projects with post_test_restore=true in vm-test-manifest.json,
+# the Phase C cleanup automatically restores the VM to its pristine
+# snapshot (e.g., pristine-275g-2026-02-25) after testing completes.
 ```
 
 ## Output

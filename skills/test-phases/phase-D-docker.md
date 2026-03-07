@@ -6,12 +6,22 @@
 
 Validate Docker image builds and registry package synchronization.
 
+## CRITICAL: Production Data Isolation
+
+**Docker containers created during Phase D must NEVER bind-mount host production paths.**
+
+- **NEVER** use `-v` to bind-mount host production database paths, library directories, or config files into a test container
+- Ephemeral in-container databases (e.g., `/tmp/test.db` or schema-initialized) are the standard for smoke tests
+- Copying data into a container image at build time is allowed — it's isolated inside the container
+
 ## Prerequisites
 
 This phase requires:
 - Docker daemon running
 - Registry authentication (for push validation)
 - Discovery phase results (Docker Status, Registry Image, Registry Status)
+
+**Post-pristine-revert note:** After reverting a test VM to its pristine snapshot, the Docker container's database does NOT exist. Phase D smoke tests use ephemeral in-container databases (`/tmp/test.db` or schema-initialized), so this is handled automatically. For full integration tests that need a populated DB, initialize from `schema.sql` or copy the native app's database into the Docker data volume.
 
 ## Execution Steps
 
@@ -406,9 +416,11 @@ Issues: [count]
 | Missing platforms | ⚠️ WARN | Registry image not multi-platform (amd64 only) |
 | Hardcoded secrets | ⚠️ ISSUE | Secrets in Dockerfile/compose |
 
-## Cleanup (MANDATORY)
+## Cleanup (MANDATORY — Release Leak Prevention)
 
-After all Docker tests complete, **always** clean up resources to prevent orphaned containers:
+After all Docker tests complete, **always** clean up resources. This is not just hygiene — test containers may contain production data (copied in for testing) that must NEVER survive into a release artifact. Orphaned test containers with production content could be accidentally committed to an image or captured by `docker save`.
+
+**Cleanup MUST complete BEFORE `/test` formally ends.**
 
 ```bash
 cleanup_docker_phase() {

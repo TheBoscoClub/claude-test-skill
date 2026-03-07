@@ -9,8 +9,17 @@ Manages automatic VM startup and shutdown for isolated testing.
 ## Purpose
 
 - **Start** the test VM when Phase 0/1 determines VM isolation is needed
+- **Detect dirty VMs** — if a `post_test_restore=true` VM is running at startup, an interrupted test left it dirty; revert to pristine before proceeding
 - **Track** that the VM was started by `/test` (to know what to cleanup)
-- **Shutdown** the VM during Phase C cleanup to preserve system resources
+- **Cleanup (Phase C)** — for `post_test_restore=true` VMs: ALWAYS revert to pristine, shut down, and leave shut down (regardless of who started it). For shared VMs: only shut down if `/test` started it
+
+### Expected VM States
+
+| When | post_test_restore=true VM | Shared VM |
+|------|--------------------------|-----------|
+| Before `/test` starts | **Shut down + pristine** | Running or shut down |
+| During `/test` | Running (started by /test) | Running |
+| After Phase C cleanup | **Shut down + pristine** | Restored to original state |
 
 ## Default Test VM
 
@@ -38,7 +47,19 @@ start_test_vm() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
     local ISOLATION_LEVEL="${ISOLATION_LEVEL:-sandbox}"
     local STATE_FILE="${PROJECT_DIR}/.test-vm-state"
+
+    # Read project-specific VM from manifest or project-vm-map, fall back to generic
     local DEFAULT_VM="test-vm-cachyos"
+    if [[ -f "${PROJECT_DIR}/vm-test-manifest.json" ]]; then
+        local MANIFEST_VM=$(python3 -c "import json; d=json.load(open('${PROJECT_DIR}/vm-test-manifest.json')); print(d.get('vm_testing',{}).get('default_vm',''))" 2>/dev/null)
+        [[ -n "$MANIFEST_VM" ]] && DEFAULT_VM="$MANIFEST_VM"
+    fi
+    local VM_MAP="$HOME/.claude/config/project-vm-map.json"
+    if [[ -f "$VM_MAP" ]]; then
+        local PROJECT_NAME=$(basename "$PROJECT_DIR")
+        local MAP_VM=$(python3 -c "import json; d=json.load(open('$VM_MAP')); print(d.get('projects',{}).get('$PROJECT_NAME',{}).get('vm',''))" 2>/dev/null)
+        [[ -n "$MAP_VM" ]] && DEFAULT_VM="$MAP_VM"
+    fi
 
     echo ""
     echo "═══════════════════════════════════════════════════════════════════"
@@ -107,20 +128,69 @@ start_test_vm() {
     local CURRENT_STATE=$(virsh domstate "$VM_NAME" 2>/dev/null | tr -d '[:space:]')
     echo "  Current State: $CURRENT_STATE"
 
+    # Read project-specific pristine snapshot name
+    local PRISTINE_SNAP=""
+    local POST_TEST_RESTORE="false"
+    if [[ -f "${PROJECT_DIR}/vm-test-manifest.json" ]]; then
+        PRISTINE_SNAP=$(python3 -c "import json; d=json.load(open('${PROJECT_DIR}/vm-test-manifest.json')); print(d.get('vm_testing',{}).get('pristine_snapshot',''))" 2>/dev/null)
+        POST_TEST_RESTORE=$(python3 -c "import json; d=json.load(open('${PROJECT_DIR}/vm-test-manifest.json')); print(str(d.get('vm_testing',{}).get('post_test_restore', False)).lower())" 2>/dev/null)
+    fi
+    PRISTINE_SNAP="${PRISTINE_SNAP:-clean-install}"
+
+    # ─── DIRTY VM DETECTION ─────────────────────────────────────────
+    # For post_test_restore=true projects, the VM should ALWAYS be
+    # pristine and shut down when we get here. If it's running, a
+    # previous test cycle was interrupted and left the VM dirty.
+    # Revert to pristine before proceeding.
+    if [[ "$CURRENT_STATE" == "running" && "$POST_TEST_RESTORE" == "true" ]]; then
+        echo ""
+        echo "  ⚠️  VM is running — likely dirty from an interrupted test cycle"
+        echo "     Reverting to pristine before proceeding..."
+        echo ""
+
+        # Force stop the dirty VM
+        sudo virsh destroy "$VM_NAME" 2>/dev/null || true
+
+        # Discard overlay and revert to pristine base
+        local OVERLAY="/hddRaid1/VirtualMachines/${VM_NAME}.${PRISTINE_SNAP}"
+        local BASE="/hddRaid1/VirtualMachines/${VM_NAME}.qcow2"
+        if [[ -f "$OVERLAY" ]]; then
+            # DISCARD changes — do NOT commit overlay into base
+            sudo virsh snapshot-delete "$VM_NAME" "$PRISTINE_SNAP" --metadata 2>/dev/null
+            sudo virt-xml "$VM_NAME" --edit target=vda --disk path="$BASE" 2>/dev/null
+            # Fix circular backingStore refs
+            sudo virsh dumpxml "$VM_NAME" > /tmp/vm-fix.xml
+            python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse('/tmp/vm-fix.xml')
+for disk in tree.getroot().iter('disk'):
+    for bs in disk.findall('backingStore'):
+        disk.remove(bs)
+tree.write('/tmp/vm-fix.xml', xml_declaration=True)
+"
+            sudo virsh define /tmp/vm-fix.xml 2>/dev/null
+            rm -f /tmp/vm-fix.xml
+            sudo rm -f "$OVERLAY"
+            echo "  ✅ Dirty overlay discarded — base image is pristine"
+        fi
+
+        # Recreate pristine snapshot and start clean
+        sudo virsh snapshot-create-as "$VM_NAME" "$PRISTINE_SNAP" \
+            "Pristine OS with dependencies. No application installed." --disk-only 2>/dev/null
+        echo "  ✅ Pristine snapshot recreated"
+
+        CURRENT_STATE="shutoff"
+    fi
+
     # Record original state for cleanup
     local STARTED_BY_TEST="false"
 
     if [[ "$CURRENT_STATE" == "running" ]]; then
+        # Only reached for non-post_test_restore VMs (e.g., shared test-vm-cachyos)
         echo "  ✅ VM already running"
         STARTED_BY_TEST="false"
     else
         echo "  Starting VM..."
-
-        # Restore to clean snapshot if available
-        if virsh snapshot-list "$VM_NAME" --name 2>/dev/null | grep -q "clean-install"; then
-            echo "  Reverting to clean-install snapshot..."
-            virsh snapshot-revert "$VM_NAME" clean-install 2>/dev/null || true
-        fi
 
         # Start the VM
         if sudo virsh start "$VM_NAME" 2>/dev/null; then
@@ -186,6 +256,10 @@ EOF
         echo "     Tests will proceed but VM state won't be auto-restored"
     fi
 
+    # ─── PRISTINE VM DETECTION & AUTO-INSTALL ─────────────────────
+    # If the VM is pristine (no app installed), run install.sh before tests
+    install_on_pristine_vm "$VM_NAME" "$VM_IP" "$PROJECT_DIR"
+
     echo ""
     echo "───────────────────────────────────────────────────────────────────"
     echo "  VM READY FOR TESTING"
@@ -200,6 +274,120 @@ EOF
     export TEST_VM_NAME="$VM_NAME"
     export TEST_VM_STARTED="$STARTED_BY_TEST"
     export TEST_VM_IP="$VM_IP"
+}
+```
+
+## Production Data Isolation (MANDATORY)
+
+**No test VM managed by this lifecycle module may have LIVE ACCESS to production storage.**
+
+- **NEVER** configure NFS, CIFS, virtiofs, or virtio-9p mounts from the host's production paths into the VM
+- Copying data *into* the VM (scp, rsync) is fine — once on the VM's disk, it's isolated
+- Test VM libraries should be ≤275GB on the VM's own disk
+
+## Install on Pristine VM (Called after VM boots)
+
+When a VM starts from a pristine snapshot (OS + deps only, no application installed),
+the test framework must bootstrap the application before tests can run.
+
+This function:
+1. Detects whether the app is installed (checks for the `audiobooks` service user)
+2. If pristine AND `vm-test-manifest.json` has an `install` section with `required_on_pristine: true`:
+   - Copies the project to the VM
+   - Runs the install command non-interactively (`install.sh --system`)
+3. The `audiobooks` user/group is a no-login service account that owns the app and data
+
+```bash
+install_on_pristine_vm() {
+    local VM_NAME="$1"
+    local VM_IP="$2"
+    local PROJECT_DIR="${3:-$(pwd)}"
+    local MANIFEST="${PROJECT_DIR}/vm-test-manifest.json"
+
+    # Skip if no manifest or install not required
+    if [[ ! -f "$MANIFEST" ]]; then
+        return 0
+    fi
+
+    local REQUIRED=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(str(d.get('vm_testing',{}).get('install',{}).get('required_on_pristine', False)).lower())" 2>/dev/null)
+    if [[ "$REQUIRED" != "true" ]]; then
+        return 0
+    fi
+
+    # Read SSH config from manifest or use defaults
+    local SSH_USER=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('ssh_config',{}).get('user','claude'))" 2>/dev/null)
+    local SSH_KEY=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('ssh_config',{}).get('key','~/.claude/ssh/id_ed25519'))" 2>/dev/null)
+    SSH_KEY="${SSH_KEY/#\~/$HOME}"
+
+    local SSH_CMD="ssh -i $SSH_KEY -o ConnectTimeout=10 -o StrictHostKeyChecking=no $SSH_USER@$VM_IP"
+
+    # Detect pristine state: check if audiobooks service user exists on VM
+    local DETECT_CMD=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('vm_testing',{}).get('install',{}).get('detects_pristine_by','getent passwd audiobooks'))" 2>/dev/null)
+
+    if $SSH_CMD "$DETECT_CMD" &>/dev/null 2>&1; then
+        echo "  ✅ Application already installed on VM (not pristine)"
+        return 0
+    fi
+
+    echo ""
+    echo "  ┌─────────────────────────────────────────────────────────────┐"
+    echo "  │  PRISTINE VM DETECTED — Running fresh install              │"
+    echo "  └─────────────────────────────────────────────────────────────┘"
+    echo ""
+
+    local INSTALL_CMD=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('vm_testing',{}).get('install',{}).get('command','./install.sh --system'))" 2>/dev/null)
+
+    # Copy project to VM staging area
+    echo "  Copying project to VM /tmp/fresh-install/..."
+    rsync -az --exclude='.git' --exclude='venv' --exclude='__pycache__' \
+        --exclude='node_modules' --exclude='.venv' --exclude='*.pyc' \
+        --exclude='.snapshots' --exclude='*.tar.gz' \
+        -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" \
+        "$PROJECT_DIR/" "$SSH_USER@$VM_IP:/tmp/fresh-install/"
+
+    if [[ $? -ne 0 ]]; then
+        echo "  ❌ Failed to copy project to VM"
+        return 1
+    fi
+    echo "  ✅ Project copied"
+
+    # Run install command on VM (non-interactive via --system flag)
+    echo "  Running: $INSTALL_CMD"
+    if $SSH_CMD "cd /tmp/fresh-install && sudo bash -c '$INSTALL_CMD'" 2>&1; then
+        echo "  ✅ Fresh install completed"
+    else
+        echo "  ❌ Fresh install FAILED"
+        echo "     The VM may not have a functioning application"
+        return 1
+    fi
+
+    # Verify: check that audiobooks user now exists
+    if $SSH_CMD "$DETECT_CMD" &>/dev/null 2>&1; then
+        echo "  ✅ Verified: audiobooks service account created"
+    else
+        echo "  ⚠️ Install completed but audiobooks user not found"
+    fi
+
+    # Verify: check VERSION file
+    local REMOTE_VERSION=$($SSH_CMD "cat /opt/audiobooks/VERSION 2>/dev/null" 2>/dev/null)
+    if [[ -n "$REMOTE_VERSION" ]]; then
+        echo "  ✅ Verified: version $REMOTE_VERSION installed"
+    fi
+
+    # Clean up staging area
+    $SSH_CMD "rm -rf /tmp/fresh-install" 2>/dev/null
+
+    # ─── POST-INSTALL: Docker container database initialization ──────
+    # After revert to pristine, BOTH native app DB and Docker container DB
+    # must be initialized. The native app DB is created by install.sh above.
+    # The Docker container DB needs separate initialization if Docker testing
+    # is configured in the manifest.
+    local HAS_DOCKERFILE=$(python3 -c "import json,os; d=json.load(open('$MANIFEST')); print('true' if os.path.exists(os.path.join('$PROJECT_DIR','Dockerfile')) else 'false')" 2>/dev/null)
+    if [[ "$HAS_DOCKERFILE" == "true" ]]; then
+        echo "  Dockerfile detected — Docker container DB will be initialized by Phase D"
+    fi
+
+    echo ""
 }
 ```
 
@@ -234,8 +422,68 @@ shutdown_test_vm() {
     echo "  Pre-test Snapshot: ${PRE_TEST_SNAPSHOT:-none}"
     echo ""
 
-    # Revert to pre-test snapshot if it exists (MANDATORY for pristine state)
-    if [[ -n "$PRE_TEST_SNAPSHOT" ]]; then
+    # Restore VM to pristine state (MANDATORY after testing)
+    # Check vm-test-manifest.json for project-specific pristine snapshot
+    local PRISTINE_SNAP=""
+    local POST_TEST_RESTORE="false"
+    if [[ -f "${PROJECT_DIR}/vm-test-manifest.json" ]]; then
+        PRISTINE_SNAP=$(python3 -c "import json; d=json.load(open('${PROJECT_DIR}/vm-test-manifest.json')); print(d.get('vm_testing',{}).get('pristine_snapshot',''))" 2>/dev/null)
+        POST_TEST_RESTORE=$(python3 -c "import json; d=json.load(open('${PROJECT_DIR}/vm-test-manifest.json')); print(str(d.get('vm_testing',{}).get('post_test_restore', False)).lower())" 2>/dev/null)
+    fi
+
+    if [[ "$POST_TEST_RESTORE" == "true" && -n "$PRISTINE_SNAP" ]]; then
+        echo "  📸 Reverting to pristine snapshot: $PRISTINE_SNAP"
+        echo "     (post_test_restore=true — DISCARD all test changes, shut down)"
+
+        # Force stop VM
+        sudo virsh destroy "$VM_NAME" 2>/dev/null || true
+
+        # For external snapshots: DISCARD overlay (do NOT commit — that bakes
+        # test changes into the base). Repoint VM to clean base, recreate snapshot.
+        local OVERLAY="/hddRaid1/VirtualMachines/${VM_NAME}.${PRISTINE_SNAP}"
+        local BASE="/hddRaid1/VirtualMachines/${VM_NAME}.qcow2"
+
+        if [[ -f "$OVERLAY" ]]; then
+            # Delete snapshot metadata first
+            sudo virsh snapshot-delete "$VM_NAME" "$PRISTINE_SNAP" --metadata 2>/dev/null
+            # Repoint VM directly to base image (discards overlay)
+            sudo virt-xml "$VM_NAME" --edit target=vda --disk path="$BASE" 2>/dev/null
+            # Fix circular backingStore refs that virt-xml sometimes leaves
+            sudo virsh dumpxml "$VM_NAME" > /tmp/vm-fix.xml
+            python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse('/tmp/vm-fix.xml')
+for disk in tree.getroot().iter('disk'):
+    for bs in disk.findall('backingStore'):
+        disk.remove(bs)
+tree.write('/tmp/vm-fix.xml', xml_declaration=True)
+"
+            sudo virsh define /tmp/vm-fix.xml 2>/dev/null
+            rm -f /tmp/vm-fix.xml
+            # Remove overlay file (all test changes discarded)
+            sudo rm -f "$OVERLAY"
+            echo "  ✅ Overlay discarded — base image is pristine"
+            # Recreate pristine snapshot for next test run
+            sudo virsh snapshot-create-as "$VM_NAME" "$PRISTINE_SNAP" \
+                "Pristine OS with dependencies. No application installed." --disk-only 2>/dev/null
+            echo "  ✅ Pristine snapshot recreated"
+        else
+            # Fallback: try internal snapshot revert
+            if sudo virsh snapshot-revert "$VM_NAME" "$PRISTINE_SNAP" 2>/dev/null; then
+                echo "  ✅ Reverted to pristine snapshot"
+            else
+                echo "  ❌ Failed to restore pristine state"
+                echo "     Manual cleanup may be needed"
+            fi
+        fi
+
+        # VM is now shut down and pristine — leave it that way
+        echo "  ✅ VM left shut down and pristine (ready for next test run)"
+        rm -f "$STATE_FILE"
+        echo "  📝 Removed state file: $STATE_FILE"
+        echo ""
+        return 0
+    elif [[ -n "$PRE_TEST_SNAPSHOT" ]]; then
         echo "  📸 Reverting to pre-test snapshot: $PRE_TEST_SNAPSHOT"
 
         # Must destroy running VM before reverting
@@ -255,8 +503,8 @@ shutdown_test_vm() {
             echo "  ❌ Failed to revert to pre-test snapshot"
             echo "     VM may have accumulated test artifacts"
         fi
-        echo ""
     fi
+    echo ""
 
     # Only shutdown if we started it
     if [[ "$STARTED_BY_TEST" != "true" ]]; then
@@ -373,7 +621,7 @@ pre_test_snapshot=pre-test-20260218-153000
 
   Selected VM: test-vm-cachyos
   Current State: shutoff
-  Reverting to clean-install snapshot...
+  Reverting to pristine snapshot...
   Starting VM...
   ✅ VM started successfully
   Waiting for VM to boot (30s)...
@@ -420,7 +668,7 @@ Pre-test Snapshot: pre-test-20260218-153000
   📝 Removed state file: .test-vm-state
 
 VM Cleanup Complete:
-  - VM test-vm-cachyos restored to pre-test state
+  - VM test-vm-cachyos restored to pristine state
   - VM test-vm-cachyos stopped
   - System resources freed (4GB RAM, 4 vCPUs)
 ```

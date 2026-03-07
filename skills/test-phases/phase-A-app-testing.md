@@ -78,6 +78,14 @@ IF MCP_AVAILABLE["playwright"] == 1 AND detect_web_ui():
 
 **Note:** Playwright testing is non-blocking. If Playwright is unavailable, skip to standard functional testing.
 
+## CRITICAL: Production Data Isolation
+
+**Sandbox environments created by Phase A must NEVER have live mounts to production storage.**
+
+- **NEVER** mount or symlink host production paths into the sandbox
+- The sandbox should use its own fresh databases (created by install scripts or synthetic data)
+- Copying data into the sandbox is allowed — it's isolated in `/tmp`
+
 ## When to Run This Phase
 
 Run this phase when the project has:
