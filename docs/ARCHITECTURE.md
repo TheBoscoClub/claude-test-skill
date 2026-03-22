@@ -1,14 +1,14 @@
 # Test-Skill Architecture
 
-> Version: 3.0.1
+> Version: 4.0.0
 
-This document describes the architecture of the claude-test-skill plugin for Claude Code, a modular 27-phase autonomous project audit system.
+This document describes the architecture of the claude-test-skill plugin for Claude Code, a modular 21-phase autonomous project audit system.
 
 ---
 
 ## Overview
 
-The test-skill follows a **dispatcher + subagent** architecture that achieves ~93% context reduction compared to a monolithic approach. Instead of loading all 27 phases into context, only the dispatcher (~1,000 lines) is loaded, and individual phases are invoked on-demand via Task tool subagents with per-phase model selection.
+The test-skill follows a **dispatcher + subagent** architecture that achieves ~93% context reduction compared to a monolithic approach. Instead of loading all 21 phases into context, only the dispatcher (~1,000 lines) is loaded, and individual phases are invoked on-demand via Task tool subagents with per-phase model selection.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -25,8 +25,8 @@ The test-skill follows a **dispatcher + subagent** architecture that achieves ~9
 │        │ spawn (parallel, model varies per phase)                   │
 │        ▼                                                            │
 │  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  [Phase 3]   [Phase 4]   [Phase 6]   [Phase 7]   [Phase 8]  │  │
-│  │   haiku       haiku       sonnet      opus        sonnet     │  │
+│  │  [Phase 5]   [Phase 6]   [Phase 7]   [Phase H]   [Phase I]  │  │
+│  │   opus       sonnet      opus        opus         sonnet     │  │
 │  │  Running in parallel — each in its own subagent context      │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │        │                                                            │
@@ -46,33 +46,26 @@ The test-skill follows a **dispatcher + subagent** architecture that achieves ~9
 ```
 claude-test-skill/
 ├── commands/
-│   ├── test.md                 # Main dispatcher (~1,000 lines)
-│   └── test-legacy.md          # Original monolithic version (backup)
+│   └── test.md                 # Main dispatcher (~1,000 lines)
 │
 ├── skills/
-│   └── test-phases/            # 27 phase files
+│   └── test-phases/            # 21 phase files
 │       │
 │       │  ── TIER 0: Safety Gates ──
 │       ├── phase-S-snapshot.md       # BTRFS safety snapshot          [haiku]
-│       ├── phase-M-mocking.md        # Sandbox environment            [haiku]
-│       ├── phase-0-preflight.md      # Environment validation         [sonnet]
+│       ├── phase-0-preflight.md      # Environment + config validation [sonnet]
 │       │
 │       │  ── TIER 1: Discovery ──
 │       ├── phase-1-discovery.md      # Project detection (GATE)       [opus]
 │       │
 │       │  ── TIER 2: Testing ──
-│       ├── phase-2-execute.md        # Run tests                      [sonnet]
+│       ├── phase-2-execute.md        # Run tests + analysis + coverage [sonnet]
 │       ├── phase-2a-runtime.md       # Service health                 [sonnet]
 │       │
 │       │  ── TIER 3: Analysis (Read-Only) ──
-│       ├── phase-3-report.md         # Test results                   [haiku]
-│       ├── phase-4-cleanup.md        # Dead code detection            [haiku]
 │       ├── phase-5-security.md       # Comprehensive security         [opus]
 │       ├── phase-6-dependencies.md   # Package health                 [sonnet]
-│       ├── phase-7-quality.md        # Linting, complexity            [opus]
-│       ├── phase-8-coverage.md       # Test coverage                  [sonnet]
-│       ├── phase-9-debug.md          # Failure analysis               [sonnet]
-│       ├── phase-11-config.md        # Configuration audit            [sonnet]
+│       ├── phase-7-quality.md        # Linting, complexity, cleanup   [opus]
 │       ├── phase-H-holistic.md       # Cross-component analysis       [opus]
 │       ├── phase-I-infrastructure.md # Infrastructure issues          [sonnet]
 │       │
@@ -99,10 +92,10 @@ claude-test-skill/
 │       ├── phase-V-vm-testing.md     # VM isolation testing           [sonnet]
 │       └── phase-VM-lifecycle.md     # VM startup/shutdown            [sonnet]
 │
-├── agents/                     # Specialized subagents
-│   ├── coverage-reviewer.md    # Test coverage analysis
-│   ├── security-scanner.md     # Security pattern matching
-│   └── test-analyzer.md        # Test result analysis
+├── agents/                     # Specialized subagents (integrated into phases)
+│   ├── coverage-reviewer.md    # Test coverage analysis (integrated into Phase 2)
+│   ├── security-scanner.md     # Security pattern matching (integrated into Phase 5)
+│   └── test-analyzer.md        # Test result analysis (integrated into Phase 2)
 │
 ├── examples/
 │   └── test-skill.local.md     # Local configuration example
@@ -167,7 +160,7 @@ Each phase file contains a standardized structure (v2.0.1+):
 ```
 
 ## Output Format
-Status: ✅ PASS / ⚠️ ISSUES / ❌ FAIL
+Status: PASS / ISSUES / FAIL
 Issues: [count]
 ```
 
@@ -183,13 +176,13 @@ Issues: [count]
 
 ### Agents (agents/)
 
-Specialized subagents for complex analysis:
+Specialized subagents that are now integrated into their respective phases. The agent files remain as reference documentation:
 
-| Agent | Purpose | Used By |
-|-------|---------|---------|
-| coverage-reviewer.md | Deep coverage analysis | Phase 8 |
+| Agent | Purpose | Integrated Into |
+|-------|---------|-----------------|
+| coverage-reviewer.md | Deep coverage analysis | Phase 2 |
 | security-scanner.md | Security pattern matching | Phase 5 |
-| test-analyzer.md | Test failure root cause | Phase 9 |
+| test-analyzer.md | Test failure root cause | Phase 2 |
 
 ---
 
@@ -214,25 +207,19 @@ Each phase is assigned to an optimal model based on task complexity:
 │  ├── Phase H  Holistic    Cross-component reasoning                 │
 │  └── Phase ST Self-Test   Framework meta-validation                 │
 │                                                                     │
-│  SONNET (12 phases)       Standard testing and verification         │
-│  ├── Phase 0  Pre-Flight  Environment checks                       │
-│  ├── Phase 2  Execute     Test runner                               │
+│  SONNET (9 phases)        Standard testing and verification         │
+│  ├── Phase 0  Pre-Flight  Environment + config checks               │
+│  ├── Phase 2  Execute     Test runner + analysis + coverage         │
 │  ├── Phase 2a Runtime     Service health probes                     │
 │  ├── Phase 6  Deps        Dependency auditing                       │
-│  ├── Phase 8  Coverage    Coverage measurement                      │
-│  ├── Phase 9  Debug       Failure root cause                        │
-│  ├── Phase 11 Config      Configuration validation                  │
 │  ├── Phase 12 Verify      Re-run verification                      │
 │  ├── Phase 13 Docs        Documentation sync                       │
 │  ├── Phase I  Infra       Infrastructure checks                    │
 │  ├── Phase V  VM Test     VM isolation testing                      │
 │  └── Phase VM Lifecycle   VM startup/shutdown management            │
 │                                                                     │
-│  HAIKU (5 phases)         Lightweight, fast operations              │
+│  HAIKU (2 phases)         Lightweight, fast operations              │
 │  ├── Phase S  Snapshot    BTRFS snapshot creation                   │
-│  ├── Phase M  Mocking     Sandbox setup                             │
-│  ├── Phase 3  Report      Result aggregation                        │
-│  ├── Phase 4  Cleanup     Dead code scan                            │
 │  └── Phase C  Restore     Environment cleanup                      │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -251,7 +238,7 @@ Phases execute in **9 tiers** with strict dependencies:
 │                         EXECUTION FLOW                              │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  TIER 0   [S] [M] [0]  ────────────────────────────────  PARALLEL  │
+│  TIER 0   [S] [0]  ───────────────────────────────────  PARALLEL   │
 │              │                                                      │
 │              ▼ GATE 1: Safety Ready                                │
 │  TIER 1   [1] Discovery  ──────────────────────────────  BLOCKING  │
@@ -260,7 +247,7 @@ Phases execute in **9 tiers** with strict dependencies:
 │  TIER 2   [2] [2a]  ───────────────────────────────────  PARALLEL  │
 │              │                                                      │
 │              ▼ GATE 3: Tests Complete                              │
-│  TIER 3   [3][4][5][6][7][8][9][11][H][I] ─────────────  PARALLEL  │
+│  TIER 3   [5][6][7][H][I] ────────────────────────────  PARALLEL   │
 │              │                                                      │
 │              ▼ GATE 4: Analysis Complete                           │
 │  TIER 4   [10] Fix  ───────────────────────────────────  BLOCKING  │
@@ -275,7 +262,7 @@ Phases execute in **9 tiers** with strict dependencies:
 │  TIER 7   [13] Docs  ────────────────────────────────────  ALWAYS  │
 │              │                                                      │
 │              ▼ GATE 8: Docs Complete                               │
-│  TIER 8   [C] Cleanup  ──────────────────────────────────  ALWAYS  │
+│  TIER 8   [C] Cleanup  ────────────────────────────────── ALWAYS   │
 │                                                                     │
 │  SPECIAL  [ST] Self-Test  ───────────────────────────────  ISOLATED│
 │           [V] VM Testing  ───────────────────────────  CONDITIONAL │
@@ -288,10 +275,10 @@ Phases execute in **9 tiers** with strict dependencies:
 
 | Tier | Phases | Mode | Model(s) | Rationale |
 |------|--------|------|----------|-----------|
-| 0 | S, M, 0 | Parallel | haiku, haiku, sonnet | Independent safety setup |
+| 0 | S, 0 | Parallel | haiku, sonnet | Independent safety setup |
 | 1 | 1 | Sequential | opus | Everything depends on discovery |
 | 2 | 2, 2a | Parallel | sonnet, sonnet | Independent test execution |
-| 3 | 3-9,11,H,I | Parallel | mixed | All read-only analysis |
+| 3 | 5,6,7,H,I | Parallel | mixed | All read-only analysis |
 | 4 | 10 | Sequential | opus | Modifies files — must be isolated |
 | 5 | A, P, D, G | Conditional | opus | Based on discovery results |
 | 6 | 12 | Sequential | sonnet | Final verification |
@@ -321,18 +308,18 @@ TaskUpdate(taskId, status="completed")     # Phase done
 This gives the user real-time visibility:
 
 ```
-✅ Phase S: Snapshot                 (completed)
-✅ Phase 0: Pre-Flight               (completed)
-⏳ Phase 1: Discovery               (in_progress) — Detecting project type...
-⬜ Phase 2: Execute Tests            (pending, blocked by Phase 1)
-⬜ Phase 5: Security                 (pending, blocked by Phase 1)
+Phase S: Snapshot                 (completed)
+Phase 0: Pre-Flight               (completed)
+Phase 1: Discovery               (in_progress) — Detecting project type...
+Phase 2: Execute Tests            (pending, blocked by Phase 1)
+Phase 5: Security                 (pending, blocked by Phase 1)
 ```
 
 ---
 
-## Allowed Tools (16 total)
+## Allowed Tools (15 total)
 
-The dispatcher declares 16 tools available to all subagents:
+The dispatcher declares 15 tools available to all subagents:
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
@@ -340,11 +327,10 @@ The dispatcher declares 16 tools available to all subagents:
 | **Subagents** | Task, TaskOutput, TaskStop | Spawning and managing subagents |
 | **Progress** | TaskCreate, TaskUpdate, TaskList | Real-time phase tracking |
 | **Interaction** | AskUserQuestion | Interactive mode decisions |
-| **Process** | KillShell | Terminate hung commands |
 | **Notebooks** | NotebookEdit | Jupyter notebook support |
 | **Research** | WebSearch | CVE lookups, error research |
 
-Phase configuration headers tell each subagent which tools are most relevant for its task. For example, Phase 5 (Security) emphasizes `WebSearch` for CVE lookups, while Phase 2 (Execute) emphasizes `KillShell` for hung test processes.
+Phase configuration headers tell each subagent which tools are most relevant for its task. For example, Phase 5 (Security) emphasizes `WebSearch` for CVE lookups, while Phase 2 (Execute) emphasizes `Bash` for running test suites.
 
 ---
 
@@ -388,12 +374,12 @@ Phase ST is a **meta-testing** phase that validates the test-skill framework its
 - **No dependencies** — runs completely standalone
 
 **Validates (6 sections):**
-1. All 27 phase files exist and are readable
+1. All 21 phase files exist and are readable
 2. Symlinks point to correct targets
 3. Dispatcher contains all phase references and shortcuts
 4. All security and core tools are installed
 5. All phase files have valid bash blocks
-6. **Opus 4.6 integration** — configuration headers present, model tier assignments match dispatcher, all 16 tools declared
+6. **Opus 4.6 integration** — configuration headers present, model tier assignments match dispatcher, all 15 tools declared
 
 ### Phase V (VM Testing) — Conditional
 
@@ -440,8 +426,8 @@ Context consumed: ~93% reduction for single-phase runs
 By assigning cheaper models to simpler phases:
 
 ```
-Without tiering: 27 phases × opus cost = $$$
-With tiering:    10 × opus + 12 × sonnet + 5 × haiku = ~40% cost reduction
+Without tiering: 21 phases x opus cost = $$$
+With tiering:    10 x opus + 9 x sonnet + 2 x haiku = ~45% cost reduction
 ```
 
 ---
@@ -471,7 +457,7 @@ With tiering:    10 × opus + 12 × sonnet + 5 × haiku = ~40% cost reduction
 │           ▼                       ▼                       ▼         │
 │  ┌─────────────────┐     ┌─────────────────┐     ┌────────────────┐│
 │  │ Task (haiku)    │     │ Task (opus)     │     │ Task (sonnet)  ││
-│  │ Phase 3 Report  │     │ Phase 5 Security│     │ Phase 8 Cover. ││
+│  │ Phase S Snapshot│     │ Phase 5 Security│     │ Phase 6 Deps   ││
 │  │ TaskUpdate ──►  │     │ TaskUpdate ──►  │     │ TaskUpdate ──► ││
 │  └────────┬────────┘     └────────┬────────┘     └────────┬───────┘│
 │           │                       │                       │         │
@@ -512,12 +498,6 @@ With tiering:    10 × opus + 12 × sonnet + 5 × haiku = ~40% cost reduction
 7. Document in this ARCHITECTURE.md
 8. Update README.md, SKILL.md, and CHANGELOG.md phase tables
 
-### Adding a New Agent
-
-1. Create `agents/agent-name.md`
-2. Document purpose and interface
-3. Reference from relevant phase files
-
 ### Adding a New Shortcut
 
 In `commands/test.md`, add to the shortcuts parsing section:
@@ -527,10 +507,34 @@ In `commands/test.md`, add to the shortcuts parsing section:
 
 ---
 
+## v4.0.0 Audit
+
+The v4.0.0 release consolidated the phase inventory from 27 to 21 phases:
+
+### Phases Merged
+| Deleted Phase | Merged Into | Rationale |
+|---------------|-------------|-----------|
+| Phase 3 (Report) | Phase 2 (Execute) | Test result analysis belongs with test execution |
+| Phase 4 (Cleanup) | Phase 7 (Quality) | Dead code removal is a quality concern |
+| Phase 8 (Coverage) | Phase 2 (Execute) | Coverage measurement belongs with test execution |
+| Phase 9 (Debug) | Phase 2 (Execute) | Failure analysis belongs with test execution |
+| Phase 11 (Config) | Phase 0 (Preflight) | Configuration audit belongs with environment validation |
+| Phase M (Mocking) | Phase 0 (Preflight) | Sandbox setup belongs with preflight checks |
+
+### Other Changes
+- **Bloat reduction** — Phase 1 (50 to 23 KB), Phase P (46 to 20 KB), Phase V (54 to 22 KB)
+- **Project-agnostic** — All hardcoded project references removed; manifest-driven detection only
+- **Orphaned agents** — coverage-reviewer, security-scanner, and test-analyzer agent files integrated into Phases 2 and 5
+- **Phase handoff contracts** — Phase 2 output schema and Phase 10 input expectations defined
+- **test-legacy.md** — 130 KB monolithic predecessor removed (superseded since v2.0)
+
+---
+
 ## Version History
 
 | Version | Key Changes |
 |---------|-------------|
+| 4.0.0 | Phase consolidation (27 to 21), bloat reduction, project-agnostic, agents integrated |
 | 3.0.1 | Canonical help block, Phase ST grep fix, argument-hint update |
 | 3.0.0 | Phase I/H dispatcher fixes, Tier 3 execution lists corrected, documentation audit |
 | 2.0.1 | Opus 4.6 phase config headers, Phase ST Section 6 validation |

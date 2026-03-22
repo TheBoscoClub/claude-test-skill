@@ -1,11 +1,11 @@
 ---
 name: project-audit
-description: Autonomous 27-phase project audit with testing, security scanning, code quality, GitHub auditing, and auto-fixing
+description: Autonomous 21-phase project audit with testing, security scanning, code quality, GitHub auditing, and auto-fixing
 ---
 
 # /test - Modular Project Audit
 
-A comprehensive 27-phase autonomous project audit system with full GitHub integration.
+A comprehensive 21-phase autonomous project audit system with full GitHub integration.
 
 ## Quick Reference
 
@@ -15,7 +15,7 @@ A comprehensive 27-phase autonomous project audit system with full GitHub integr
 /test docker             # Validate Docker image and registry (Phase D)
 /test github             # Audit GitHub repository settings (Phase G)
 /test --phase=A          # Run single phase
-/test --phase=0-3        # Run phase range
+/test --phase=0-2        # Run phase range
 /test --phase=5,6        # Security + Dependencies only
 /test --interactive      # Enable interactive mode
 /test help               # Show help
@@ -24,7 +24,7 @@ A comprehensive 27-phase autonomous project audit system with full GitHub integr
 ## Key Features
 
 - **Autonomous**: Fixes ALL issues without prompting, loops until clean
-- **27 Phases**: Complete coverage from safety snapshots to documentation sync
+- **21 Phases**: Complete coverage from safety snapshots to documentation sync
 - **Multi-Language**: Python, Node.js, Go, Rust, Shell, Docker, YAML
 - **20+ Tools**: ruff, pylint, bandit, trivy, CodeQL, and more
 - **GitHub Integration**: Dependabot, CodeQL workflows, branch protection audit
@@ -35,20 +35,14 @@ A comprehensive 27-phase autonomous project audit system with full GitHub integr
 | Phase | Name | Description |
 |-------|------|-------------|
 | S | Snapshot | BTRFS safety snapshot |
-| M | Mocking | Sandbox environment |
-| 0 | Pre-Flight | Environment validation |
+| 0 | Pre-Flight | Environment validation + config audit + sandbox setup |
 | 1 | Discovery | Detect project type, tools, GitHub |
-| 2 | Execute | Run tests |
+| 2 | Execute | Run tests + analysis + coverage |
 | 2a | Runtime | Service health checks |
-| 3 | Report | Test results |
-| 4 | Cleanup | Dead code removal |
 | 5 | Security | CVE scanning, SAST |
 | 6 | Dependencies | Package health |
-| 7 | Quality | Linting, complexity |
-| 8 | Coverage | 85% enforcement |
-| 9 | Debug | Failure analysis |
+| 7 | Quality | Linting, complexity, dead code cleanup |
 | 10 | Fix | Auto-fix issues |
-| 11 | Config | Configuration audit |
 | A | App Test | Sandbox app testing |
 | P | Production | Live app validation |
 | D | Docker | Image validation |
@@ -58,7 +52,9 @@ A comprehensive 27-phase autonomous project audit system with full GitHub integr
 | 12 | Verify | Re-run tests |
 | 13 | Docs | Documentation sync |
 | V | VM Testing | Heavy isolation testing |
+| VM | Lifecycle | VM startup/shutdown management |
 | C | Restore | Cleanup |
+| ST | Self-Test | Framework self-validation (explicit only) |
 
 ## Autonomous Behavior
 
@@ -89,7 +85,7 @@ Upload this `SKILL.md` file directly to your Claude.ai account:
 
 ### Claude Code (CLI)
 
-For full autonomous execution with all 27 phases:
+For full autonomous execution with all 21 phases:
 
 ```bash
 # Clone and symlink
@@ -102,4 +98,4 @@ ln -s ~/claude-test-skill/skills/test-phases ~/.claude/skills/test-phases
 
 - **Repository**: https://github.com/TheBoscoClub/claude-test-skill
 - **Full Documentation**: See README.md and INSTALL.md
-- **Version**: 3.0.1
+- **Version**: 4.0.0

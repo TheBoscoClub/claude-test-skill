@@ -2,7 +2,7 @@
 
 > **Model**: `sonnet` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for system checks. Use `WebSearch` to research infrastructure error patterns. Use `KillShell` for hung service probes. Parallelize with other Tier 3 phases.
+> **Key Tools**: `Bash` for system checks. Use `WebSearch` to research infrastructure error patterns. Use `Bash` with `kill` or `timeout` for hung service probes. Parallelize with other Tier 3 phases.
 
 ## Purpose
 
@@ -167,13 +167,44 @@ echo -n "[1] Proxy header filtering: "
 grep -rq "HOP_BY_HOP" --include="*.py" . 2>/dev/null && echo "OK" || echo "CHECK"
 
 echo -n "[2] Shell variable typos: "
-typos=$(grep -rc ': > "[a-z_]*"' --include="*.sh" . 2>/dev/null | grep -cv ':0$')
+typos=$(grep -rl ': > "[a-z_]*"' --include="*.sh" . 2>/dev/null | wc -l)
 [[ "$typos" -gt 0 ]] && echo "WARN ($typos files)" || echo "OK"
 
 echo -n "[3] Systemd sandboxing: "
-grep -l "ProtectSystem=strict" /etc/systemd/system/*.service 2>/dev/null | \
-    xargs -I{} grep -L "ReadWritePaths" {} 2>/dev/null | wc -l | \
-    xargs -I{} sh -c '[[ {} -gt 0 ]] && echo "WARN" || echo "OK"'
+sandbox_issues=0
+for svc in /etc/systemd/system/*.service; do
+    [[ -f "$svc" ]] || continue
+    if grep -q "ProtectSystem=strict" "$svc" 2>/dev/null && ! grep -q "ReadWritePaths" "$svc" 2>/dev/null; then
+        sandbox_issues=$((sandbox_issues + 1))
+    fi
+done
+[[ "$sandbox_issues" -gt 0 ]] && echo "WARN ($sandbox_issues services)" || echo "OK"
+
+echo -n "[4] OOM-killer patterns: "
+oom_count=$(dmesg 2>/dev/null | grep -c "Out of memory\|oom-kill\|invoked oom-killer" || echo "0")
+[[ "$oom_count" -gt 0 ]] && echo "WARN ($oom_count events in dmesg)" || echo "OK"
+
+echo -n "[5] SELinux/AppArmor conflicts: "
+mac_issues=0
+if command -v getenforce &>/dev/null && [[ "$(getenforce 2>/dev/null)" == "Enforcing" ]]; then
+    mac_denials=$(ausearch -m avc --start recent 2>/dev/null | grep -c "denied" || echo "0")
+    [[ "$mac_denials" -gt 0 ]] && mac_issues=$((mac_issues + mac_denials))
+fi
+if command -v aa-status &>/dev/null; then
+    aa_complain=$(aa-status 2>/dev/null | grep -c "complain" || echo "0")
+    [[ "$aa_complain" -gt 0 ]] && mac_issues=$((mac_issues + aa_complain))
+fi
+[[ "$mac_issues" -gt 0 ]] && echo "WARN ($mac_issues)" || echo "OK (or not active)"
+
+echo -n "[6] Database on slow storage: "
+slow_db=0
+for db in $(find /var/lib /srv /opt -name "*.db" -o -name "*.sqlite" 2>/dev/null | head -20); do
+    device=$(df "$db" 2>/dev/null | tail -1 | awk '{print $1}')
+    dev_name=$(basename "$device" 2>/dev/null | sed 's/[0-9]*$//')
+    rotational=$(cat "/sys/block/$dev_name/queue/rotational" 2>/dev/null)
+    [[ "$rotational" == "1" ]] && slow_db=$((slow_db + 1))
+done
+[[ "$slow_db" -gt 0 ]] && echo "WARN ($slow_db DBs on HDD)" || echo "OK"
 ```
 
 ## References

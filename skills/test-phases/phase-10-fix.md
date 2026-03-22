@@ -2,438 +2,309 @@
 
 > **Model**: `opus` | **Tier**: 4 (Fix — BLOCKING) | **Modifies Files**: YES
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done. This phase blocks ALL subsequent phases.
-> **Key Tools**: `Edit`, `Write`, `Bash` for fixes. Use `AskUserQuestion` in `--interactive` mode for architectural decisions. Use `WebSearch` to research best-practice fix patterns. Use `NotebookEdit` if fixes affect Jupyter notebooks.
+> **Key Tools**: `Edit`, `Bash` for fixes. `Read`, `Grep` for analysis. `AskUserQuestion` in `--interactive` mode only.
+
+Fix ALL issues found by prior phases. Three categories, executed in order: auto-fixable tool runs, test failures, and audit findings. Every fix is verified before moving on.
+
+---
 
 ## Execution Mode
 
-This phase behaves differently based on execution mode:
-
 | Mode | Behavior |
 |------|----------|
-| **Autonomous** (default) | Fix ALL issues, loop until clean, no manual items |
-| **Interactive** (`--interactive`) | May skip complex fixes, may list "manual required" |
+| **Autonomous** (default) | Fix ALL issues. No "manual required" items. No skipping. |
+| **Interactive** (`--interactive`) | May use `AskUserQuestion` for ambiguous logic or architectural decisions. |
+
+In autonomous mode, the only valid reasons to skip a fix are: (1) requires credentials/access you don't have, (2) requires an explicit architectural decision from the user. Everything else gets fixed.
 
 ---
 
-## Autonomous Mode (Default)
+## Preparation: Collect Issues from Prior Phases
 
-**CRITICAL: This phase MUST fix ALL issues found by prior phases.**
+Before fixing anything, gather the structured output from prior phases. The dispatcher passes findings via the `PHASE_RESULTS` context. Extract:
 
-There is no "manual fix required" category. If an issue was identified, it gets fixed.
+- **Phase 2 output**: Test failures (test file, test name, error type, traceback)
+- **Phase 5 output**: Security findings (file, line, issue type, severity)
+- **Phase 6 output**: Dependency vulnerabilities (package, current version, fixed version, CVE)
+- **Phase 7 output**: Quality issues (file, line, rule code, message)
 
-### Core Directive
-
-Fix EVERY issue regardless of:
-- Priority (critical, high, medium, low, advisory)
-- Severity (error, warning, info)
-- Complexity (simple typo or complex refactor)
-- Type (code, tests, config, documentation)
-
-The only exceptions requiring user input are:
-1. **SAFETY**: Destructive operations on production data
-2. **ARCHITECTURE**: Complete system rewrites (rare)
-3. **EXTERNAL**: Missing credentials or external service access
+Read each phase's output section and build a mental inventory before starting fixes. This prevents duplicate work and helps prioritize.
 
 ---
 
-## Interactive Mode (`--interactive`)
+## Category 1: Auto-Fixable (Tool-Driven Fixes)
 
-When running with `--interactive`, this phase MAY:
-- Skip complex fixes that require judgment
-- Output "manual required" items for user review
-- Output "recommendations" for optional improvements
-- Skip logic errors if intent is unclear
-- Skip security-related changes for user review
+These are deterministic fixes handled entirely by formatting and linting tools. Run them first because they're safe, fast, and eliminate noise from later categories.
 
-### Safety Rules (Interactive Only)
+### Step 1.1: Run Formatters
 
-**Auto-fix if:**
-- Fix is deterministic (one correct solution)
-- Change is reversible (git tracked)
-- No business logic changes
-- Tests exist to verify fix
+Guard every tool with `command -v` (or check for `node_modules/.bin/TOOL`). Only run tools that exist. Run formatters first — they never change semantics.
 
-**Skip and report if:**
-- Logic errors requiring judgment
-- Architecture changes
-- Security-related code
-- Code without tests
+| Language | Formatter | Command | Notes |
+|----------|-----------|---------|-------|
+| Python | ruff format (preferred) or black | `ruff format .` / `black . --quiet` | Run one, not both |
+| Python imports | ruff or isort | `ruff check --fix --select I .` / `isort . --quiet` | Run after formatter |
+| JS/TS | prettier | `npx prettier --write "**/*.{js,ts,tsx,jsx,json,css,scss}"` | Only if `package.json` exists |
+| Go | gofmt | `gofmt -w .` | Only if `go.mod` exists |
+| Rust | cargo fmt | `cargo fmt` | Only if `Cargo.toml` exists |
+| Shell | shfmt | `find . -name "*.sh" -not -path "./.git/*" -not -path "./.snapshots/*" -exec shfmt -w {} \;` | Guard with `command -v` |
+
+### Step 1.2: Run Lint Auto-Fixers
+
+These fix simple lint violations (unused imports, trailing whitespace, basic code patterns). They CAN change semantics, so they run after formatters.
+
+| Language | Tool | Command | Notes |
+|----------|------|---------|-------|
+| Python | ruff | `ruff check --fix .` | Do NOT use `--unsafe-fixes` unless you've reviewed the specific rules |
+| JS/TS | eslint | `npx eslint --fix . --ext .js,.ts,.tsx,.jsx` | Only if `package.json` exists |
+| Go | golangci-lint | `golangci-lint run --fix` | Guard with `command -v` |
+| Rust | clippy | `cargo clippy --fix --allow-dirty --allow-staged` | Only if `Cargo.toml` exists |
+| Spelling | codespell | `codespell --write-changes --skip=".git,.venv,node_modules,.snapshots,*.lock" .` | Guard with `command -v` |
+
+### Step 1.4: Verify Auto-Fixes Didn't Break Anything
+
+Run the project's test suite after all auto-fixes:
+
+```bash
+# Python
+pytest --tb=short -q 2>&1
+
+# Node.js
+npm test 2>&1
+
+# Go
+go test ./... 2>&1
+
+# Rust
+cargo test 2>&1
+```
+
+**If tests fail after auto-fixes**: A formatting or lint fix broke something. Identify which fix caused the failure by checking `git diff`. Revert the specific file(s) that caused breakage:
+
+```bash
+git diff --name-only  # See what changed
+git checkout -- path/to/broken_file.py  # Revert specific file
+```
+
+Then re-run tests to confirm the revert fixed it. Record the reverted file and why in the output — it will need a manual-style fix in Category 2 or 3.
+
+### Step 1.5: Commit Auto-Fixes
+
+If auto-fixes were applied and tests pass, commit them as a batch:
+
+```bash
+git add -A
+git commit -m "style: auto-format and lint fixes from /test Phase 10"
+```
+
+This creates a clean checkpoint. If later fixes go wrong, you can revert to this point.
 
 ---
 
-## Fix Categories
+## Category 2: Test Failures (from Phase 2)
 
-### 1. Code Quality Issues - Auto-Fix Commands
+Fix failing tests identified by Phase 2. This requires reading code and making judgment calls about whether the test or the source is wrong.
 
-**Python Formatting & Linting:**
+### Step 2.1: Parse Phase 2 Failures
+
+From Phase 2's structured output, extract each failure. Prioritize by error type:
+
+1. **Import errors** — usually a missing dependency or renamed module. Fix first because they block other tests.
+2. **Assertion errors** — the test ran but got wrong results. Most common; fix second.
+3. **Runtime errors** (TypeError, AttributeError, etc.) — code crashes during test. Fix third.
+4. **Timeout/hang** — test never completes. Fix last (often needs architectural change).
+
+### Step 2.2: Fix Each Failure
+
+For EACH failing test, follow this sequence:
+
+**A. Read the failing test:**
+Use `Read` to examine the test file at the failing line. Understand what the test expects.
+
+**B. Read the source under test:**
+Use `Read` to examine the module/function being tested. Understand what the code actually does.
+
+**C. Determine the root cause — is the test wrong or the code wrong?**
+
+The test is wrong if:
+- It references an old API that was intentionally changed
+- It asserts a value that was never correct (copy-paste error)
+- It tests behavior that was deliberately changed in a recent commit
+- The test setup is missing or incomplete (missing fixtures, wrong mock)
+
+The code is wrong if:
+- The test describes the correct/intended behavior and the code doesn't match
+- Multiple tests for the same function fail in consistent ways
+- The docstring/comments describe behavior the code doesn't implement
+- The failure is a regression (code used to work, recent change broke it)
+
+When unclear: check git log for the file to see if recent changes explain the mismatch. If still ambiguous and in `--interactive` mode, ask the user. In autonomous mode, prefer fixing the code (conservative: tests document intent).
+
+**D. Apply the fix:**
+Use `Edit` to modify either the test file or the source file. Make the minimal change that fixes the failure.
+
+**E. Verify the fix:**
+Re-run ONLY the specific test that failed:
+
 ```bash
-echo "───────────────────────────────────────────────────────────────────"
-echo "  Python Auto-Fix"
-echo "───────────────────────────────────────────────────────────────────"
+# Python — run single test
+pytest tests/test_foo.py::TestClass::test_method -v
 
-# Ruff - Fast, comprehensive (preferred)
-if command -v ruff &>/dev/null; then
-    echo "Running ruff format..."
-    ruff format . 2>&1
-    echo ""
-    echo "Running ruff check --fix (all fixable issues)..."
-    ruff check --fix . 2>&1
-    echo ""
-    echo "Running ruff check --fix --unsafe-fixes (aggressive fixes)..."
-    ruff check --fix --unsafe-fixes . 2>&1
-fi
+# Node.js — run single test file
+npx jest tests/foo.test.js
 
-# Black - Code formatting (fallback or additional)
-if command -v black &>/dev/null; then
-    echo ""
-    echo "Running black (formatting)..."
-    black . --quiet 2>&1
-fi
+# Go — run single test
+go test ./pkg/foo -run TestBar -v
 
-# isort - Import sorting
-if command -v isort &>/dev/null; then
-    echo ""
-    echo "Running isort (import sorting)..."
-    isort . --quiet 2>&1
-fi
+# Rust — run single test
+cargo test test_name -- --exact
 ```
 
-**Shell Script Formatting:**
+**F. Check for collateral damage:**
+After fixing each test, run the full suite to ensure the fix didn't break other tests:
+
 ```bash
-echo ""
-echo "───────────────────────────────────────────────────────────────────"
-echo "  Shell Script Auto-Fix"
-echo "───────────────────────────────────────────────────────────────────"
-
-# shfmt - Format shell scripts
-if command -v shfmt &>/dev/null; then
-    echo "Running shfmt (formatting)..."
-    find . -name "*.sh" -not -path "./.snapshots/*" -exec shfmt -w {} \; 2>&1
-fi
-
+pytest --tb=line -q 2>&1 | tail -5
 ```
 
-**JavaScript/TypeScript Formatting & Linting:**
+If a previously passing test now fails, your fix introduced a regression. Revert it and try a different approach.
+
+### Step 2.3: Handle Cascading Failures
+
+Sometimes fixing one test reveals or fixes others. After fixing all identified failures, run the full suite again. If new failures appear that weren't in Phase 2's output, fix those too — they may have been masked by earlier failures (e.g., an import error that prevented a module from loading).
+
+### Step 2.4: Commit Test Fixes
+
+Once all test failures are resolved and the full suite passes:
+
 ```bash
-echo ""
-echo "───────────────────────────────────────────────────────────────────"
-echo "  JavaScript/TypeScript Auto-Fix"
-echo "───────────────────────────────────────────────────────────────────"
-
-if [[ -f package.json ]]; then
-    # Prettier - Code formatting
-    if command -v prettier &>/dev/null || [[ -f node_modules/.bin/prettier ]]; then
-        echo "Running prettier (formatting)..."
-        npx prettier --write "**/*.{js,ts,tsx,jsx,json,css,scss,md}" 2>&1
-    fi
-
-    # ESLint - Lint and fix
-    if command -v eslint &>/dev/null || [[ -f node_modules/.bin/eslint ]]; then
-        echo ""
-        echo "Running eslint --fix..."
-        npx eslint --fix . --ext .js,.ts,.tsx,.jsx 2>&1
-    fi
-fi
+git add -A
+git commit -m "fix: resolve test failures identified by /test Phase 2"
 ```
 
-**Go Formatting:**
+---
+
+## Category 3: Audit Findings (from Phases 5, 6, 7)
+
+Fix issues found by security analysis (Phase 5), dependency audit (Phase 6), and code quality analysis (Phase 7). These require more judgment than auto-fixes.
+
+### Step 3.1: Security Findings (Phase 5) — Fix First
+
+Security issues take priority. Common patterns and how to fix them:
+
+Common security fix patterns:
+
+| Finding | Fix |
+|---------|-----|
+| SQL injection (string formatting in queries) | Use parameterized queries with the project's DB library |
+| Hardcoded secrets | Move to environment variable or config file; add config to `.gitignore`; note in output if secret was committed (user must rotate) |
+| Insecure defaults (`debug=True`, `verify=False`) | Change to secure default; gate dev-only settings behind env vars |
+| Weak crypto (MD5/SHA1 for security) | Replace with SHA-256+; for non-security use, add `usedforsecurity=False` (Python 3.9+) |
+| Subprocess injection (`shell=True` + user input) | Switch to `shell=False` with argument list |
+
+After each security fix, run the relevant test(s). If no test covers the fixed code, note it in the output — Phase 12 should add coverage.
+
+### Step 3.2: Dependency Issues (Phase 6) — Fix Second
+
+Use the language-appropriate audit-fix tool:
+
+| Language | Auto-fix command | Manual fallback | Notes |
+|----------|-----------------|-----------------|-------|
+| Python | `pip-audit --fix` | `pip install --upgrade PKG` then update requirements.txt | Guard with `command -v` |
+| Node.js | `npm audit fix` | `npm install PKG@version` | NEVER use `--force` (major version bumps break things) |
+| Go | `go get -u PKG && go mod tidy` | — | — |
+| Rust | `cargo update -p PKG` | — | — |
+
+After updating dependencies, ALWAYS run the full test suite. Dependency updates can introduce breaking changes.
+
+**Pinned versions with CVEs**: Update the pin to the minimum fixed version, not to latest. This minimizes breakage risk.
+
+### Step 3.3: Quality Issues (Phase 7) — Fix Third
+
+Quality issues from linters, complexity analysis, and dead code detection. Handle by subcategory:
+
+**Remaining Lint Warnings** (not auto-fixed by Category 1): Read each warning, understand the code, fix manually. Common: unused variables (remove or prefix `_`), unreachable code (remove), bare `except:` (specify type), mutable default args (use `None`).
+
+**High Complexity**: Extract helpers, use early returns, replace long if/elif with dicts. Run tests after refactoring.
+
+**Dead Code**: Remove unused functions/classes/imports. Check for dynamic usage first (`getattr`, plugin loading, CLI entry points) with `Grep` — dead code detectors have false positives.
+
+**Type Errors** (mypy, pyright, tsc): Add/correct annotations. Run the type checker after fixes. Use `# type: ignore[specific-error]` only as last resort.
+
+### Step 3.4: Commit Audit Fixes
+
+Once all audit findings are resolved:
+
 ```bash
-if [[ -f go.mod ]]; then
-    echo ""
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Go Auto-Fix"
-    echo "───────────────────────────────────────────────────────────────────"
-
-    echo "Running gofmt..."
-    gofmt -w . 2>&1
-
-    echo ""
-    echo "Running go mod tidy..."
-    go mod tidy 2>&1
-
-    if command -v golangci-lint &>/dev/null; then
-        echo ""
-        echo "Running golangci-lint --fix..."
-        golangci-lint run --fix 2>&1
-    fi
-fi
+git add -A
+git commit -m "fix: resolve security, dependency, and quality findings from /test audit"
 ```
 
-**Rust Formatting:**
+---
+
+## Final Verification
+
+After all three categories are complete, run a final comprehensive check:
+
 ```bash
-if [[ -f Cargo.toml ]]; then
-    echo ""
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Rust Auto-Fix"
-    echo "───────────────────────────────────────────────────────────────────"
+# 1. Full test suite
+pytest --tb=short -q 2>&1  # (or project-appropriate test command)
 
-    echo "Running cargo fmt..."
-    cargo fmt 2>&1
+# 2. Lint check (should be clean)
+ruff check . 2>&1  # (or project-appropriate linter)
 
-    echo ""
-    echo "Running cargo clippy --fix..."
-    cargo clippy --fix --allow-dirty --allow-staged 2>&1
-fi
+# 3. Security scan (should show no new issues)
+bandit -r src/ -q 2>&1  # (or project-appropriate security scanner)
 ```
 
-**Spelling Fixes:**
-```bash
-echo ""
-echo "───────────────────────────────────────────────────────────────────"
-echo "  Spelling Auto-Fix"
-echo "───────────────────────────────────────────────────────────────────"
+If ANY check fails, go back and fix. Do not proceed to Phase 12 with known failures.
 
-if command -v codespell &>/dev/null; then
-    echo "Running codespell --write-changes..."
-    codespell --write-changes --skip=".git,.venv,venv,node_modules,.snapshots,*.lock,package-lock.json" . 2>&1
-fi
-```
+---
 
-**YAML Formatting:**
-```bash
-YAML_FILES=$(find . -name "*.yml" -o -name "*.yaml" 2>/dev/null | grep -v node_modules | grep -v .snapshots | head -1)
+## Rules
 
-if [[ -n "$YAML_FILES" ]]; then
-    echo ""
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  YAML Auto-Fix"
-    echo "───────────────────────────────────────────────────────────────────"
+1. **Fix everything** — no "pre-existing", no "cosmetic", no "non-blocking" dismissals. If an issue was identified by a prior phase, it gets fixed.
+2. **Verify every fix** — after each fix, run the relevant test(s). A fix without verification is not a fix.
+3. **Don't break passing tests** — if a fix causes a previously passing test to fail, revert the fix and try a different approach. Record it in the output.
+4. **Commit in batches by category** — auto-fixes together, test fixes together, audit fixes together. This makes rollback possible if a batch causes problems.
+5. **Track what was fixed** — produce the structured output below so Phase 12 and the final report know what changed.
 
-    # yamllint doesn't auto-fix, but prettier can format YAML
-    if command -v prettier &>/dev/null; then
-        echo "Running prettier on YAML files..."
-        npx prettier --write "**/*.{yml,yaml}" 2>&1
-    fi
-fi
-```
-
-### 2. Test Failures
-- Analyze failing tests
-- Fix the code OR the test (whichever is wrong)
-- If test is outdated, update it
-- If code is buggy, fix the bug
-- Add missing test fixtures
-
-### 3. Type Errors
-```bash
-# Python - fix type annotations
-mypy . --show-error-codes 2>&1 | while read line; do
-  # Parse and fix each error
-done
-
-# TypeScript - fix type errors
-npx tsc --noEmit 2>&1 | while read line; do
-  # Parse and fix each error
-done
-```
-
-### 4. Security Vulnerabilities
-
-**Python Security Fixes:**
-```bash
-echo ""
-echo "───────────────────────────────────────────────────────────────────"
-echo "  Security Vulnerability Fixes"
-echo "───────────────────────────────────────────────────────────────────"
-
-# pip-audit auto-fix
-if command -v pip-audit &>/dev/null; then
-    if [[ -f requirements.txt ]] || [[ -f pyproject.toml ]]; then
-        echo "Running pip-audit --fix..."
-        pip-audit --fix 2>&1
-
-        # If auto-fix fails, try manual upgrade of vulnerable packages
-        echo ""
-        echo "Checking for remaining vulnerabilities..."
-        VULNS=$(pip-audit --progress-spinner=off 2>&1 | grep -c "vulnerability" || echo "0")
-        if [[ "$VULNS" -gt 0 ]]; then
-            echo "Manual fixes needed for $VULNS vulnerabilities"
-            pip-audit --progress-spinner=off 2>&1 | grep -E "^Name|vulnerability"
-        fi
-    fi
-fi
-
-# Bandit findings (security issues in code) - these require manual review
-# but we can add usedforsecurity=False to non-crypto MD5/SHA1 calls
-```
-
-**Node.js Security Fixes:**
-```bash
-if [[ -f package.json ]]; then
-    echo ""
-    echo "Running npm audit fix..."
-    npm audit fix 2>&1
-
-    # For stubborn issues, try force (with caution)
-    echo ""
-    echo "Checking for remaining issues..."
-    REMAINING=$(npm audit --json 2>/dev/null | jq '.metadata.vulnerabilities.total // 0')
-    if [[ "$REMAINING" -gt 0 ]]; then
-        echo "$REMAINING vulnerabilities remain. Trying npm audit fix --force..."
-        echo "(Note: This may introduce breaking changes)"
-        npm audit fix --force --dry-run 2>&1 | head -20
-    fi
-fi
-```
-
-**Go Security Fixes:**
-```bash
-if [[ -f go.mod ]]; then
-    echo ""
-    echo "Updating Go dependencies..."
-    go get -u ./... 2>&1
-    go mod tidy 2>&1
-fi
-```
-
-**Rust Security Fixes:**
-```bash
-if [[ -f Cargo.toml ]]; then
-    echo ""
-    echo "Updating Rust dependencies..."
-    cargo update 2>&1
-fi
-```
-
-### 5. Deprecated Code
-- Replace deprecated function calls
-- Update to current APIs
-- Remove dead code paths
-
-### 6. Configuration Issues
-- Fix invalid config values
-- Add missing required fields
-- Update outdated paths/versions
-
-### 7. Logic Errors
-- Analyze the intent from context, tests, and docs
-- Implement the correct logic
-- Add test to prevent regression
-
-### 8. Missing Documentation
-- Add missing docstrings
-- Add missing type hints
-- Update outdated comments
-
-## Execution Flow
-
-```
-1. Collect ALL issues from phases 3-9, 11
-2. Group by file to minimize edit passes
-3. For each issue:
-   a. Read current code
-   b. Analyze the fix needed
-   c. Apply the fix
-   d. Verify fix doesn't break tests
-4. Run full test suite
-5. If new issues found, fix those too
-6. Loop until ALL tests pass and ALL issues resolved
-7. Report what was fixed
-```
-
-## Verification Loop
-
-```
-REPEAT:
-  Run tests
-  IF tests fail:
-    Analyze new failures
-    Fix new issues
-  UNTIL all tests pass
-
-REPEAT:
-  Run all analysis phases (3-9, 11)
-  IF new issues found:
-    Fix them
-  UNTIL no issues remain
-```
+---
 
 ## Output Format
 
-### Autonomous Mode Output
+Produce this structured output at the end of the phase:
+
+```
+FIXES_APPLIED:
+- file: path/to/file.py
+  category: auto-format|test-fix|security|quality|dependency
+  description: what was changed and why
+  verified: true|false
+  test_command: pytest tests/test_foo.py -k test_bar
+```
+
+Then produce the summary block:
 
 ```
 ═══════════════════════════════════════════════════════════════════
   PHASE 10: FIX ALL ISSUES
 ═══════════════════════════════════════════════════════════════════
 
-Issues Received: 47
-Issues Fixed: 47
+Issues Received: N    Issues Fixed: N
 
 By Category:
-  Formatting:        12 files
-  Import Sorting:     8 files
-  Lint Errors:       15 fixes
-  Type Errors:        5 fixes
-  Test Failures:      4 fixes
-  Security:           2 packages updated
-  Documentation:      1 docstring added
+  Auto-Format: X files | Lint Auto-Fix: X | Test Failures: X
+  Security: X | Dependencies: X updated | Quality: X
 
-VERIFICATION:
-  Tests: 236 passed, 0 failed ✅
-  Lint:  0 errors ✅
-  Types: 0 errors ✅
+Verification:  Tests: N passed, 0 failed | Lint: 0 errors | Security: 0 new
 
-Status: ✅ PASS - All issues resolved
+Commits:
+  1. abc1234 style: auto-format and lint fixes
+  2. def5678 fix: resolve test failures
+  3. ghi9012 fix: resolve audit findings
+
+Status: PASS - All issues resolved
 ```
 
-### Interactive Mode Output
-
-```
-═══════════════════════════════════════════════════════════════════
-  PHASE 10: AUTO-FIX (Interactive)
-═══════════════════════════════════════════════════════════════════
-
-Issues Received: 47
-Auto-Fixed: 42
-Manual Required: 5
-
-By Category:
-  Formatting:        12 files fixed
-  Import Sorting:     8 files fixed
-  Lint Errors:       15 fixes
-  Type Errors:        3 fixed, 2 skipped
-  Test Failures:      2 fixed, 2 skipped
-  Security:           2 packages updated
-  Documentation:      1 skipped (unclear intent)
-
-VERIFICATION:
-  Tests: 234 passed, 2 failed
-  Lint:  0 errors ✅
-  Types: 2 errors remaining
-
-MANUAL REQUIRED:
-1. src/api/auth.py:45 - Logic error: unclear if null check intended
-2. src/utils/db.py:23 - Security: review SQL construction
-3. tests/test_api.py:89 - Test expects old behavior
-4. tests/test_api.py:112 - Test expects old behavior
-5. library/utils.py:34 - Missing type annotation for complex generic
-
-Status: ⚠️ ISSUES - 5 items require manual review
-```
-
----
-
-## Autonomous Mode Rules
-
-If you find yourself wanting to write "requires manual fix" or "skipped" - STOP.
-
-Ask yourself: "Can I identify what the fix should be?"
-- If YES → Fix it
-- If NO → Gather more context until you CAN identify the fix
-
-The only valid "skip" is when the issue requires:
-- Production database access you don't have
-- External API credentials not available
-- Explicit user architectural decision
-
-Everything else gets fixed. Now.
-
-## Interactive Mode Rules
-
-In interactive mode, it's acceptable to:
-- List items for manual review
-- Skip complex judgment calls
-- Output recommendations
-
-But still prefer fixing over skipping when possible.
+In `--interactive` mode, append a `MANUAL REQUIRED` section listing skipped items with reasons. Status becomes: `PARTIAL - N fixed, M require manual review`.

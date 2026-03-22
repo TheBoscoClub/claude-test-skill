@@ -19,23 +19,25 @@ sudo virsh start example-test-vm
 virt-viewer example-test-vm
 sudo virsh snapshot-create-as example-test-vm clean-install --description "Fresh install"
 sudo virsh snapshot-revert example-test-vm clean-install
-# Project-specific pristine snapshots (from vm-test-manifest.json):
-#   test-example-project uses "pristine" (post_test_restore=true)
+# Project-specific pristine snapshots are defined in each project's vm-test-manifest.json
+# (see "snapshot" and "post_test_restore" fields)
 ```
 
 ## VM Exclusivity Rules
 
 VM assignments are defined in `~/.claude/config/project-vm-map.json`. The `exclusive_to` field is a **bidirectional lock**: only the named project may use that VM, and no other project may.
 
+**Example** (generic — actual assignments live in the JSON config):
+
 | VM | Exclusive To | Purpose | Snapshot |
 |----|-------------|---------|----------|
-| `test-example-project` | example-project | Integration/API/UI testing | `pristine` |
-| `qa-example-project` | example-project | QA only — released versions, no test runs | `qa-baseline` |
+| `test-<project>-cachyos` | `<your-project>` | Integration/API/UI testing | `pristine-*` |
+| `qa-<project>-cachyos` | `<your-project>` | QA only — released versions, no test runs | `qa-baseline-*` |
 | `example-test-vm` | *(none)* | Default for all other projects | — |
 
 **Rules:**
-- `test-example-project` is reserved exclusively for example-project testing. No other project may use it. No other VM may be used for example-project testing.
-- `qa-example-project` is reserved exclusively for example-project QA. No other project may deploy to it. `/test` phases never run against this VM — it receives only promoted releases.
+- VMs with `exclusive_to` set are reserved for the named project only. No other project may use them, and the named project must not use other VMs for testing.
+- QA VMs (if configured) receive only promoted releases — `/test` phases never run against them.
 - All other projects use `example-test-vm` (or any non-exclusive VM for cross-distro testing).
 
 ## When Phase V Runs
@@ -47,7 +49,7 @@ VM assignments are defined in `~/.claude/config/project-vm-map.json`. The `exclu
 
 ## VM Lifecycle for `post_test_restore=true` VMs
 
-For exclusive VMs like `test-example-project`, the expected lifecycle is:
+For exclusive VMs with `post_test_restore=true`, the expected lifecycle is:
 
 | Phase | VM State | Action |
 |-------|----------|--------|

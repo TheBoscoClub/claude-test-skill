@@ -1,8 +1,8 @@
 # Phase A: Deployable Application Testing
 
-> **Model**: `opus` | **Tier**: Special | **Modifies Files**: Sandbox only
+> **Model**: `opus` | **Tier**: 7 (Conditional) | **Modifies Files**: Sandbox only
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for install/test commands. Use `KillShell` to terminate hung install processes. Use `AskUserQuestion` in `--interactive` mode if install paths or config choices are needed. Can parallel with Tier 3 phases.
+> **Key Tools**: `Bash` for install/test commands (use `Bash` with `kill` to terminate hung install processes). Use `AskUserQuestion` in `--interactive` mode if install paths or config choices are needed. Can parallel with Tier 3 phases.
 
 ## Purpose
 
@@ -41,10 +41,13 @@ detect_web_ui() {
 
 ### Playwright E2E Testing
 
-When Playwright MCP is available (`MCP_AVAILABLE["playwright"]=1` from Discovery):
+Check for Playwright MCP availability dynamically by attempting to call a Playwright tool. If the tool is not available (MCP not connected), fall back to standard functional testing.
 
 ```
-# E2E Test Flow:
+# E2E Test Flow (requires Playwright MCP to be connected):
+# Detection: Try calling browser_navigate — if it fails with "tool not found",
+# Playwright MCP is not available. Skip to standard functional tests.
+
 1. Start the application in sandbox (or connect to running instance)
 2. Use playwright MCP to:
    - Navigate to key pages
@@ -59,16 +62,22 @@ When Playwright MCP is available (`MCP_AVAILABLE["playwright"]=1` from Discovery
 - browser_navigate: Load pages
 - browser_click: Interact with elements
 - browser_fill: Enter form data
-- browser_screenshot: Visual capture
+- browser_snapshot: Accessibility snapshot
+- browser_take_screenshot: Visual capture
 - browser_evaluate: Run JS assertions
 ```
 
 ### Example Playwright Test Sequence
 
 ```
-IF MCP_AVAILABLE["playwright"] == 1 AND detect_web_ui():
-    1. browser_navigate to http://localhost:${APP_PORT}
-    2. browser_screenshot for baseline
+# Check Playwright MCP availability dynamically:
+# Attempt browser_navigate — if the tool is unavailable, the call will fail
+# and the phase should fall back to non-browser functional testing.
+
+IF detect_web_ui():
+    1. Try browser_navigate to http://localhost:${APP_PORT}
+       - If tool not found → skip Playwright tests, use standard HTTP checks
+    2. browser_take_screenshot for baseline
     3. For each critical flow (login, main action, etc.):
        - Perform actions
        - Verify expected state
@@ -76,7 +85,7 @@ IF MCP_AVAILABLE["playwright"] == 1 AND detect_web_ui():
     4. Report: Pages tested, errors found, screenshots captured
 ```
 
-**Note:** Playwright testing is non-blocking. If Playwright is unavailable, skip to standard functional testing.
+**Note:** Playwright testing is non-blocking. If Playwright MCP is not connected to this session, skip to standard functional testing (curl/wget HTTP checks).
 
 ## CRITICAL: Production Data Isolation
 
@@ -144,7 +153,7 @@ detect_deployable_app() {
 ```bash
 setup_app_sandbox() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local SANDBOX_BASE="${SANDBOX_DIR:-/tmp/claude-test-sandbox-$(basename $PROJECT_DIR)}"
+    local SANDBOX_BASE="${SANDBOX_DIR:-/tmp/claude-test-sandbox-$(basename $PROJECT_DIR)-$$-$(date +%s)}"
     local APP_SANDBOX="${SANDBOX_BASE}/app-install"
 
     echo "═══════════════════════════════════════════════════════════════════"
@@ -569,7 +578,7 @@ run_phase_A() {
 ```bash
 cleanup_app_sandbox() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local SANDBOX_BASE="${SANDBOX_DIR:-/tmp/claude-test-sandbox-$(basename $PROJECT_DIR)}"
+    local SANDBOX_BASE="${SANDBOX_DIR:-/tmp/claude-test-sandbox-$(basename $PROJECT_DIR)-$$-$(date +%s)}"
     local APP_SANDBOX="${SANDBOX_BASE}/app-install"
 
     echo ""
