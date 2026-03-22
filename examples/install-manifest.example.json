@@ -2,42 +2,42 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$comment": "Example install manifest for Phase P production validation",
 
-  "name": "my-audiobook-app",
+  "name": "my-app",
   "version": "1.0.0",
-  "description": "Audiobook management application",
+  "description": "Example application for install manifest schema",
   "install_type": "user",
 
   "binaries": [
     {
-      "name": "audiobook-cli",
+      "name": "my-app-cli",
       "paths": [
-        "~/.local/bin/audiobook-cli",
-        "/usr/local/bin/audiobook-cli"
+        "~/.local/bin/my-app-cli",
+        "/usr/local/bin/my-app-cli"
       ],
       "version_flag": "--version",
-      "health_check": "audiobook-cli --health"
+      "health_check": "my-app-cli --health"
     },
     {
-      "name": "audiobook-convert",
-      "paths": ["~/.local/bin/audiobook-convert"],
+      "name": "my-app-worker",
+      "paths": ["~/.local/bin/my-app-worker"],
       "version_flag": "-V"
     }
   ],
 
   "services": [
     {
-      "name": "audiobook-api.service",
+      "name": "my-app-api.service",
       "type": "user",
       "expected_state": "active",
-      "health_endpoint": "http://localhost:8585/health"
+      "health_endpoint": "http://localhost:8080/health"
     },
     {
-      "name": "audiobook-worker.service",
+      "name": "my-app-worker.service",
       "type": "user",
       "expected_state": "active"
     },
     {
-      "name": "audiobook-scheduler.timer",
+      "name": "my-app-scheduler.timer",
       "type": "user",
       "expected_state": "active"
     }
@@ -45,45 +45,45 @@
 
   "config_files": [
     {
-      "path": "~/.config/audiobook/config.env",
+      "path": "~/.config/my-app/config.env",
       "required": true,
-      "validate_command": "bash -n ~/.config/audiobook/config.env"
+      "validate_command": "bash -n ~/.config/my-app/config.env"
     },
     {
-      "path": "~/.config/audiobook/library.json",
+      "path": "~/.config/my-app/settings.json",
       "required": false
     }
   ],
 
   "data_directories": [
     {
-      "path": "~/.local/share/audiobook",
+      "path": "~/.local/share/my-app",
       "required": true,
       "min_permissions": "700"
     },
     {
-      "path": "~/.local/share/audiobook/cache",
+      "path": "~/.local/share/my-app/cache",
       "required": false,
       "min_permissions": "700"
     }
   ],
 
   "environment": {
-    "required_vars": ["AUDIOBOOK_HOME", "AUDIOBOOK_LIBRARY"],
-    "optional_vars": ["AUDIOBOOK_DEBUG", "AUDIOBOOK_LOG_LEVEL"]
+    "required_vars": ["MY_APP_HOME", "MY_APP_DATA_DIR"],
+    "optional_vars": ["MY_APP_DEBUG", "MY_APP_LOG_LEVEL"]
   },
 
   "ports": [
     {
-      "port": 8585,
+      "port": 8080,
       "protocol": "tcp",
-      "service": "audiobook-api.service",
+      "service": "my-app-api.service",
       "description": "REST API"
     },
     {
-      "port": 8586,
+      "port": 8081,
       "protocol": "tcp",
-      "service": "audiobook-api.service",
+      "service": "my-app-api.service",
       "description": "WebSocket for live updates"
     }
   ],
@@ -91,17 +91,17 @@
   "health_checks": [
     {
       "name": "API responding",
-      "command": "curl -sf http://localhost:8585/health",
+      "command": "curl -sf http://localhost:8080/health",
       "timeout": 5
     },
     {
       "name": "Database accessible",
-      "command": "audiobook-cli db ping",
+      "command": "my-app-cli db ping",
       "timeout": 10
     },
     {
-      "name": "Library readable",
-      "command": "audiobook-cli library check",
+      "name": "Data directory readable",
+      "command": "my-app-cli data check",
       "timeout": 30
     }
   ]

@@ -1,89 +1,39 @@
 # Phase P: Production Validation
 
-> **Model**: `opus` | **Tier**: 5 (Post-fix, Conditional) | **Modifies Files**: No (validates live)
+> **Model**: `opus` | **Tier**: 7 (Conditional) | **Modifies Files**: No (validates live)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for system validation. Use `KillShell` to terminate hung service checks. Use `AskUserQuestion` in `--interactive` mode for production remediation decisions. Use `WebSearch` to verify expected service behavior.
+> **Key Tools**: `Bash` for system validation (use `timeout` for hung service checks). Use `AskUserQuestion` in `--interactive` mode for production remediation decisions.
 
-## Purpose
+Validate that a project's installed production application is running correctly. Compares expected state (from `install-manifest.json` + install script analysis) against actual system state.
 
-Validate that a project's **installed production application** is running correctly on the system. This phase compares the expected installation state (from manifest + install script analysis) against the actual system state.
+**Key Difference from Phase A:** Phase A tests installation *in a sandbox*. Phase P validates *live production*.
 
-**Key Difference from Phase A:**
-- Phase A: Tests installation *in a sandbox* - "does the install process work?"
-- Phase P: Validates *live production* - "is the installed app healthy on this system?"
+**Prerequisites:** Application must already be installed on the system.
 
-## When to Run This Phase
-
-Run after:
-- Running a project's `install.sh` or equivalent
-- Deploying services via systemd
-- Any production deployment
-
-**Prerequisites**: The application must already be installed on the system.
-
-## Manifest File: `install-manifest.json`
-
-Projects should provide an `install-manifest.json` describing expected installation state:
+## Manifest: `install-manifest.json`
 
 ```json
 {
   "name": "my-app",
   "version": "1.0.0",
   "install_type": "user",
-
   "binaries": [
-    {
-      "name": "my-app",
-      "paths": ["~/.local/bin/my-app", "/usr/local/bin/my-app"],
-      "version_flag": "--version",
-      "health_check": "my-app --health"
-    }
+    { "name": "my-app", "paths": ["~/.local/bin/my-app"], "version_flag": "--version", "health_check": "my-app --health" }
   ],
-
   "services": [
-    {
-      "name": "my-app.service",
-      "type": "user",
-      "expected_state": "active",
-      "health_endpoint": "http://localhost:8080/health"
-    }
+    { "name": "my-app.service", "type": "user", "expected_state": "active", "health_endpoint": "http://localhost:8080/health" }
   ],
-
   "config_files": [
-    {
-      "path": "~/.config/my-app/config.yml",
-      "required": true,
-      "validate_command": "my-app config validate"
-    }
+    { "path": "~/.config/my-app/config.yml", "required": true, "validate_command": "my-app config validate" }
   ],
-
   "data_directories": [
-    {
-      "path": "~/.local/share/my-app",
-      "required": true,
-      "min_permissions": "700"
-    }
+    { "path": "~/.local/share/my-app", "required": true, "min_permissions": "700" }
   ],
-
-  "environment": {
-    "required_vars": ["MY_APP_HOME"],
-    "optional_vars": ["MY_APP_DEBUG"]
-  },
-
   "ports": [
-    {
-      "port": 8080,
-      "protocol": "tcp",
-      "service": "my-app.service"
-    }
+    { "port": 8080, "protocol": "tcp", "service": "my-app.service" }
   ],
-
   "health_checks": [
-    {
-      "name": "API responding",
-      "command": "curl -sf http://localhost:8080/health",
-      "timeout": 5
-    }
+    { "name": "API responding", "command": "curl -sf http://localhost:8080/health", "timeout": 5 }
   ]
 }
 ```
@@ -93,109 +43,50 @@ Projects should provide an `install-manifest.json` describing expected installat
 ```bash
 load_production_manifest() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local MANIFEST_FILE=""
 
-    echo "═══════════════════════════════════════════════════════════════════"
-    echo "  PHASE P: PRODUCTION VALIDATION"
-    echo "═══════════════════════════════════════════════════════════════════"
-    echo ""
-
-    # Find manifest file
     for candidate in "install-manifest.json" ".install-manifest.json" "manifest.json"; do
-        if [[ -f "$PROJECT_DIR/$candidate" ]]; then
-            MANIFEST_FILE="$PROJECT_DIR/$candidate"
-            break
-        fi
+        [[ -f "$PROJECT_DIR/$candidate" ]] && { export PROD_MANIFEST="$PROJECT_DIR/$candidate"; break; }
     done
 
-    if [[ -n "$MANIFEST_FILE" ]]; then
-        echo "✅ Found manifest: $MANIFEST_FILE"
-        export PROD_MANIFEST="$MANIFEST_FILE"
-
-        # Extract key fields
-        export APP_NAME=$(jq -r '.name // "unknown"' "$MANIFEST_FILE")
-        export INSTALL_TYPE=$(jq -r '.install_type // "user"' "$MANIFEST_FILE")
-        echo "   App: $APP_NAME"
-        echo "   Install type: $INSTALL_TYPE"
+    if [[ -n "$PROD_MANIFEST" ]]; then
+        export APP_NAME=$(jq -r '.name // "unknown"' "$PROD_MANIFEST")
+        export INSTALL_TYPE=$(jq -r '.install_type // "user"' "$PROD_MANIFEST")
     else
-        echo "⚠️ No manifest found - will infer from install script"
-        export PROD_MANIFEST=""
-
-        # Try to infer app name from project directory
-        export APP_NAME=$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')
+        export PROD_MANIFEST="" APP_NAME=$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')
     fi
-    echo ""
 }
 
 analyze_install_script() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
     local INSTALL_SCRIPT="$PROJECT_DIR/install.sh"
-    local INFERRED_FILE="/tmp/phase-p-inferred-$$.json"
-
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Analyzing Install Script"
-    echo "───────────────────────────────────────────────────────────────────"
-    echo ""
-
-    if [[ ! -f "$INSTALL_SCRIPT" ]]; then
-        echo "ℹ️ No install.sh found"
-        return 0
-    fi
-
-    echo "Parsing: $INSTALL_SCRIPT"
-    echo ""
-
-    # Initialize inferred data
-    local INFERRED_BINS=()
-    local INFERRED_SERVICES=()
-    local INFERRED_CONFIGS=()
-    local INFERRED_PREFIX=""
+    [[ ! -f "$INSTALL_SCRIPT" ]] && return 0
 
     # Extract PREFIX/install location
-    INFERRED_PREFIX=$(grep -oP '(?<=PREFIX=["'"'"']?)[^"'"'"'\s]+' "$INSTALL_SCRIPT" | head -1)
-    if [[ -z "$INFERRED_PREFIX" ]]; then
-        INFERRED_PREFIX=$(grep -oP '(?<=INSTALL_DIR=["'"'"']?)[^"'"'"'\s]+' "$INSTALL_SCRIPT" | head -1)
-    fi
-    echo "  Inferred PREFIX: ${INFERRED_PREFIX:-~/.local}"
+    local PREFIX=$(grep -oP '(?<=PREFIX=["'"'"']?)[^"'"'"'\s]+' "$INSTALL_SCRIPT" | head -1)
+    [[ -z "$PREFIX" ]] && PREFIX=$(grep -oP '(?<=INSTALL_DIR=["'"'"']?)[^"'"'"'\s]+' "$INSTALL_SCRIPT" | head -1)
+    export INFERRED_PREFIX="${PREFIX:-$HOME/.local}"
 
-    # Extract binary installations (cp/install commands to bin/)
+    # Extract binary names from cp/install commands to bin/
+    local BINS=()
     while IFS= read -r line; do
-        local bin_name=$(echo "$line" | grep -oP '[\w-]+(?=\s*$)' | head -1)
-        if [[ -n "$bin_name" ]]; then
-            INFERRED_BINS+=("$bin_name")
-        fi
+        local bn=$(echo "$line" | grep -oP '[\w-]+(?=\s*$)' | head -1)
+        [[ -n "$bn" ]] && BINS+=("$bn")
     done < <(grep -E 'cp.*bin/|install.*bin/' "$INSTALL_SCRIPT" 2>/dev/null)
+    export INFERRED_BINS="${BINS[*]}"
 
     # Extract systemd service names
-    while IFS= read -r service; do
-        INFERRED_SERVICES+=("$service")
-    done < <(grep -oP '[\w-]+\.service' "$INSTALL_SCRIPT" 2>/dev/null | sort -u)
-
-    # Also check systemd directory in project
+    local SVCS=()
+    while IFS= read -r svc; do SVCS+=("$svc"); done < <(grep -oP '[\w-]+\.service' "$INSTALL_SCRIPT" 2>/dev/null | sort -u)
     if [[ -d "$PROJECT_DIR/systemd" ]]; then
-        while IFS= read -r service_file; do
-            local svc=$(basename "$service_file")
-            if [[ ! " ${INFERRED_SERVICES[*]} " =~ " ${svc} " ]]; then
-                INFERRED_SERVICES+=("$svc")
-            fi
+        while IFS= read -r sf; do
+            local s=$(basename "$sf")
+            [[ ! " ${SVCS[*]} " =~ " ${s} " ]] && SVCS+=("$s")
         done < <(find "$PROJECT_DIR/systemd" -name "*.service" 2>/dev/null)
     fi
+    export INFERRED_SERVICES="${SVCS[*]}"
 
     # Extract config file paths
-    while IFS= read -r config; do
-        INFERRED_CONFIGS+=("$config")
-    done < <(grep -oP '(?<=\.config/)[^\s"'"'"']+' "$INSTALL_SCRIPT" 2>/dev/null | sort -u)
-
-    echo "  Inferred binaries: ${INFERRED_BINS[*]:-none}"
-    echo "  Inferred services: ${INFERRED_SERVICES[*]:-none}"
-    echo "  Inferred configs: ${INFERRED_CONFIGS[*]:-none}"
-    echo ""
-
-    # Export for later steps
-    export INFERRED_PREFIX="${INFERRED_PREFIX:-$HOME/.local}"
-    export INFERRED_BINS="${INFERRED_BINS[*]}"
-    export INFERRED_SERVICES="${INFERRED_SERVICES[*]}"
-    export INFERRED_CONFIGS="${INFERRED_CONFIGS[*]}"
+    export INFERRED_CONFIGS=$(grep -oP '(?<=\.config/)[^\s"'"'"']+' "$INSTALL_SCRIPT" 2>/dev/null | sort -u | tr '\n' ' ')
 }
 ```
 
@@ -205,163 +96,73 @@ analyze_install_script() {
 validate_binaries() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
     local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
+    local BINARIES=() FOUND=0 MISSING=0
 
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Step 2: Validating Installed Binaries"
-    echo "───────────────────────────────────────────────────────────────────"
-    echo ""
+    # Collect from manifest + inferred
+    [[ -n "$PROD_MANIFEST" ]] && while IFS= read -r b; do BINARIES+=("$b"); done < <(jq -r '.binaries[].name // empty' "$PROD_MANIFEST" 2>/dev/null)
+    for b in $INFERRED_BINS; do [[ ! " ${BINARIES[*]} " =~ " ${b} " ]] && BINARIES+=("$b"); done
 
-    local BINARIES=()
-    local FOUND=0
-    local MISSING=0
-
-    # Get binaries from manifest or inferred
-    if [[ -n "$PROD_MANIFEST" ]]; then
-        while IFS= read -r bin; do
-            BINARIES+=("$bin")
-        done < <(jq -r '.binaries[].name // empty' "$PROD_MANIFEST" 2>/dev/null)
-    fi
-
-    # Add inferred binaries
-    for bin in $INFERRED_BINS; do
-        if [[ ! " ${BINARIES[*]} " =~ " ${bin} " ]]; then
-            BINARIES+=("$bin")
-        fi
-    done
-
-    if [[ ${#BINARIES[@]} -eq 0 ]]; then
-        echo "ℹ️ No binaries to validate"
-        return 0
-    fi
+    [[ ${#BINARIES[@]} -eq 0 ]] && return 0
 
     for bin in "${BINARIES[@]}"; do
-        echo -n "  $bin: "
-
-        # Check multiple possible locations
         local bin_path=""
         for loc in "$HOME/.local/bin/$bin" "/usr/local/bin/$bin" "/usr/bin/$bin" "$INFERRED_PREFIX/bin/$bin"; do
-            loc=$(eval echo "$loc")  # Expand ~
-            if [[ -x "$loc" ]]; then
-                bin_path="$loc"
-                break
-            fi
+            loc=$(eval echo "$loc")
+            [[ -x "$loc" ]] && { bin_path="$loc"; break; }
         done
-
-        # Also try which
-        if [[ -z "$bin_path" ]]; then
-            bin_path=$(which "$bin" 2>/dev/null)
-        fi
+        [[ -z "$bin_path" ]] && bin_path=$(which "$bin" 2>/dev/null)
 
         if [[ -n "$bin_path" ]]; then
-            echo "✅ Found at $bin_path"
+            echo "  $bin: found at $bin_path"
+            "$bin_path" --version &>/dev/null && echo "     Version: $("$bin_path" --version 2>&1 | head -1)"
             ((FOUND++))
 
-            # Try to get version
-            if "$bin_path" --version &>/dev/null; then
-                local ver=$("$bin_path" --version 2>&1 | head -1)
-                echo "     Version: $ver"
-            fi
-
-            # Run health check if defined in manifest
+            # Run manifest health check if defined
             if [[ -n "$PROD_MANIFEST" ]]; then
-                local health_cmd=$(jq -r --arg b "$bin" '.binaries[] | select(.name == $b) | .health_check // empty' "$PROD_MANIFEST")
-                if [[ -n "$health_cmd" ]]; then
-                    if eval "$health_cmd" &>/dev/null; then
-                        echo "     Health: ✅ Passed"
-                    else
-                        echo "     Health: ❌ Failed" | tee -a "$ISSUES_FILE"
-                    fi
-                fi
+                local hc=$(jq -r --arg b "$bin" '.binaries[] | select(.name == $b) | .health_check // empty' "$PROD_MANIFEST")
+                [[ -n "$hc" ]] && { eval "$hc" &>/dev/null && echo "     Health: PASS" || echo "     Health: FAIL" | tee -a "$ISSUES_FILE"; }
             fi
         else
-            echo "❌ NOT FOUND"
+            echo "  $bin: NOT FOUND"
             echo "Binary not found: $bin" >> "$ISSUES_FILE"
             ((MISSING++))
         fi
     done
-
-    echo ""
     echo "  Summary: $FOUND found, $MISSING missing"
-    echo ""
 }
 ```
 
 ## Step 2b: Validate Wrapper Script Targets
 
-**CRITICAL**: Wrapper scripts are small shell scripts in `/usr/local/bin/` that `exec` into other scripts. If the target of the `exec` doesn't exist, the wrapper will fail silently at runtime.
+Wrapper scripts in `/usr/local/bin/` that `exec` into other scripts will fail silently if the target is missing.
 
 ```bash
 validate_wrapper_targets() {
-    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
     local APP_NAME_LOWER=$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]' | tr -d '-')
+    local ISSUES_FILE="${PROJECT_DIR:-$(pwd)}/production-issues.log"
+    local FOUND=0 BROKEN=0
 
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Step 2b: Validating Wrapper Script Targets"
-    echo "───────────────────────────────────────────────────────────────────"
-    echo ""
-
-    local FOUND=0
-    local BROKEN=0
-
-    # Find wrapper scripts in /usr/local/bin that might belong to this app
     local wrappers=()
-    while IFS= read -r wrapper; do
-        wrappers+=("$wrapper")
-    done < <(ls /usr/local/bin/${APP_NAME_LOWER}* /usr/local/bin/${APP_NAME}* 2>/dev/null | sort -u)
-
-    if [[ ${#wrappers[@]} -eq 0 ]]; then
-        echo "ℹ️ No wrapper scripts found for $APP_NAME"
-        return 0
-    fi
+    while IFS= read -r w; do wrappers+=("$w"); done < <(ls /usr/local/bin/${APP_NAME_LOWER}* /usr/local/bin/${APP_NAME}* 2>/dev/null | sort -u)
+    [[ ${#wrappers[@]} -eq 0 ]] && return 0
 
     for wrapper in "${wrappers[@]}"; do
-        local basename=$(basename "$wrapper")
-        echo -n "  $basename: "
+        head -5 "$wrapper" 2>/dev/null | grep -q "exec" || { ((FOUND++)); continue; }
+        local target=$(grep -m1 "^exec " "$wrapper" 2>/dev/null | sed 's/^exec //' | awk '{print $1}')
+        [[ -z "$target" ]] && continue
 
-        # Check if it's a shell script wrapper (contains exec)
-        if ! head -5 "$wrapper" 2>/dev/null | grep -q "exec"; then
-            echo "✅ Not a wrapper (standalone script)"
-            ((FOUND++))
-            continue
-        fi
-
-        # Extract exec target path
-        local exec_target=$(grep -m1 "^exec " "$wrapper" 2>/dev/null | sed 's/^exec //' | awk '{print $1}')
-
-        if [[ -z "$exec_target" ]]; then
-            echo "⚠️ Could not extract exec target"
-            continue
-        fi
-
-        # Resolve variables in the path (e.g., ${AUDIOBOOKS_HOME})
-        local resolved_target
-        if [[ "$exec_target" == *'$'* ]]; then
-            # Try to resolve using environment or common patterns
-            resolved_target=$(eval echo "$exec_target" 2>/dev/null || echo "$exec_target")
-        else
-            resolved_target="$exec_target"
-        fi
-
-        # Check if target exists and is executable
-        if [[ -x "$resolved_target" ]]; then
-            echo "✅ -> $resolved_target (exists)"
+        local resolved=$(eval echo "$target" 2>/dev/null || echo "$target")
+        if [[ -x "$resolved" ]]; then
+            echo "  $(basename "$wrapper"): -> $resolved (OK)"
             ((FOUND++))
         else
-            echo "❌ BROKEN: -> $resolved_target (NOT FOUND)"
-            echo "Wrapper script broken: $wrapper -> $resolved_target" >> "$ISSUES_FILE"
+            echo "  $(basename "$wrapper"): BROKEN -> $resolved"
+            echo "Wrapper script broken: $wrapper -> $resolved" >> "$ISSUES_FILE"
             ((BROKEN++))
         fi
     done
 
-    echo ""
-    if [[ $BROKEN -gt 0 ]]; then
-        echo "  ❌ $BROKEN BROKEN WRAPPER(S) - Commands will fail at runtime!"
-        echo "     FIX: Re-run install.sh or manually copy missing scripts"
-    else
-        echo "  ✅ All $FOUND wrapper targets verified"
-    fi
-    echo ""
+    [[ $BROKEN -gt 0 ]] && echo "  $BROKEN BROKEN WRAPPER(S) — re-run install.sh"
 }
 ```
 
@@ -369,101 +170,36 @@ validate_wrapper_targets() {
 
 ```bash
 validate_services() {
-    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
+    local ISSUES_FILE="${PROJECT_DIR:-$(pwd)}/production-issues.log"
+    local SERVICES=() HEALTHY=0 UNHEALTHY=0
 
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Step 3: Validating Running Services"
-    echo "───────────────────────────────────────────────────────────────────"
-    echo ""
-
-    local SERVICES=()
-    local HEALTHY=0
-    local UNHEALTHY=0
-
-    # Get services from manifest
-    if [[ -n "$PROD_MANIFEST" ]]; then
-        while IFS= read -r svc; do
-            SERVICES+=("$svc")
-        done < <(jq -r '.services[].name // empty' "$PROD_MANIFEST" 2>/dev/null)
-    fi
-
-    # Add inferred services
-    for svc in $INFERRED_SERVICES; do
-        if [[ ! " ${SERVICES[*]} " =~ " ${svc} " ]]; then
-            SERVICES+=("$svc")
-        fi
-    done
-
-    if [[ ${#SERVICES[@]} -eq 0 ]]; then
-        echo "ℹ️ No services to validate"
-        return 0
-    fi
+    [[ -n "$PROD_MANIFEST" ]] && while IFS= read -r s; do SERVICES+=("$s"); done < <(jq -r '.services[].name // empty' "$PROD_MANIFEST" 2>/dev/null)
+    for s in $INFERRED_SERVICES; do [[ ! " ${SERVICES[*]} " =~ " ${s} " ]] && SERVICES+=("$s"); done
+    [[ ${#SERVICES[@]} -eq 0 ]] && return 0
 
     for svc in "${SERVICES[@]}"; do
-        echo "  $svc:"
-
-        # Determine service type (user vs system)
         local svc_type="user"
-        if [[ -n "$PROD_MANIFEST" ]]; then
-            svc_type=$(jq -r --arg s "$svc" '.services[] | select(.name == $s) | .type // "user"' "$PROD_MANIFEST")
-        fi
+        [[ -n "$PROD_MANIFEST" ]] && svc_type=$(jq -r --arg s "$svc" '.services[] | select(.name == $s) | .type // "user"' "$PROD_MANIFEST")
+        local cmd="systemctl"; [[ "$svc_type" == "user" ]] && cmd="systemctl --user"
 
-        local systemctl_cmd="systemctl"
-        [[ "$svc_type" == "user" ]] && systemctl_cmd="systemctl --user"
+        local status=$($cmd is-active "$svc" 2>/dev/null)
+        local expected="active"
+        [[ -n "$PROD_MANIFEST" ]] && expected=$(jq -r --arg s "$svc" '.services[] | select(.name == $s) | .expected_state // "active"' "$PROD_MANIFEST")
 
-        # Check if service exists
-        if ! $systemctl_cmd list-unit-files "$svc" &>/dev/null; then
-            echo "     ❌ Service not installed"
-            echo "Service not installed: $svc" >> "$ISSUES_FILE"
-            ((UNHEALTHY++))
-            continue
-        fi
-
-        # Get service status
-        local status=$($systemctl_cmd is-active "$svc" 2>/dev/null)
-        local enabled=$($systemctl_cmd is-enabled "$svc" 2>/dev/null)
-
-        echo "     Status: $status"
-        echo "     Enabled: $enabled"
-
-        # Check expected state from manifest
-        local expected_state="active"
-        if [[ -n "$PROD_MANIFEST" ]]; then
-            expected_state=$(jq -r --arg s "$svc" '.services[] | select(.name == $s) | .expected_state // "active"' "$PROD_MANIFEST")
-        fi
-
-        if [[ "$status" == "$expected_state" ]]; then
-            echo "     ✅ State matches expected ($expected_state)"
-            ((HEALTHY++))
+        if [[ "$status" == "$expected" ]]; then
+            echo "  $svc: $status (OK)"; ((HEALTHY++))
         else
-            echo "     ❌ Expected: $expected_state, Got: $status" | tee -a "$ISSUES_FILE"
-            ((UNHEALTHY++))
-
-            # Show recent logs for failed services
-            if [[ "$status" != "active" ]]; then
-                echo "     Recent logs:"
-                $systemctl_cmd status "$svc" --no-pager 2>&1 | tail -5 | sed 's/^/       /'
-            fi
+            echo "  $svc: $status (expected: $expected)" | tee -a "$ISSUES_FILE"; ((UNHEALTHY++))
+            [[ "$status" != "active" ]] && $cmd status "$svc" --no-pager 2>&1 | tail -3 | sed 's/^/       /'
         fi
 
-        # Check health endpoint if defined
-        if [[ -n "$PROD_MANIFEST" ]]; then
-            local health_url=$(jq -r --arg s "$svc" '.services[] | select(.name == $s) | .health_endpoint // empty' "$PROD_MANIFEST")
-            if [[ -n "$health_url" ]]; then
-                echo -n "     Health endpoint: "
-                if curl -sf "$health_url" &>/dev/null; then
-                    echo "✅ Responding"
-                else
-                    echo "❌ Not responding" | tee -a "$ISSUES_FILE"
-                fi
-            fi
-        fi
-        echo ""
+        # Health endpoint
+        [[ -n "$PROD_MANIFEST" ]] && {
+            local url=$(jq -r --arg s "$svc" '.services[] | select(.name == $s) | .health_endpoint // empty' "$PROD_MANIFEST")
+            [[ -n "$url" ]] && { curl -sf "$url" &>/dev/null && echo "     Endpoint: OK" || echo "     Endpoint: FAIL" | tee -a "$ISSUES_FILE"; }
+        }
     done
-
     echo "  Summary: $HEALTHY healthy, $UNHEALTHY unhealthy"
-    echo ""
 }
 ```
 
@@ -471,81 +207,31 @@ validate_services() {
 
 ```bash
 validate_configs() {
-    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
+    local ISSUES_FILE="${PROJECT_DIR:-$(pwd)}/production-issues.log"
+    local CONFIGS=() VALID=0 INVALID=0
 
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Step 4: Validating Configuration Files"
-    echo "───────────────────────────────────────────────────────────────────"
-    echo ""
-
-    local CONFIGS=()
-    local VALID=0
-    local INVALID=0
-
-    # Get configs from manifest
-    if [[ -n "$PROD_MANIFEST" ]]; then
-        while IFS= read -r cfg; do
-            CONFIGS+=("$cfg")
-        done < <(jq -r '.config_files[].path // empty' "$PROD_MANIFEST" 2>/dev/null)
-    fi
-
-    # Add inferred configs with common prefixes
-    for cfg in $INFERRED_CONFIGS; do
-        local full_path="$HOME/.config/$cfg"
-        if [[ ! " ${CONFIGS[*]} " =~ " ${full_path} " ]]; then
-            CONFIGS+=("$full_path")
-        fi
+    [[ -n "$PROD_MANIFEST" ]] && while IFS= read -r c; do CONFIGS+=("$c"); done < <(jq -r '.config_files[].path // empty' "$PROD_MANIFEST" 2>/dev/null)
+    for c in $INFERRED_CONFIGS; do
+        local fp="$HOME/.config/$c"
+        [[ ! " ${CONFIGS[*]} " =~ " ${fp} " ]] && CONFIGS+=("$fp")
     done
-
-    if [[ ${#CONFIGS[@]} -eq 0 ]]; then
-        echo "ℹ️ No config files to validate"
-        return 0
-    fi
+    [[ ${#CONFIGS[@]} -eq 0 ]] && return 0
 
     for cfg in "${CONFIGS[@]}"; do
-        local expanded_cfg=$(eval echo "$cfg")
-        echo -n "  $expanded_cfg: "
-
-        if [[ -f "$expanded_cfg" ]]; then
-            echo "✅ Exists"
+        local exp=$(eval echo "$cfg")
+        if [[ -f "$exp" ]]; then
+            echo "  $exp: EXISTS ($(stat -c '%a' "$exp"))"
             ((VALID++))
-
-            # Check permissions
-            local perms=$(stat -c "%a" "$expanded_cfg" 2>/dev/null)
-            echo "     Permissions: $perms"
-
-            # Run validation command if specified
-            if [[ -n "$PROD_MANIFEST" ]]; then
-                local validate_cmd=$(jq -r --arg c "$cfg" '.config_files[] | select(.path == $c) | .validate_command // empty' "$PROD_MANIFEST")
-                if [[ -n "$validate_cmd" ]]; then
-                    if eval "$validate_cmd" &>/dev/null; then
-                        echo "     Validation: ✅ Passed"
-                    else
-                        echo "     Validation: ❌ Failed" | tee -a "$ISSUES_FILE"
-                    fi
-                fi
-            fi
+            [[ -n "$PROD_MANIFEST" ]] && {
+                local vcmd=$(jq -r --arg c "$cfg" '.config_files[] | select(.path == $c) | .validate_command // empty' "$PROD_MANIFEST")
+                [[ -n "$vcmd" ]] && { eval "$vcmd" &>/dev/null && echo "     Validation: PASS" || echo "     Validation: FAIL" | tee -a "$ISSUES_FILE"; }
+            }
         else
-            # Check if required
-            local required=true
-            if [[ -n "$PROD_MANIFEST" ]]; then
-                required=$(jq -r --arg c "$cfg" '.config_files[] | select(.path == $c) | .required // true' "$PROD_MANIFEST")
-            fi
-
-            if [[ "$required" == "true" ]]; then
-                echo "❌ MISSING (required)"
-                echo "Missing required config: $expanded_cfg" >> "$ISSUES_FILE"
-                ((INVALID++))
-            else
-                echo "⚠️ Missing (optional)"
-            fi
+            local req=true
+            [[ -n "$PROD_MANIFEST" ]] && req=$(jq -r --arg c "$cfg" '.config_files[] | select(.path == $c) | .required // true' "$PROD_MANIFEST")
+            [[ "$req" == "true" ]] && { echo "  $exp: MISSING (required)"; echo "Missing config: $exp" >> "$ISSUES_FILE"; ((INVALID++)); } || echo "  $exp: missing (optional)"
         fi
     done
-
-    echo ""
-    echo "  Summary: $VALID valid, $INVALID invalid"
-    echo ""
 }
 ```
 
@@ -553,377 +239,124 @@ validate_configs() {
 
 ```bash
 validate_data_dirs() {
-    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
+    local ISSUES_FILE="${PROJECT_DIR:-$(pwd)}/production-issues.log"
+    [[ -z "$PROD_MANIFEST" ]] && return 0
 
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Step 5: Validating Data Directories"
-    echo "───────────────────────────────────────────────────────────────────"
-    echo ""
+    jq -c '.data_directories[]' "$PROD_MANIFEST" 2>/dev/null | while read -r obj; do
+        local path=$(echo "$obj" | jq -r '.path') expanded=$(eval echo "$(echo "$obj" | jq -r '.path')")
+        local required=$(echo "$obj" | jq -r '.required // true')
+        local min_perms=$(echo "$obj" | jq -r '.min_permissions // "700"')
 
-    if [[ -z "$PROD_MANIFEST" ]]; then
-        echo "ℹ️ No manifest - skipping data directory validation"
-        return 0
-    fi
-
-    local count=$(jq '.data_directories | length' "$PROD_MANIFEST" 2>/dev/null)
-    if [[ "$count" == "0" ]] || [[ -z "$count" ]]; then
-        echo "ℹ️ No data directories defined in manifest"
-        return 0
-    fi
-
-    jq -c '.data_directories[]' "$PROD_MANIFEST" 2>/dev/null | while read -r dir_obj; do
-        local path=$(echo "$dir_obj" | jq -r '.path')
-        local expanded_path=$(eval echo "$path")
-        local required=$(echo "$dir_obj" | jq -r '.required // true')
-        local min_perms=$(echo "$dir_obj" | jq -r '.min_permissions // "700"')
-
-        echo -n "  $expanded_path: "
-
-        if [[ -d "$expanded_path" ]]; then
-            echo "✅ Exists"
-
-            local perms=$(stat -c "%a" "$expanded_path" 2>/dev/null)
-            echo "     Permissions: $perms (min: $min_perms)"
-
-            # Check permissions are at least as restrictive
-            if [[ "$perms" -le "$min_perms" ]]; then
-                echo "     ✅ Permissions OK"
-            else
-                echo "     ⚠️ Permissions more permissive than recommended" | tee -a "$ISSUES_FILE"
-            fi
-
-            # Show size
-            local size=$(du -sh "$expanded_path" 2>/dev/null | cut -f1)
-            echo "     Size: $size"
-        else
-            if [[ "$required" == "true" ]]; then
-                echo "❌ MISSING (required)"
-                echo "Missing required directory: $expanded_path" >> "$ISSUES_FILE"
-            else
-                echo "⚠️ Missing (optional)"
-            fi
+        if [[ -d "$expanded" ]]; then
+            local perms=$(stat -c "%a" "$expanded") size=$(du -sh "$expanded" 2>/dev/null | cut -f1)
+            echo "  $expanded: EXISTS ($perms, $size)"
+            [[ "$perms" -gt "$min_perms" ]] && echo "     Permissions more permissive than $min_perms" | tee -a "$ISSUES_FILE"
+        elif [[ "$required" == "true" ]]; then
+            echo "  $expanded: MISSING (required)"
+            echo "Missing directory: $expanded" >> "$ISSUES_FILE"
         fi
     done
-    echo ""
 }
 ```
 
-## Step 5a: Validate Installation Permissions and Ownership
+## Step 5a: Validate Permissions and Ownership
 
 ```bash
 validate_permissions_and_ownership() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
+    local ISSUES_FILE="$PROJECT_DIR/production-issues.log"
 
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Step 5a: Validating Permissions and Ownership"
-    echo "───────────────────────────────────────────────────────────────────"
-    echo ""
-
-    # Determine installation directory from manifest or common locations
+    # Find installation directory
     local INSTALL_DIR=""
-    if [[ -n "$PROD_MANIFEST" ]]; then
-        INSTALL_DIR=$(jq -r '.install_dir // empty' "$PROD_MANIFEST" 2>/dev/null)
-    fi
-
-    # Try common locations if not in manifest
+    [[ -n "$PROD_MANIFEST" ]] && INSTALL_DIR=$(jq -r '.install_dir // empty' "$PROD_MANIFEST" 2>/dev/null)
     if [[ -z "$INSTALL_DIR" ]]; then
         for loc in "/opt/$APP_NAME" "/opt/${APP_NAME,,}" "/usr/local/lib/$APP_NAME"; do
-            if [[ -d "$loc" ]]; then
-                INSTALL_DIR="$loc"
-                break
-            fi
+            [[ -d "$loc" ]] && { INSTALL_DIR="$loc"; break; }
         done
     fi
+    [[ -z "$INSTALL_DIR" || ! -d "$INSTALL_DIR" ]] && return 0
 
-    if [[ -z "$INSTALL_DIR" ]] || [[ ! -d "$INSTALL_DIR" ]]; then
-        echo "ℹ️ No installation directory found - skipping permissions check"
-        return 0
-    fi
+    local is_system=false issues=0
+    [[ "$INSTALL_DIR" == /opt/* || "$INSTALL_DIR" == /usr/* ]] && is_system=true
 
-    echo "  Installation directory: $INSTALL_DIR"
-    echo ""
-
-    local issues=0
-
-    # Determine expected owner (system installs use service user, user installs use current user)
-    local EXPECTED_USER="$USER"
-    local EXPECTED_GROUP="$USER"
-    local is_system=false
-
-    [[ "$INSTALL_DIR" == /opt/* ]] || [[ "$INSTALL_DIR" == /usr/* ]] && is_system=true
-
+    # Determine expected owner
+    local EXPECTED_USER="$USER" EXPECTED_GROUP="$USER"
     if [[ "$is_system" == "true" ]]; then
-        # For system installs, check manifest for service user or infer from app name
-        if [[ -n "$PROD_MANIFEST" ]]; then
-            EXPECTED_USER=$(jq -r '.service_user // empty' "$PROD_MANIFEST" 2>/dev/null)
-            EXPECTED_GROUP=$(jq -r '.service_group // empty' "$PROD_MANIFEST" 2>/dev/null)
-        fi
-
-        # Default to app name if not specified
-        if [[ -z "$EXPECTED_USER" ]]; then
-            EXPECTED_USER="${APP_NAME,,}"  # lowercase app name
-            EXPECTED_USER="${EXPECTED_USER//-/}"  # remove hyphens
-        fi
+        [[ -n "$PROD_MANIFEST" ]] && { EXPECTED_USER=$(jq -r '.service_user // empty' "$PROD_MANIFEST"); EXPECTED_GROUP=$(jq -r '.service_group // empty' "$PROD_MANIFEST"); }
+        [[ -z "$EXPECTED_USER" ]] && EXPECTED_USER="${APP_NAME,,}"
         [[ -z "$EXPECTED_GROUP" ]] && EXPECTED_GROUP="$EXPECTED_USER"
-
-        # Check if service user exists
-        if ! id "$EXPECTED_USER" &>/dev/null; then
-            echo "  ⚠️ Expected service user '$EXPECTED_USER' does not exist"
-            EXPECTED_USER="root"
-            EXPECTED_GROUP="root"
-        fi
+        id "$EXPECTED_USER" &>/dev/null || { EXPECTED_USER="root"; EXPECTED_GROUP="root"; }
     fi
 
-    echo "  Expected owner: $EXPECTED_USER:$EXPECTED_GROUP"
-    echo ""
-
-    # Check ownership of key directories
-    echo "  Checking ownership..."
-    local key_dirs=("library" "converter" "backend" "web" "web-v2")
-    for subdir in "${key_dirs[@]}"; do
-        if [[ -d "$INSTALL_DIR/$subdir" ]]; then
-            local wrong_count=$(find "$INSTALL_DIR/$subdir" \( ! -user "$EXPECTED_USER" -o ! -group "$EXPECTED_GROUP" \) 2>/dev/null | wc -l)
-            if [[ "$wrong_count" -gt 0 ]]; then
-                echo "    ❌ $subdir/: $wrong_count files have wrong owner" | tee -a "$ISSUES_FILE"
-                # Show examples
-                find "$INSTALL_DIR/$subdir" \( ! -user "$EXPECTED_USER" -o ! -group "$EXPECTED_GROUP" \) 2>/dev/null | head -3 | while read -r f; do
-                    local owner=$(stat -c "%U:%G" "$f" 2>/dev/null)
-                    echo "       Example: $(basename "$f") is $owner (expected $EXPECTED_USER:$EXPECTED_GROUP)"
-                done
-                ((issues++))
-            else
-                echo "    ✅ $subdir/: ownership correct"
-            fi
-        fi
+    # Check ownership of all subdirectories (dynamically discovered)
+    for subdir in $(find "$INSTALL_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null); do
+        local wrong=$(find "$INSTALL_DIR/$subdir" \( ! -user "$EXPECTED_USER" -o ! -group "$EXPECTED_GROUP" \) 2>/dev/null | wc -l)
+        [[ "$wrong" -gt 0 ]] && { echo "  $subdir/: $wrong files wrong owner" | tee -a "$ISSUES_FILE"; ((issues++)); } || echo "  $subdir/: ownership OK"
     done
-    echo ""
 
-    # Check directory permissions (should be 755, not 700)
-    echo "  Checking directory permissions..."
+    # Check directory/file permissions and script executability
     local bad_dirs=$(find "$INSTALL_DIR" -type d -perm 700 2>/dev/null | wc -l)
-    if [[ "$bad_dirs" -gt 0 ]]; then
-        echo "    ❌ $bad_dirs directories have restrictive permissions (700)" | tee -a "$ISSUES_FILE"
-        find "$INSTALL_DIR" -type d -perm 700 2>/dev/null | head -3 | while read -r d; do
-            echo "       Example: $d"
-        done
-        ((issues++))
-    else
-        echo "    ✅ All directories have correct permissions"
-    fi
-    echo ""
+    [[ "$bad_dirs" -gt 0 ]] && { echo "  $bad_dirs dirs have 700 perms" | tee -a "$ISSUES_FILE"; ((issues++)); }
 
-    # Check file permissions (should be 644 for .py, .html, etc., not 600)
-    echo "  Checking file permissions..."
-    local bad_files=$(find "$INSTALL_DIR" \( -name "*.py" -o -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.sql" \) \( -perm 600 -o -perm 700 \) 2>/dev/null | wc -l)
-    if [[ "$bad_files" -gt 0 ]]; then
-        echo "    ❌ $bad_files files have restrictive permissions (600/700)" | tee -a "$ISSUES_FILE"
-        find "$INSTALL_DIR" \( -name "*.py" -o -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.sql" \) \( -perm 600 -o -perm 700 \) 2>/dev/null | head -3 | while read -r f; do
-            local perms=$(stat -c "%a" "$f" 2>/dev/null)
-            echo "       Example: $(basename "$f") has $perms"
-        done
-        ((issues++))
-    else
-        echo "    ✅ All source files have readable permissions"
-    fi
-    echo ""
+    local bad_files=$(find "$INSTALL_DIR" \( -name "*.py" -o -name "*.html" -o -name "*.css" -o -name "*.js" \) \( -perm 600 -o -perm 700 \) 2>/dev/null | wc -l)
+    [[ "$bad_files" -gt 0 ]] && { echo "  $bad_files source files have restrictive perms" | tee -a "$ISSUES_FILE"; ((issues++)); }
 
-    # Check that executable scripts are actually executable
-    echo "  Checking script executability..."
     local non_exec=$(find "$INSTALL_DIR" -name "*.sh" ! -perm -u+x 2>/dev/null | wc -l)
-    if [[ "$non_exec" -gt 0 ]]; then
-        echo "    ❌ $non_exec shell scripts are not executable" | tee -a "$ISSUES_FILE"
-        ((issues++))
-    else
-        echo "    ✅ All shell scripts are executable"
-    fi
-    echo ""
+    [[ "$non_exec" -gt 0 ]] && { echo "  $non_exec shell scripts not executable" | tee -a "$ISSUES_FILE"; ((issues++)); }
 
-    # Summary
-    if [[ "$issues" -gt 0 ]]; then
-        echo "  ❌ Found $issues permission/ownership issues"
-        echo ""
-        echo "  To fix: Run the upgrade script which auto-corrects permissions:"
-        echo "    audiobooks-upgrade --from-project /path/to/project"
-        echo ""
-        echo "  Or manually fix with:"
-        if [[ "$is_system" == "true" ]]; then
-            echo "    sudo chown -R $EXPECTED_USER:$EXPECTED_GROUP $INSTALL_DIR/library $INSTALL_DIR/converter"
-            echo "    sudo chmod -R u+r,g+r,o+r $INSTALL_DIR/library $INSTALL_DIR/converter"
-        else
-            echo "    chmod -R u+r,g+r $INSTALL_DIR"
-        fi
-    else
-        echo "  ✅ All permissions and ownership correct"
-    fi
-    echo ""
+    [[ "$issues" -eq 0 ]] && echo "  All permissions and ownership correct"
 }
 ```
 
 ## Step 5b: Validate Production/Development Separation
 
-**CRITICAL**: Production installations MUST be completely independent from development project directories. This prevents:
-- Accidental dev code running in production
-- Broken production when dev directory is modified
-- Security risks from mixing development and production
-- Configuration drift and debugging nightmares
+Production installations MUST NOT reference development directories.
 
 ```bash
 validate_prod_dev_separation() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
-
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Step 5b: Validating Production/Development Separation"
-    echo "───────────────────────────────────────────────────────────────────"
-    echo ""
-
+    local ISSUES_FILE="$PROJECT_DIR/production-issues.log"
     local issues=0
 
-    # Define development paths that should NEVER appear in production
-    local DEV_PATTERNS=(
-        "/hddRaid1/ClaudeCodeProjects/"
-        "/home/.*/ClaudeCodeProjects/"
-        "/home/.*/Projects/"
-        "/home/.*/dev/"
-        "/home/.*/src/"
-        "ClaudeCodeProjects"
-    )
+    local DEV_PATTERNS=("/hddRaid1/ClaudeCodeProjects/" "/home/.*/ClaudeCodeProjects/" "/home/.*/Projects/" "/home/.*/dev/" "/home/.*/src/")
+    local grep_pattern=$(printf "%s\\|" "${DEV_PATTERNS[@]}"); grep_pattern="${grep_pattern%\\|}"
 
-    # Build grep pattern
-    local grep_pattern=$(printf "%s\\|" "${DEV_PATTERNS[@]}")
-    grep_pattern="${grep_pattern%\\|}"  # Remove trailing \|
-
-    echo "  Checking for development path references..."
-    echo ""
-
-    # 1. Check SYSTEM-LEVEL systemd services
-    echo "  [1/5] System systemd services (/etc/systemd/system/):"
-    if [[ -d /etc/systemd/system ]]; then
-        local sys_services=$(grep -l -E "$grep_pattern" /etc/systemd/system/${APP_NAME}*.service /etc/systemd/system/audiobook*.service 2>/dev/null || true)
-        if [[ -n "$sys_services" ]]; then
-            echo "    ❌ CRITICAL: System services reference development paths!" | tee -a "$ISSUES_FILE"
-            for svc in $sys_services; do
-                echo "      - $svc" | tee -a "$ISSUES_FILE"
-                grep -E "$grep_pattern" "$svc" 2>/dev/null | head -3 | sed 's/^/         /' | tee -a "$ISSUES_FILE"
-            done
-            echo "    FIX: Reinstall services from production installer" >> "$ISSUES_FILE"
-            ((issues++))
-        else
-            echo "    ✅ No development paths found"
-        fi
-    else
-        echo "    ⚠️ No system service directory"
-    fi
-
-    # 2. Check USER-LEVEL systemd services
-    echo "  [2/5] User systemd services (~/.config/systemd/user/):"
-    local user_svc_dir="$HOME/.config/systemd/user"
-    if [[ -d "$user_svc_dir" ]]; then
-        local user_services=$(grep -l -E "$grep_pattern" "$user_svc_dir"/${APP_NAME}*.service "$user_svc_dir"/audiobook*.service 2>/dev/null || true)
-        if [[ -n "$user_services" ]]; then
-            echo "    ❌ CRITICAL: User services reference development paths!" | tee -a "$ISSUES_FILE"
-            for svc in $user_services; do
-                echo "      - $svc" | tee -a "$ISSUES_FILE"
-            done
-            echo "    FIX: Remove stale user services if system services are primary" >> "$ISSUES_FILE"
-            echo "         rm ~/.config/systemd/user/${APP_NAME}*.service" >> "$ISSUES_FILE"
-            ((issues++))
-        else
-            echo "    ✅ No development paths found"
-        fi
-    else
-        echo "    ✅ No user service directory"
-    fi
-
-    # 3. Check installed scripts in INSTALL_DIR
-    echo "  [3/5] Installed scripts ($INSTALL_DIR):"
-    if [[ -n "$INSTALL_DIR" ]] && [[ -d "$INSTALL_DIR" ]]; then
-        local bad_scripts=$(grep -rl -E "$grep_pattern" "$INSTALL_DIR" --include="*.sh" --include="*.py" --include="*.conf" 2>/dev/null || true)
-        if [[ -n "$bad_scripts" ]]; then
-            local script_count=$(echo "$bad_scripts" | wc -l)
-            echo "    ❌ CRITICAL: $script_count installed files reference development paths!" | tee -a "$ISSUES_FILE"
-            echo "$bad_scripts" | head -5 | while read -r script; do
-                echo "      - $script" | tee -a "$ISSUES_FILE"
-            done
-            [[ "$script_count" -gt 5 ]] && echo "      ... and $((script_count - 5)) more"
-            echo "    FIX: Re-run installation from clean project source" >> "$ISSUES_FILE"
-            ((issues++))
-        else
-            echo "    ✅ No development paths found in installed scripts"
-        fi
-    else
-        echo "    ⚠️ No installation directory identified"
-    fi
-
-    # 4. Check for symlinks pointing to development directories
-    echo "  [4/5] Symlinks pointing to development directories:"
-    if [[ -n "$INSTALL_DIR" ]] && [[ -d "$INSTALL_DIR" ]]; then
-        local bad_symlinks=$(find "$INSTALL_DIR" -type l 2>/dev/null | while read -r link; do
-            target=$(readlink -f "$link" 2>/dev/null)
-            if echo "$target" | grep -qE "$grep_pattern"; then
-                echo "$link -> $target"
-            fi
-        done)
-        if [[ -n "$bad_symlinks" ]]; then
-            echo "    ❌ CRITICAL: Symlinks point to development directories!" | tee -a "$ISSUES_FILE"
-            echo "$bad_symlinks" | head -3 | sed 's/^/      /' | tee -a "$ISSUES_FILE"
-            echo "    FIX: Remove symlinks and copy files from production source" >> "$ISSUES_FILE"
-            ((issues++))
-        else
-            echo "    ✅ No symlinks to development directories"
-        fi
-    fi
-
-    # 5. Check database path references
-    echo "  [5/5] Configuration path references:"
-    if [[ -n "$INSTALL_DIR" ]]; then
-        local config_files=$(find "$INSTALL_DIR" \( -name "*.conf" -o -name "*.env" -o -name "*.yml" -o -name "*.yaml" -o -name "config*.py" \) 2>/dev/null)
-        local bad_configs=""
-        for cfg in $config_files; do
-            if grep -qE "$grep_pattern" "$cfg" 2>/dev/null; then
-                bad_configs+="$cfg"$'\n'
-            fi
+    # Determine install dir (reuse from Step 5a or detect)
+    local INSTALL_DIR=""
+    [[ -n "$PROD_MANIFEST" ]] && INSTALL_DIR=$(jq -r '.install_dir // empty' "$PROD_MANIFEST" 2>/dev/null)
+    if [[ -z "$INSTALL_DIR" ]]; then
+        for loc in "/opt/$APP_NAME" "/opt/${APP_NAME,,}" "/usr/local/lib/$APP_NAME"; do
+            [[ -d "$loc" ]] && { INSTALL_DIR="$loc"; break; }
         done
-        if [[ -n "$bad_configs" ]]; then
-            echo "    ❌ CRITICAL: Config files reference development paths!" | tee -a "$ISSUES_FILE"
-            echo "$bad_configs" | head -3 | while read -r cfg; do
-                [[ -n "$cfg" ]] && echo "      - $cfg" | tee -a "$ISSUES_FILE"
-            done
-            ((issues++))
-        else
-            echo "    ✅ No development paths in config files"
-        fi
     fi
 
-    echo ""
+    local APP_NAME_LOWER=$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]' | tr -d '-')
 
-    # Summary
-    if [[ "$issues" -gt 0 ]]; then
-        echo "  ═══════════════════════════════════════════════════════════════"
-        echo "  ❌ PROD/DEV SEPARATION VIOLATION: $issues issues found"
-        echo "  ═══════════════════════════════════════════════════════════════"
-        echo ""
-        echo "  Production installations MUST NOT reference development paths."
-        echo "  This is a CRITICAL architectural requirement."
-        echo ""
-        echo "  Common causes:"
-        echo "    - Installed from dev directory instead of release tarball"
-        echo "    - Manually copied services with wrong paths"
-        echo "    - Symlinks created during development"
-        echo "    - Old user services not cleaned up after migration to system services"
-        echo ""
-        echo "  Resolution:"
-        echo "    1. Run: /git-release (creates clean release)"
-        echo "    2. Install from the release tarball, NOT the project directory"
-        echo "    3. Remove any stale user services: rm ~/.config/systemd/user/${APP_NAME}*.service"
-        echo ""
-    else
-        echo "  ✅ Production/Development separation is clean"
-        echo "     All production files are independent from development directories."
+    # 1. System systemd services
+    local sys_svcs=$(grep -l -E "$grep_pattern" /etc/systemd/system/${APP_NAME_LOWER}*.service /etc/systemd/system/${APP_NAME}*.service 2>/dev/null || true)
+    [[ -n "$sys_svcs" ]] && { echo "  CRITICAL: System services reference dev paths: $sys_svcs" | tee -a "$ISSUES_FILE"; ((issues++)); }
+
+    # 2. User systemd services
+    local user_svcs=$(grep -l -E "$grep_pattern" "$HOME/.config/systemd/user/${APP_NAME_LOWER}"*.service "$HOME/.config/systemd/user/${APP_NAME}"*.service 2>/dev/null || true)
+    [[ -n "$user_svcs" ]] && { echo "  CRITICAL: User services reference dev paths" | tee -a "$ISSUES_FILE"; ((issues++)); }
+
+    # 3. Installed scripts referencing dev paths
+    if [[ -n "$INSTALL_DIR" && -d "$INSTALL_DIR" ]]; then
+        local bad_scripts=$(grep -rl -E "$grep_pattern" "$INSTALL_DIR" --include="*.sh" --include="*.py" --include="*.conf" 2>/dev/null | wc -l)
+        [[ "$bad_scripts" -gt 0 ]] && { echo "  CRITICAL: $bad_scripts installed files reference dev paths" | tee -a "$ISSUES_FILE"; ((issues++)); }
+
+        # 4. Symlinks pointing to dev directories
+        local bad_links=$(find "$INSTALL_DIR" -type l 2>/dev/null | while read -r l; do
+            local t=$(readlink -f "$l" 2>/dev/null); echo "$t" | grep -qE "$grep_pattern" && echo "$l"
+        done | wc -l)
+        [[ "$bad_links" -gt 0 ]] && { echo "  CRITICAL: $bad_links symlinks point to dev dirs" | tee -a "$ISSUES_FILE"; ((issues++)); }
+
+        # 5. Config files with dev paths
+        local bad_cfgs=$(find "$INSTALL_DIR" \( -name "*.conf" -o -name "*.env" -o -name "*.yml" -o -name "*.yaml" -o -name "config*.py" \) -exec grep -l -E "$grep_pattern" {} \; 2>/dev/null | wc -l)
+        [[ "$bad_cfgs" -gt 0 ]] && { echo "  CRITICAL: $bad_cfgs config files reference dev paths" | tee -a "$ISSUES_FILE"; ((issues++)); }
     fi
-    echo ""
+
+    [[ "$issues" -eq 0 ]] && echo "  Production/Development separation clean" || echo "  $issues prod/dev separation violations found"
 }
 ```
 
@@ -931,47 +364,18 @@ validate_prod_dev_separation() {
 
 ```bash
 validate_ports() {
-    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
+    local ISSUES_FILE="${PROJECT_DIR:-$(pwd)}/production-issues.log"
+    [[ -z "$PROD_MANIFEST" ]] && return 0
 
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Step 6: Validating Ports and Network"
-    echo "───────────────────────────────────────────────────────────────────"
-    echo ""
-
-    if [[ -z "$PROD_MANIFEST" ]]; then
-        echo "ℹ️ No manifest - skipping port validation"
-        return 0
-    fi
-
-    local count=$(jq '.ports | length' "$PROD_MANIFEST" 2>/dev/null)
-    if [[ "$count" == "0" ]] || [[ -z "$count" ]]; then
-        echo "ℹ️ No ports defined in manifest"
-        return 0
-    fi
-
-    jq -c '.ports[]' "$PROD_MANIFEST" 2>/dev/null | while read -r port_obj; do
-        local port=$(echo "$port_obj" | jq -r '.port')
-        local protocol=$(echo "$port_obj" | jq -r '.protocol // "tcp"')
-        local service=$(echo "$port_obj" | jq -r '.service // "unknown"')
-
-        echo -n "  Port $port/$protocol ($service): "
-
-        # Check if port is listening
+    jq -c '.ports[]' "$PROD_MANIFEST" 2>/dev/null | while read -r obj; do
+        local port=$(echo "$obj" | jq -r '.port') service=$(echo "$obj" | jq -r '.service // "unknown"')
         if ss -tuln 2>/dev/null | grep -q ":$port "; then
-            echo "✅ Listening"
-
-            # Show what's using it
-            local proc=$(ss -tulnp 2>/dev/null | grep ":$port " | grep -oP '(?<=users:\(\()[^)]+' | head -1)
-            if [[ -n "$proc" ]]; then
-                echo "     Process: $proc"
-            fi
+            echo "  Port $port ($service): LISTENING"
         else
-            echo "❌ NOT LISTENING"
-            echo "Port $port not listening (expected by $service)" >> "$ISSUES_FILE"
+            echo "  Port $port ($service): NOT LISTENING"
+            echo "Port $port not listening" >> "$ISSUES_FILE"
         fi
     done
-    echo ""
 }
 ```
 
@@ -979,48 +383,18 @@ validate_ports() {
 
 ```bash
 run_health_checks() {
-    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
+    local ISSUES_FILE="${PROJECT_DIR:-$(pwd)}/production-issues.log"
+    [[ -z "$PROD_MANIFEST" ]] && return 0
 
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Step 7: Running Custom Health Checks"
-    echo "───────────────────────────────────────────────────────────────────"
-    echo ""
-
-    if [[ -z "$PROD_MANIFEST" ]]; then
-        echo "ℹ️ No manifest - skipping health checks"
-        return 0
-    fi
-
-    local count=$(jq '.health_checks | length' "$PROD_MANIFEST" 2>/dev/null)
-    if [[ "$count" == "0" ]] || [[ -z "$count" ]]; then
-        echo "ℹ️ No health checks defined in manifest"
-        return 0
-    fi
-
-    local passed=0
-    local failed=0
-
-    jq -c '.health_checks[]' "$PROD_MANIFEST" 2>/dev/null | while read -r check_obj; do
-        local name=$(echo "$check_obj" | jq -r '.name')
-        local cmd=$(echo "$check_obj" | jq -r '.command')
-        local timeout_sec=$(echo "$check_obj" | jq -r '.timeout // 10')
-
-        echo -n "  $name: "
-
-        if timeout "$timeout_sec" bash -c "$cmd" &>/dev/null; then
-            echo "✅ Passed"
-            ((passed++))
+    jq -c '.health_checks[]' "$PROD_MANIFEST" 2>/dev/null | while read -r obj; do
+        local name=$(echo "$obj" | jq -r '.name') cmd=$(echo "$obj" | jq -r '.command') t=$(echo "$obj" | jq -r '.timeout // 10')
+        if timeout "$t" bash -c "$cmd" &>/dev/null; then
+            echo "  $name: PASS"
         else
-            echo "❌ Failed"
+            echo "  $name: FAIL"
             echo "Health check failed: $name" >> "$ISSUES_FILE"
-            ((failed++))
         fi
     done
-
-    echo ""
-    echo "  Summary: $passed passed, $failed failed"
-    echo ""
 }
 ```
 
@@ -1028,173 +402,57 @@ run_health_checks() {
 
 ```bash
 check_service_logs() {
-    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
-
-    echo "───────────────────────────────────────────────────────────────────"
-    echo "  Step 8: Checking Service Logs for Errors"
-    echo "───────────────────────────────────────────────────────────────────"
-    echo ""
-
+    local ISSUES_FILE="${PROJECT_DIR:-$(pwd)}/production-issues.log"
     local SERVICES=()
 
-    # Collect services
-    if [[ -n "$PROD_MANIFEST" ]]; then
-        while IFS= read -r svc; do
-            SERVICES+=("$svc")
-        done < <(jq -r '.services[].name // empty' "$PROD_MANIFEST" 2>/dev/null)
-    fi
-    for svc in $INFERRED_SERVICES; do
-        if [[ ! " ${SERVICES[*]} " =~ " ${svc} " ]]; then
-            SERVICES+=("$svc")
-        fi
-    done
-
-    if [[ ${#SERVICES[@]} -eq 0 ]]; then
-        echo "ℹ️ No services to check logs for"
-        return 0
-    fi
+    [[ -n "$PROD_MANIFEST" ]] && while IFS= read -r s; do SERVICES+=("$s"); done < <(jq -r '.services[].name // empty' "$PROD_MANIFEST" 2>/dev/null)
+    for s in $INFERRED_SERVICES; do [[ ! " ${SERVICES[*]} " =~ " ${s} " ]] && SERVICES+=("$s"); done
+    [[ ${#SERVICES[@]} -eq 0 ]] && return 0
 
     for svc in "${SERVICES[@]}"; do
-        echo "  $svc (last 1 hour):"
-
-        # Determine service type
         local svc_type="user"
-        if [[ -n "$PROD_MANIFEST" ]]; then
-            svc_type=$(jq -r --arg s "$svc" '.services[] | select(.name == $s) | .type // "user"' "$PROD_MANIFEST")
-        fi
+        [[ -n "$PROD_MANIFEST" ]] && svc_type=$(jq -r --arg s "$svc" '.services[] | select(.name == $s) | .type // "user"' "$PROD_MANIFEST")
+        local jcmd="journalctl --user"; [[ "$svc_type" == "system" ]] && jcmd="journalctl"
 
-        local journal_cmd="journalctl --user"
-        [[ "$svc_type" == "system" ]] && journal_cmd="journalctl"
-
-        # Count errors in last hour
-        local errors=$($journal_cmd -u "$svc" --since "1 hour ago" -p err --no-pager 2>/dev/null | wc -l)
-        local warnings=$($journal_cmd -u "$svc" --since "1 hour ago" -p warning --no-pager 2>/dev/null | wc -l)
-
-        echo "     Errors: $errors"
-        echo "     Warnings: $warnings"
-
-        if [[ "$errors" -gt 0 ]]; then
-            echo "     Recent errors:" | tee -a "$ISSUES_FILE"
-            $journal_cmd -u "$svc" --since "1 hour ago" -p err --no-pager 2>/dev/null | tail -3 | sed 's/^/       /' | tee -a "$ISSUES_FILE"
-        fi
-        echo ""
+        local errors=$($jcmd -u "$svc" --since "1 hour ago" -p err --no-pager 2>/dev/null | wc -l)
+        local warnings=$($jcmd -u "$svc" --since "1 hour ago" -p warning --no-pager 2>/dev/null | wc -l)
+        echo "  $svc: $errors errors, $warnings warnings (last hour)"
+        [[ "$errors" -gt 0 ]] && $jcmd -u "$svc" --since "1 hour ago" -p err --no-pager 2>/dev/null | tail -3 | sed 's/^/       /' | tee -a "$ISSUES_FILE"
     done
 }
 ```
 
-## Step 9: Generate Production Validation Report
-
-```bash
-generate_production_report() {
-    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
-
-    echo "═══════════════════════════════════════════════════════════════════"
-    echo "  PHASE P: PRODUCTION VALIDATION SUMMARY"
-    echo "═══════════════════════════════════════════════════════════════════"
-    echo ""
-
-    if [[ -f "$ISSUES_FILE" ]] && [[ -s "$ISSUES_FILE" ]]; then
-        local issue_count=$(wc -l < "$ISSUES_FILE")
-        echo "❌ ISSUES FOUND: $issue_count"
-        echo ""
-        echo "Issues recorded to: $ISSUES_FILE"
-        echo ""
-        echo "───────────────────────────────────────────────────────────────────"
-        cat "$ISSUES_FILE"
-        echo "───────────────────────────────────────────────────────────────────"
-        echo ""
-        echo "To resolve:"
-        echo "  1. Fix each issue listed above"
-        echo "  2. Re-run: /test --phase=P"
-        echo ""
-        return 1
-    else
-        echo "✅ ALL PRODUCTION VALIDATION CHECKS PASSED"
-        echo ""
-        echo "The installed application appears healthy."
-        rm -f "$ISSUES_FILE" 2>/dev/null
-        return 0
-    fi
-}
-```
-
-## Phase P Execution Order
+## Execution Order
 
 ```bash
 run_phase_P() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-
-    # Initialize issues file
-    local ISSUES_FILE="${PROJECT_DIR}/production-issues.log"
+    local ISSUES_FILE="$PROJECT_DIR/production-issues.log"
     > "$ISSUES_FILE"
 
-    # Run all validation steps
     load_production_manifest
     analyze_install_script
     validate_binaries
+    validate_wrapper_targets
     validate_services
     validate_configs
     validate_data_dirs
-    validate_permissions_and_ownership  # Step 5a: Check perms/ownership
-    validate_prod_dev_separation        # Step 5b: CRITICAL - Check prod/dev isolation
+    validate_permissions_and_ownership
+    validate_prod_dev_separation
     validate_ports
     run_health_checks
     check_service_logs
-    generate_production_report
 
-    return $?
+    # Summary
+    if [[ -s "$ISSUES_FILE" ]]; then
+        echo ""; echo "ISSUES FOUND: $(wc -l < "$ISSUES_FILE")"
+        cat "$ISSUES_FILE"
+        echo "To resolve: fix each issue, then re-run /test --phase=P"
+        return 1
+    else
+        echo "ALL PRODUCTION VALIDATION CHECKS PASSED"
+        rm -f "$ISSUES_FILE"
+        return 0
+    fi
 }
-```
-
-## Report Format
-
-```markdown
-## Phase P: Production Validation Report
-
-### Environment
-| Attribute | Value |
-|-----------|-------|
-| App Name | [from manifest or inferred] |
-| Install Type | user/system |
-| Manifest | [path or "inferred"] |
-
-### Binaries
-| Binary | Status | Location | Version |
-|--------|--------|----------|---------|
-| app-cli | ✅ Found | ~/.local/bin/app-cli | 1.2.3 |
-| app-daemon | ❌ Missing | - | - |
-
-### Services
-| Service | Expected | Actual | Enabled |
-|---------|----------|--------|---------|
-| app.service | active | active | yes |
-| app-worker.service | active | failed | yes |
-
-### Configuration
-| Config File | Status | Valid |
-|-------------|--------|-------|
-| ~/.config/app/config.yml | ✅ Exists | ✅ Yes |
-
-### Ports
-| Port | Protocol | Status | Process |
-|------|----------|--------|---------|
-| 8080 | tcp | ✅ Listening | app-daemon |
-
-### Health Checks
-| Check | Status |
-|-------|--------|
-| API responding | ✅ Passed |
-| Database connected | ❌ Failed |
-
-### Log Analysis (Last Hour)
-| Service | Errors | Warnings |
-|---------|--------|----------|
-| app.service | 0 | 2 |
-
-### Issues Found
-- [List from production-issues.log]
-
-### Phase P Status: ✅ HEALTHY / ❌ ISSUES FOUND
 ```

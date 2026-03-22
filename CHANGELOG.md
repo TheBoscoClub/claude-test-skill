@@ -13,6 +13,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [4.0.0] - 2026-03-22
+
+### Changed
+- **BREAKING: Phase consolidation** — 27 phases reduced to 21 via strategic merges
+  - Phase 3 (Report) → merged into Phase 2 (Test Execution & Analysis)
+  - Phase 4 (Cleanup) → merged into Phase 7 (Code Quality)
+  - Phase 8 (Coverage) → merged into Phase 2
+  - Phase 9 (Debug) → merged into Phase 2
+  - Phase 11 (Config) → merged into Phase 0 (Preflight)
+  - Phase M (Mocking) → merged into Phase 0
+- **Bloat reduction** — Phase 1 (50→23 KB), Phase P (46→20 KB), Phase V (54→22 KB)
+- **Project-agnostic** — Removed all Audiobook-Manager hardcoded references; all phases now use manifest-driven detection
+
+### Fixed
+- KillShell tool references replaced with Bash tool across all phases
+- Phase 0 VM_AVAILABLE bug (was unconditionally true)
+- Phase I broken grep syntax in Quick Check Summary
+- Phase C brittle sed-on-JSON parsing replaced with python3/jq
+- Phase S filesystem detection (stat -f -c was unreliable)
+- Insecure plaintext password removed from vm-test-manifest.json template
+- Orphaned agents (coverage-reviewer, security-scanner, test-analyzer) integrated into Phases 2 and 5
+- Phase handoff contracts defined (Phase 2 output schema, Phase 10 input expectations)
+- Version conflict resolved (3.1.0 in test.md → canonical from VERSION file)
+- Stale references to deprecated tools and APIs cleaned up
+
+### Removed
+- test-legacy.md (130 KB monolithic predecessor, superseded since v2.0)
+- Phase 3 (Report), Phase 4 (Cleanup), Phase 8 (Coverage), Phase 9 (Debug), Phase 11 (Config), Phase M (Mocking) — all merged into other phases
+
 ## [3.0.1] - 2026-02-18
 
 ### Fixed
@@ -190,7 +219,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Converted to modular plugin architecture (93% context reduction)
 - All phases load on-demand via subagents
 
-[Unreleased]: https://github.com/TheBoscoClub/claude-test-skill/compare/v3.0.1...HEAD
+[Unreleased]: https://github.com/TheBoscoClub/claude-test-skill/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/TheBoscoClub/claude-test-skill/compare/v3.0.1...v4.0.0
 [3.0.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.1...v3.0.0
 [2.0.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.0...v2.0.1

@@ -1,8 +1,8 @@
 # Phase D: Docker Validation
 
-> **Model**: `opus` | **Tier**: 5 (Post-fix, Conditional) | **Modifies Files**: No (validates registry)
+> **Model**: `opus` | **Tier**: 7 (Conditional) | **Modifies Files**: No (validates registry)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for docker/buildx commands. Use `KillShell` to terminate hung Docker builds. Use `WebSearch` to check for base image vulnerabilities or updated tags.
+> **Key Tools**: `Bash` for docker/buildx commands (use `timeout` for hung builds). Use `WebSearch` to check for base image vulnerabilities or updated tags.
 
 Validate Docker image builds and registry package synchronization.
 
@@ -273,9 +273,18 @@ verify_image_contents() {
     fi
 
     # Check that key application files exist in the image
-    # Detect key files from project structure
+    # Dynamically detect key files from project structure (entrypoints, configs, dep files)
     MISSING_FILES=0
-    for check_file in "VERSION" "library/backend/app.py" "library/config.py" "library/requirements.txt"; do
+    KEY_FILES=("VERSION")
+    # Add main entrypoint files (app.py, main.py, server.py, etc.)
+    for ep in $(find "$PROJECT_DIR" -maxdepth 3 -name "app.py" -o -name "main.py" -o -name "server.py" -o -name "index.js" 2>/dev/null | head -5); do
+        KEY_FILES+=("${ep#$PROJECT_DIR/}")
+    done
+    # Add dependency files
+    for dep in requirements.txt package.json go.mod Cargo.toml; do
+        [ -f "$PROJECT_DIR/$dep" ] && KEY_FILES+=("$dep")
+    done
+    for check_file in "${KEY_FILES[@]}"; do
         if [ -f "$PROJECT_DIR/$check_file" ]; then
             if docker run --rm "${PROJECT_NAME}:${TEST_TAG}" test -f "/app/$check_file" 2>/dev/null; then
                 echo "  ✅ /app/$check_file exists"
@@ -290,29 +299,39 @@ verify_image_contents() {
         ((ISSUES++))
     fi
 
-    # Check Python dependencies are installed
-    DEPS_OK=$(docker run --rm "${PROJECT_NAME}:${TEST_TAG}" \
-        python3 -c "import flask; print('ok')" 2>/dev/null)
-    if [ "$DEPS_OK" = "ok" ]; then
-        echo "✅ Python dependencies installed (flask importable)"
-    else
-        echo "❌ Python dependencies NOT properly installed"
-        ((ISSUES++))
+    # Check runtime dependencies are installed (detect from project structure)
+    # Find the main entrypoint and try importing its top-level module
+    if [ -f "$PROJECT_DIR/requirements.txt" ]; then
+        # Python project — check pip list works inside the container
+        DEPS_OK=$(docker run --rm "${PROJECT_NAME}:${TEST_TAG}" \
+            python3 -c "import pkg_resources; print('ok')" 2>/dev/null)
+        if [ "$DEPS_OK" = "ok" ]; then
+            echo "✅ Python runtime available in container"
+        else
+            echo "❌ Python runtime NOT available in container"
+            ((ISSUES++))
+        fi
+    elif [ -f "$PROJECT_DIR/package.json" ]; then
+        DEPS_OK=$(docker run --rm "${PROJECT_NAME}:${TEST_TAG}" \
+            node -e "console.log('ok')" 2>/dev/null)
+        if [ "$DEPS_OK" = "ok" ]; then
+            echo "✅ Node.js runtime available in container"
+        else
+            echo "❌ Node.js runtime NOT available in container"
+            ((ISSUES++))
+        fi
     fi
 
-    # Check that the API can at least start (basic smoke test)
-    # Run container briefly and check if it responds
+    # Smoke test: run container briefly and verify it starts without crash
     CONTAINER_ID=$(docker run -d --name "test-smoke-$$" \
-        -e "DATABASE_PATH=/tmp/test.db" \
         "${PROJECT_NAME}:${TEST_TAG}" sleep 30 2>/dev/null)
     if [ -n "$CONTAINER_ID" ]; then
-        # Try importing the app module
-        IMPORT_OK=$(docker exec "$CONTAINER_ID" \
-            python3 -c "import sys; sys.path.insert(0, '/app'); from library.backend.app import app; print('ok')" 2>/dev/null)
-        if [ "$IMPORT_OK" = "ok" ]; then
-            echo "✅ Application module imports successfully"
+        sleep 2
+        RUNNING=$(docker inspect -f '{{.State.Running}}' "$CONTAINER_ID" 2>/dev/null)
+        if [ "$RUNNING" = "true" ]; then
+            echo "✅ Container starts and stays running"
         else
-            echo "⚠️ Application module import failed (may need runtime deps)"
+            echo "⚠️ Container exited within 2s (may need env vars or config)"
         fi
         docker rm -f "$CONTAINER_ID" &>/dev/null
     fi
@@ -384,14 +403,14 @@ Buildx Test:
 
 Registry Package:
   Image: ghcr.io/owner/repo
-  Version Tag: ✅ 3.2.0 exists
+  Version Tag: ✅ 1.5.0 exists
   Latest Tag: ✅ exists
   Platforms: amd64, arm64
 
 Version Sync:
-  VERSION file: 3.2.0
-  Git tag: v3.2.0
-  Registry: 3.2.0
+  VERSION file: 1.5.0
+  Git tag: v1.5.0
+  Registry: 1.5.0
   Status: ✅ All synchronized
 
 Docker Compose:

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Before completing this task, consider: Have tests been run? Use `/test --phase=2` for a quick test run, or `/test --phase=0-3` for discovery through reporting."
+            "prompt": "Before completing this task, consider: Have tests been run? Use `/test --phase=2` for a quick test run, or `/test --phase=0-2` for discovery through test execution."
           }
         ]
       }

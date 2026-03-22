@@ -8,16 +8,16 @@ allowed-tools:
   - Edit
   - Glob
   - Grep
-  - Task
+  - TaskGet
   - TaskOutput
   - TaskStop
   - TaskCreate
   - TaskUpdate
   - TaskList
   - AskUserQuestion
-  - KillShell
   - NotebookEdit
   - WebSearch
+  - WebFetch
 argument-hint: "[help] [prodapp] [docker] [qaapp] [qadocker] [qaall] [security] [github] [holistic] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
 ---
 
@@ -100,12 +100,10 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | Phase | Name | Description |
 |-------|------|-------------|
 | S | Snapshot | BTRFS safety snapshot |
-| M | Mocking | Safe sandbox environment |
-| 0 | Pre-Flight | Environment validation |
+| 0 | Pre-Flight | Environment validation, config audit, sandbox setup |
 | 1 | Discovery | Find testable components |
-| 2 | Execute | Run tests |
+| 2 | Execute & Analyze | Run tests, coverage, reporting, failure analysis |
 | 2a | Runtime | Service health checks |
-| 3 | Report | Test results |
 | **A** | **App Test** | **Deployable application testing (sandbox)** |
 | **P** | **Production** | **Validate installed production app** |
 | **D** | **Docker** | **Validate Docker image and registry package** |
@@ -113,14 +111,11 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **H** | **Holistic** | **Full-stack cross-component analysis** |
 | **I** | **Infrastructure** | **Infrastructure & runtime issue detection** |
 | **V** | **VM Testing** | **Heavy isolation testing in libvirt/QEMU VM** |
-| 4 | Cleanup | Deprecation, dead code |
+| **VM** | **VM Lifecycle** | **VM snapshot create/revert/delete management** |
 | **5/SEC** | **Security** | **Comprehensive security (GitHub + Local + Installed)** |
 | 6 | Dependencies | Package health |
-| 7 | Quality | Linting, complexity |
-| 8 | Coverage | Test coverage analysis |
-| 9 | Debug | Failure analysis |
+| 7 | Quality | Linting, complexity, formatting, dead code detection |
 | 10 | Fix | Auto-fixing |
-| 11 | Config | Configuration audit |
 | 12 | Verify | Final verification |
 | 13 | Docs | Documentation review |
 | C | Cleanup | Restore environment |
@@ -130,24 +125,24 @@ This skill operates **entirely non-interactively** except in extremely rare case
 
 | Phase | Tier | Depends On | Modifies Files? | Can Parallel With |
 |-------|------|------------|-----------------|-------------------|
-| S | 0 | None | No (creates snapshot) | M, 0 |
-| M | 0 | None | Creates sandbox | S, 0 |
-| 0 | 0 | None | No | S, M |
-| **1** | **1** | **S,M,0** | **No** | **None (GATE)** |
-| 2 | 2 | 1 | No (runs tests) | 2a |
+| S | 0 | None | No (creates snapshot) | 0 |
+| 0 | 1 | S | No | None (GATE with 1) |
+| **1** | **1** | **S,0** | **No** | **None (GATE)** |
+| 2 | 2 | 1 | No (runs tests + analysis) | 2a |
 | 2a | 2 | 1 | No | 2 |
-| 3-9,11 | 3 | 1,2 | No (read-only) | Each other |
+| 5,6,7,H,I | 3 | 1,2 | No (read-only) | Each other |
 | **10** | **4** | **ALL Tier 3** | **YES** | **None (BLOCKING)** |
-| **P** | **5** | **10 + Discovery** | **No (validates live)** | **None (CONDITIONAL)** |
-| **D** | **5** | **10 + Discovery** | **No (validates registry)** | **P (CONDITIONAL)** |
-| **G** | **5** | **10 + Discovery** | **No (audits GitHub)** | **P, D (CONDITIONAL)** |
-| **H** | **3** | **1** | **YES (fixes cross-component)** | **7, 5, I (after Discovery)** |
+| 12 | 5 | 10 | No (re-tests) | None |
+| **13** | **6** | **12** | **YES (fixes docs)** | **None (ALWAYS RUNS)** |
+| **A** | **7** | **1** | **Sandbox only** | **P, D** |
+| **P** | **7** | **10 + Discovery** | **No (validates live)** | **None (CONDITIONAL)** |
+| **D** | **7** | **10 + Discovery** | **No (validates registry)** | **P (CONDITIONAL)** |
+| **G** | **7** | **10 + Discovery** | **No (audits GitHub)** | **P, D (CONDITIONAL)** |
+| **H** | **3** | **1** | **No (read-only analysis)** | **7, 5, I (after Discovery)** |
 | **I** | **3** | **1** | **No (read-only)** | **H, 7, 5 (after Discovery)** |
-| 12 | 6 | P (or 10 if P skipped) | No (re-tests) | None |
-| **13** | **7** | **12** | **YES (fixes docs)** | **None (ALWAYS RUNS)** |
-| **C** | **8** | **ALL** | **Cleans up** | **None (LAST)** |
-| A | Special | 1 | Sandbox only | Tier 3 |
-| **V** | **Special** | **1 (isolation-required)** | **VM only** | **None (CONDITIONAL)** |
+| **V** | **8** | **1 (isolation-required)** | **VM only** | **None (CONDITIONAL)** |
+| **VM** | **8** | **V** | **VM snapshots** | **None** |
+| **C** | **last** | **ALL** | **Cleans up** | **None (LAST)** |
 | **ST** | **Special** | **None** | **No (read-only)** | **None (ISOLATED)** |
 
 **Legend:**
@@ -170,7 +165,7 @@ Phase P (Production Validation) execution depends on Discovery (Phase 1) results
 | Any | `installed-not-running` | **RUN** - Check why not running |
 | Any | `not-installed` | **SKIP** - App not installed on this system |
 
-When Phase P is skipped, Phase 12 (Verify) proceeds directly after Phase 10 (Fix).
+When Phase P is skipped, Phase D proceeds (or Phase G if D also skipped).
 
 ### Phase D Conditional Execution
 
@@ -183,7 +178,7 @@ Phase D (Docker Validation) execution depends on Discovery (Phase 1) results:
 | exists | `found` | **RUN** - Validate image and registry package |
 | exists | `version-mismatch` | **RUN** - Flag and FIX version sync issue |
 
-When Phase D is skipped, Phase 12 (Verify) proceeds after Phase P (or 10 if P also skipped).
+When Phase D is skipped, Phase G proceeds (or Tier 8 if G also skipped).
 
 ### Phase G Conditional Execution
 
@@ -195,7 +190,7 @@ Phase G (GitHub Audit) execution depends on Discovery (Phase 1) results:
 | exists | `not-authenticated` | **SKIP** - Cannot audit without gh CLI auth |
 | exists | `authenticated` | **RUN** - Full GitHub repository audit |
 
-When Phase G is skipped, Phase 12 (Verify) proceeds after Phase D (or P if D skipped, or 10 if both skipped).
+When Phase G is skipped, Tier 8 (VM) proceeds (or Cleanup if VM also skipped).
 
 ### Phase V (VM Testing) Conditional Execution
 
@@ -203,7 +198,7 @@ Phase V execution depends on **both** Discovery (Phase 1) isolation analysis AND
 
 | Discovery: Isolation Level | Staged Release | Pre-Flight: VM Available | Phase V Action |
 |---------------------------|----------------|-------------------------|----------------|
-| `sandbox` | `none` | Any | **SKIP** - Sandbox (Phase M) sufficient |
+| `sandbox` | `none` | Any | **SKIP** - Sandbox (Phase 0) sufficient |
 | `sandbox` | `valid` | `true` | **RUN** - Staged release lifecycle test |
 | `sandbox` | `valid` | `false` | **WARN** - Cannot test staged release without VM |
 | `sandbox-warn` | Any | Any | **SKIP** - Sandbox with monitoring (unless staged) |
@@ -248,11 +243,11 @@ To proceed:
 2. Or explicitly bypass (DANGEROUS): /test --force-sandbox
 ```
 
-### Phase M vs Phase V Selection
+### Sandbox vs Phase V Selection
 
 The dispatcher automatically selects the appropriate isolation:
 
-| Isolation Level | Phase M (Sandbox) | Phase V (VM) |
+| Isolation Level | Sandbox (Phase 0) | Phase V (VM) |
 |-----------------|-------------------|--------------|
 | `sandbox` | ✅ Used | ⚪ Skipped |
 | `sandbox-warn` | ✅ Used (monitoring) | ⚪ Skipped |
@@ -272,39 +267,36 @@ invalidated rollback points.
 │                         PHASE DEPENDENCY GRAPH                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  TIER 0: SAFETY GATES (Complete before ANY other phases)                   │
+│  TIER 0: SAFETY SNAPSHOT (Complete before ANY file modifications)           │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ S (Snapshot) ─┬─> Must complete BEFORE any file modifications       │   │
-│  │ M (Mocking)  ─┤   Can run in PARALLEL with each other              │   │
-│  │ 0 (PreFlight)─┘   └──> GATE 1: Safety Ready                        │   │
+│  │ S (Snapshot) ──> Must complete BEFORE any file modifications        │   │
+│  │                   └──> GATE 0: Snapshot Ready                       │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              │                                              │
 │                              ▼                                              │
-│  TIER 1: DISCOVERY (Everything depends on this completing)                 │
+│  TIER 1: PREFLIGHT & DISCOVERY (Everything depends on these completing)    │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 1 (Discovery) ──────────> GATE 2: Project Known                     │   │
-│  │   - Project type, test framework, file locations                    │   │
+│  │ 0 (PreFlight) ──> Config validation, sandbox setup, env checks      │   │
+│  │ 1 (Discovery) ──> Project type, tests, isolation level              │   │
 │  │   - Detects: Installable app? Production installed?                 │   │
 │  │   - Sets Phase P recommendation: SKIP / RUN / PROMPT                │   │
+│  │                   └──> GATE 1: Project Known                        │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              │                                              │
 │                              ▼                                              │
-│  TIER 2: TEST EXECUTION (Sequential - tests must complete first)           │
+│  TIER 2: TEST EXECUTION & ANALYSIS (tests + coverage + reporting)          │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 2 (Execute)  ─┬─> Run tests                                         │   │
-│  │ 2a (Runtime) ─┘   Can run in PARALLEL                               │   │
-│  │                   └──> GATE 3: Tests Complete                       │   │
+│  │ 2 (Execute & Analyze) ─┬─> Run tests, coverage, reporting, debug   │   │
+│  │ 2a (Runtime)           ─┘   Can run in PARALLEL                     │   │
+│  │                   └──> GATE 2: Tests Complete                       │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              │                                              │
 │                              ▼                                              │
 │  TIER 3: READ-ONLY ANALYSIS (Can parallelize - no file modifications)      │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │ These phases ONLY READ files - safe to run in parallel:             │   │
-│  │ [3, 4, 5, 6, 7, 8, 9, 11, H, I]  ← Note: 13 moved to Tier 7        │   │
-│  │                                                                      │   │
-│  │ ⚠️  Phase 8 (Coverage) needs test results from Phase 2              │   │
-│  │ ⚠️  Phase 9 (Debug) needs failure data from Phase 2                 │   │
-│  │                   └──> GATE 4: Analysis Complete                    │   │
+│  │ [5, 6, 7, H, I]  ← Note: 13 moved to Tier 6                        │   │
+│  │                   └──> GATE 3: Analysis Complete                    │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              │                                              │
 │                              ▼                                              │
@@ -313,12 +305,30 @@ invalidated rollback points.
 │  │ 10 (Fix) ────> MODIFIES FILES                                       │   │
 │  │   ⛔ ALL analysis phases MUST complete before this starts           │   │
 │  │   ⛔ NO other phases can run while this is running                  │   │
-│  │                   └──> GATE 5: Fixes Applied                        │   │
+│  │                   └──> GATE 4: Fixes Applied                        │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              │                                              │
 │                              ▼                                              │
-│  TIER 5: PRODUCTION & DOCKER VALIDATION (Conditional based on Discovery)  │
+│  TIER 5: VERIFICATION (After modifications)                                │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ 12 (Verify) ──> Re-run tests after fixes                            │   │
+│  │                   └──> GATE 5: Verified                             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                              │                                              │
+│                              ▼                                              │
+│  TIER 6: DOCUMENTATION (Only if ALL prior phases PASSED)                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ 13 (Docs) ──> Documentation review/update                           │   │
+│  │   ⛔ SUCCESS GATE: Only runs if ALL phases 0-12 passed              │   │
+│  │   ⛔ If any prior phase FAILED, skip Phase 13                       │   │
+│  │                   └──> GATE 6: Docs Complete                        │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                              │                                              │
+│                              ▼                                              │
+│  TIER 7: APP, PRODUCTION & DOCKER VALIDATION (Conditional)                 │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ A (App Test) ──> Sandbox installation & deployment testing          │   │
+│  │                                                                      │   │
 │  │ P (Production) ──> Validates live installed app                     │   │
 │  │   📋 CONDITIONAL execution based on Discovery:                      │   │
 │  │      - No installable app → SKIP                                    │   │
@@ -336,36 +346,25 @@ invalidated rollback points.
 │  │      - No GitHub remote → SKIP                                      │   │
 │  │      - GitHub + gh authenticated → RUN                              │   │
 │  │      - GitHub but no gh auth → SKIP (cannot audit)                  │   │
-│  │                   └──> GATE 6: Production/Docker/GitHub Validated   │   │
+│  │                   └──> GATE 7: App/Production/Docker/GitHub Done    │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              │                                              │
 │                              ▼                                              │
-│  TIER 6: VERIFICATION (After modifications and production check)           │
+│  TIER 8: VM TESTING (Conditional on isolation level or staged release)      │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 12 (Verify) ──> Re-run tests after fixes                            │   │
-│  │                   └──> GATE 7: Verified                             │   │
+│  │ V (VM Testing) ──> Heavy isolation in libvirt/QEMU VM               │   │
+│  │ VM (VM Lifecycle) ──> Snapshot create/revert/delete management      │   │
+│  │                   └──> GATE 8: VM Complete                          │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              │                                              │
 │                              ▼                                              │
-│  TIER 7: DOCUMENTATION (Only if ALL prior phases PASSED)                   │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 13 (Docs) ──> Documentation review/update                           │   │
-│  │   ⛔ SUCCESS GATE: Only runs if ALL phases 0-12,P passed            │   │
-│  │   ⛔ If any prior phase FAILED, skip Phase 13                       │   │
-│  │                   └──> GATE 8: Docs Complete                        │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  TIER 8: CLEANUP (ALWAYS LAST)                                             │
+│  CLEANUP (ALWAYS LAST)                                                      │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │ C (Restore) ──> MUST be last phase, never parallel                  │   │
 │  │   Always runs regardless of prior failures (cleanup is mandatory)   │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 │  SPECIAL PHASES (Independent tracks):                                        │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ A (App Test) ─> Depends on 1, sandbox testing independent of main   │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │ ST (Self-Test) ─> ISOLATED: validates test-skill framework itself   │   │
 │  │   ⛔ NEVER included in normal /test runs                            │   │
@@ -379,15 +378,16 @@ invalidated rollback points.
 
 | Tier | Phases | Parallel? | Gate Condition |
 |------|--------|-----------|----------------|
-| 0 | S, M, 0 | ✅ Yes | All three complete |
-| 1 | 1 | ❌ No (single) | Discovery complete (+ P decision made) |
+| 0 | S | ❌ No (single) | Snapshot complete |
+| 1 | 0, 1 | ❌ No (sequential) | Preflight + Discovery complete (+ P decision made) |
 | 2 | 2, 2a | ✅ Yes | Tests complete |
-| 3 | 3,4,5,6,7,8,9,11,H,I | ✅ Yes | All analysis complete |
+| 3 | 5,6,7,H,I | ✅ Yes | All analysis complete |
 | 4 | 10 | ❌ No | Fixes complete |
-| 5 | P, D, G | ❌ No (conditional) | Production/Docker/GitHub validated OR skipped |
-| 6 | 12 | ❌ No | Verification complete |
-| 7 | 13 | ❌ No (success gate) | Docs complete - ONLY if all prior passed |
-| 8 | C | ❌ No (always last) | Cleanup complete (always runs) |
+| 5 | 12 | ❌ No | Verification complete |
+| 6 | 13 | ❌ No (success gate) | Docs complete - ONLY if all prior passed |
+| 7 | A, P, D, G | ❌ No (conditional) | App/Production/Docker/GitHub validated OR skipped |
+| 8 | V, VM | ❌ No (conditional) | VM testing complete OR skipped |
+| last | C | ❌ No (always last) | Cleanup complete (always runs) |
 
 ### Execution Algorithm
 
@@ -398,15 +398,16 @@ function executeAudit(requestedPhases):
     allPhasesSucceeded = true
     phasePRecommendation = null  # Set by Discovery
 
-    # TIER 0: Safety (parallel)
-    tier0 = intersection(requestedPhases, [S, M, 0])
-    if tier0:
-        executionPlan.append({phases: tier0, parallel: true, gate: "SAFETY"})
+    # TIER 0: Snapshot
+    if S in requestedPhases:
+        executionPlan.append({phases: [S], parallel: false, gate: "SNAPSHOT"})
 
-    # TIER 1: Discovery (sequential - BLOCKER)
+    # TIER 1: Preflight + Discovery (sequential - BLOCKER)
+    # Preflight now includes config validation and sandbox setup
     # Discovery ALSO determines Phase P recommendation AND isolation level
-    if 1 in requestedPhases:
-        executionPlan.append({phases: [1], parallel: false, gate: "DISCOVERY"})
+    tier1 = intersection(requestedPhases, [0, 1])
+    if tier1:
+        executionPlan.append({phases: tier1, parallel: false, gate: "DISCOVERY"})
         # After Discovery completes, extract:
         #   - phasePRecommendation: "SKIP" | "RUN" | "PROMPT"
         #   - installableApp: type of app (or "none")
@@ -422,7 +423,7 @@ function executeAudit(requestedPhases):
         executionPlan.append({phases: tier2, parallel: true, gate: "TESTS"})
 
     # TIER 3: Analysis (parallel - all read-only, EXCLUDES 13)
-    tier3 = intersection(requestedPhases, [3,4,5,6,7,8,9,11,H,I])
+    tier3 = intersection(requestedPhases, [5,6,7,H,I])
     if tier3:
         executionPlan.append({phases: tier3, parallel: true, gate: "ANALYSIS"})
 
@@ -430,27 +431,11 @@ function executeAudit(requestedPhases):
     if 10 in requestedPhases:
         executionPlan.append({phases: [10], parallel: false, gate: "FIXES"})
 
-    # TIER 5: Production, Docker & GitHub Validation (CONDITIONAL)
-    tier5Phases = []
-    if P in requestedPhases:
-        tier5Phases.append({phase: P, condition: "phasePRecommendation"})
-    if D in requestedPhases:
-        tier5Phases.append({phase: D, condition: "phaseDRecommendation"})
-    if G in requestedPhases:
-        tier5Phases.append({phase: G, condition: "phaseGRecommendation"})
-    if tier5Phases:
-        executionPlan.append({
-            phases: tier5Phases,
-            parallel: false,  # Run P then D then G sequentially
-            gate: "PRODUCTION_DOCKER_GITHUB",
-            conditional: true
-        })
-
-    # TIER 6: Verification
+    # TIER 5: Verification
     if 12 in requestedPhases:
         executionPlan.append({phases: [12], parallel: false, gate: "VERIFY"})
 
-    # TIER 7: Documentation (SUCCESS GATE - only if all prior passed)
+    # TIER 6: Documentation (SUCCESS GATE - only if all prior passed)
     if 13 in requestedPhases:
         executionPlan.append({
             phases: [13],
@@ -459,16 +444,47 @@ function executeAudit(requestedPhases):
             successGate: true  # Only runs if allPhasesSucceeded
         })
 
-    # TIER 8: Cleanup (always last, always runs)
+    # TIER 7: App, Production, Docker & GitHub Validation (CONDITIONAL)
+    tier7Phases = []
+    if A in requestedPhases:
+        tier7Phases.append({phase: A, condition: "always"})
+    if P in requestedPhases:
+        tier7Phases.append({phase: P, condition: "phasePRecommendation"})
+    if D in requestedPhases:
+        tier7Phases.append({phase: D, condition: "phaseDRecommendation"})
+    if G in requestedPhases:
+        tier7Phases.append({phase: G, condition: "phaseGRecommendation"})
+    if tier7Phases:
+        executionPlan.append({
+            phases: tier7Phases,
+            parallel: false,  # Run A then P then D then G sequentially
+            gate: "APP_PRODUCTION_DOCKER_GITHUB",
+            conditional: true
+        })
+
+    # TIER 8: VM Testing (CONDITIONAL on isolation level or staged release)
+    tier8Phases = intersection(requestedPhases, [V, VM])
+    if tier8Phases:
+        executionPlan.append({
+            phases: tier8Phases,
+            parallel: false,
+            gate: "VM",
+            conditional: true
+        })
+
+    # CLEANUP: Always last, always runs
     if C in requestedPhases:
         executionPlan.append({phases: [C], parallel: false, gate: "CLEANUP", alwaysRun: true})
 
     # Execute plan tier by tier
     for tier in executionPlan:
-        # Handle conditional execution (Phase P and D)
+        # Handle conditional execution (Phases A, P, D, G)
         if tier.conditional:
             for phaseInfo in tier.phases:
-                if phaseInfo.phase == P:
+                if phaseInfo.phase == A:
+                    # App testing always runs if requested
+                    pass
+                elif phaseInfo.phase == P:
                     if phasePRecommendation == "SKIP":
                         log("Phase P skipped: No installable app or not installed")
                         continue
@@ -579,17 +595,17 @@ To proceed:
    → Snapshot captures mid-modification state
    → Rollback would restore corrupted state
 
-❌ Phase 9 (Debug) runs before Phase 2 (Execute)
-   → No test failures exist yet to debug
-   → Phase 9 reports "no issues" incorrectly
+❌ Phase 7 (Quality) runs before Phase 2 (Execute)
+   → No test results available for dead code analysis
+   → Phase 7 reports incomplete findings
 ```
 
 **With dependency enforcement:**
 ```
-✅ S, M, 0 complete → snapshot is clean baseline
-✅ 1 completes → all phases know project type
-✅ 2, 2a complete → test results available
-✅ 3-9, 11, H, I run parallel (read-only) → safe
+✅ S completes → snapshot is clean baseline
+✅ 0, 1 complete → config validated, project type known
+✅ 2, 2a complete → test results + coverage + failure analysis available
+✅ 5, 6, 7, H, I run parallel (read-only) → safe
 ✅ 10 runs alone → no race conditions
 ✅ 12 verifies → confirms fixes work
 ✅ C runs last → clean exit
@@ -617,8 +633,8 @@ When spawning Task subagents for phases, specify the `model` parameter based on 
 | Model | Phases | Rationale |
 |-------|--------|-----------|
 | **opus** | 1, 5, 7, 10, A, P, D, G, H, ST | Complex analysis, multi-step fixes, security audit, cross-component reasoning |
-| **sonnet** | 0, 2, 2a, 6, 8, 9, 11, 12, 13, I, V | Moderate complexity: test execution, dependency checks, verification |
-| **haiku** | S, M, 3, 4, C | Lightweight: snapshots, sandbox setup, reporting, cleanup |
+| **sonnet** | 0, 2, 2a, 6, 12, 13, I, V, VM | Moderate complexity: test execution, dependency checks, verification |
+| **haiku** | S, C | Lightweight: snapshots, cleanup |
 
 **Example Task call with model:**
 ```
@@ -659,25 +675,30 @@ If phase files don't exist, use these minimal instructions:
 # Check if BTRFS and create read-only snapshot
 PROJECT_DIR="$(pwd)"
 if df -T "$PROJECT_DIR" | grep -q btrfs; then
-    SNAPSHOT="/snapshots/audit/audit-$(date +%Y%m%d-%H%M%S)-$(basename $PROJECT_DIR)"
+    SNAPSHOT="$PROJECT_DIR/.snapshots/audit-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$PROJECT_DIR/.snapshots"
     sudo btrfs subvolume snapshot -r "$PROJECT_DIR" "$SNAPSHOT"
 fi
 ```
 
-**Phase 0 (Pre-Flight)**:
+**Phase 0 (Pre-Flight)** — now includes config validation and sandbox setup:
 - Check dependencies: `pip check` / `npm ls` / `go mod verify`
 - Verify env vars exist
 - Test service connectivity
 - Check file permissions
+- Validate configuration files
+- Set up safe sandbox environment
 
 **Phase 1 (Discovery)**:
 - Identify project type (Python/Node/Go/Rust/etc.)
 - Find test files
 - Locate config files
 
-**Phase 2 (Execute Tests)**:
+**Phase 2 (Execute Tests & Analyze)** — now includes coverage, reporting, and failure analysis:
 - Run: `pytest` / `npm test` / `go test` / `cargo test`
 - Check actual output, not just exit codes
+- Run coverage tool and enforce 85% minimum (configurable)
+- Summarize test results and analyze failures
 
 **Phase A (App Testing)** - Sandbox Installation:
 ```
@@ -710,10 +731,6 @@ Key steps:
 - `pip-audit` / `npm audit` / `cargo audit`
 - Grep for hardcoded secrets
 - Check CVEs
-
-**Phase 8 (Coverage)**:
-- Run coverage tool
-- Enforce 85% minimum (configurable)
 
 ---
 
@@ -795,13 +812,13 @@ When `/test` is invoked:
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  /test — Modular Project Audit                                              │
-│  Autonomous, context-efficient project testing with 27 phases in 9 tiers    │
+│  Autonomous, context-efficient project testing with 21 phases in 9 tiers    │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  USAGE                                                                      │
 │  ─────                                                                      │
 │  /test                           Full audit (autonomous — fixes everything) │
-│  /test --phase=0-3               Quick check (safety + discovery + tests)   │
+│  /test --phase=0-2               Quick check (safety + discovery + tests)   │
 │  /test --phase=X                 Run single phase (e.g., --phase=5)         │
 │  /test --phase=X,Y,Z             Run multiple phases                        │
 │  /test --interactive             Enable prompts and manual items            │
@@ -809,7 +826,7 @@ When `/test` is invoked:
 │  /test --force-sandbox           DANGEROUS: bypass VM requirement           │
 │  /test --no-mcp-enable           Skip auto-enabling MCP servers             │
 │  /test help                      This help                                  │
-│  /test --list-phases             Show all 27 phases                         │
+│  /test --list-phases             Show all 21 phases                         │
 │                                                                             │
 │  SHORTCUTS                                                                  │
 │  ─────────                                                                  │
@@ -824,52 +841,48 @@ When `/test` is invoked:
 │                                                                             │
 │  ALL PHASES                                                                 │
 │  ──────────                                                                 │
-│  Tier 0 — Safety Gates (parallel)                                           │
+│  Tier 0 — Safety Snapshot                                                   │
 │    S   Snapshot         BTRFS read-only safety snapshot                     │
-│    M   Mocking          Safe sandbox environment setup                      │
-│    0   Pre-Flight       Environment & dependency validation                 │
 │                                                                             │
-│  Tier 1 — Discovery (gate)                                                  │
+│  Tier 1 — Preflight & Discovery (gate)                                      │
+│    0   Pre-Flight       Config validation, sandbox setup, env checks        │
 │    1   Discovery         Detect project type, tests, isolation level        │
 │                                                                             │
-│  Tier 2 — Test Execution (parallel)                                         │
-│    2   Execute           Run pytest / npm test / go test / cargo test       │
+│  Tier 2 — Test Execution & Analysis (parallel)                              │
+│    2   Execute&Analyze   Run tests, coverage, reporting, failure analysis   │
 │    2a  Runtime           Service health checks & connectivity               │
 │                                                                             │
 │  Tier 3 — Read-Only Analysis (parallel)                                     │
-│    3   Report            Summarize test results                             │
-│    4   Cleanup           Detect dead code & deprecations                    │
 │    5   Security          8-tool security suite (SAST + deps + secrets)      │
 │    6   Dependencies      Package health & outdated checks                   │
-│    7   Quality           Linting, complexity, formatting                    │
-│    8   Coverage          Test coverage analysis (85% threshold)             │
-│    9   Debug             Failure root-cause analysis                        │
-│   11   Config            Configuration file audit                           │
+│    7   Quality           Linting, complexity, formatting, dead code detect  │
 │    H   Holistic          Full-stack cross-component analysis                │
 │    I   Infrastructure    Infrastructure & runtime issue detection           │
 │                                                                             │
 │  Tier 4 — Modifications (blocking)                                          │
 │   10   Fix               Auto-fix ALL issues found in Tier 3                │
 │                                                                             │
-│  Tier 5 — Conditional Validation (sequential)                               │
+│  Tier 5 — Verification                                                      │
+│   12   Verify            Re-run tests; loop to Tier 4 if failures           │
+│                                                                             │
+│  Tier 6 — Documentation                                                     │
+│   13   Docs              Sync docs with codebase (always runs)              │
+│                                                                             │
+│  Tier 7 — App, Production & Docker Validation (conditional)                 │
+│    A   App Test          Sandbox installation & deployment testing           │
 │    P   Production        Validate installed production app                  │
 │    D   Docker            Validate Docker image & registry package           │
 │    G   GitHub            Audit repo security: Dependabot, CodeQL, etc.      │
 │                                                                             │
-│  Tier 6 — Verification                                                      │
-│   12   Verify            Re-run tests; loop to Tier 4 if failures           │
+│  Tier 8 — VM Testing (conditional)                                          │
+│    V   VM Testing        Heavy isolation in libvirt/QEMU VM                 │
+│   VM   VM Lifecycle      VM snapshot create/revert/delete management        │
 │                                                                             │
-│  Tier 7 — Documentation                                                     │
-│   13   Docs              Sync docs with codebase (always runs)              │
-│                                                                             │
-│  Tier 8 — Cleanup                                                           │
+│  Cleanup (always last)                                                      │
 │    C   Cleanup           Restore environment, remove temp files             │
 │                                                                             │
 │  SPECIAL PHASES (independent tracks)                                        │
 │  ─────────────────────────────────────                                      │
-│    A   App Test          Sandbox installation & deployment testing           │
-│    V   VM Testing        Heavy isolation in libvirt/QEMU VM                 │
-│   VM   VM Lifecycle      VM snapshot create/revert/delete management        │
 │   ST   Self-Test         Validate the test-skill framework itself           │
 │                                                                             │
 │  NOTES                                                                      │
@@ -965,14 +978,15 @@ ELSE (Autonomous - DEFAULT):
 5. **Execute by tier (respecting dependencies):**
 
    ```
-   TIER 0: Safety Gates [S, M, 0] - Run in PARALLEL (Task tools in single message)
+   TIER 0: Snapshot [S] - Run SEQUENTIALLY (single Task)
    ──────────────────────────────────────────────────────────────────
-   Wait for all to complete → GATE 1: Safety Ready
+   Wait for completion → GATE 0: Snapshot Ready
    If --skip-snapshot: exclude S
 
-   TIER 1: Discovery [1] - Run SEQUENTIALLY (single Task)
+   TIER 1: Preflight & Discovery [0, 1] - Run SEQUENTIALLY
    ──────────────────────────────────────────────────────────────────
-   Wait for completion → GATE 2: Project Known
+   Phase 0 includes config validation and sandbox setup
+   Wait for completion → GATE 1: Project Known
    ⛔ ABORT if this fails - nothing else can proceed
    📋 Extract Phase P recommendation from output:
       - Installable App: [type or "none"]
@@ -997,27 +1011,44 @@ ELSE (Autonomous - DEFAULT):
       - If no resource flags and autonomous: Set PYTEST_EXTRA_FLAGS=""
       - Pass PYTEST_EXTRA_FLAGS as context to Phase 2 subagent
 
-   TIER 2: Test Execution [2, 2a] - Run in PARALLEL
+   TIER 2: Test Execution & Analysis [2, 2a] - Run in PARALLEL
    ──────────────────────────────────────────────────────────────────
+   Phase 2 now includes coverage, reporting, and failure analysis
    📋 Pass PYTEST_EXTRA_FLAGS to Phase 2 subagent context:
       "Set PYTEST_EXTRA_FLAGS to: [flags from Discovery]"
       (empty string if no flags selected)
-   Wait for all to complete → GATE 3: Tests Complete
+   Wait for all to complete → GATE 2: Tests Complete
 
-   TIER 3: Analysis [3,4,5,6,7,8,9,11,H,I] - Run in PARALLEL
+   TIER 3: Analysis [5,6,7,H,I] - Run in PARALLEL
    ──────────────────────────────────────────────────────────────────
    All are READ-ONLY, safe to parallelize
-   ⚠️ Phase 13 is NOT in this tier (moved to Tier 7)
-   Wait for all to complete → GATE 4: Analysis Complete
+   Phase 7 now includes dead code detection
+   ⚠️ Phase 13 is NOT in this tier (moved to Tier 6)
+   Wait for all to complete → GATE 3: Analysis Complete
 
    TIER 4: Modifications [10] - Run ALONE (no parallel)
    ──────────────────────────────────────────────────────────────────
    ⛔ Must wait for ALL Tier 3 to complete
    ⛔ No other phases can run during this
-   Wait for completion → GATE 5: Fixes Applied
+   Wait for completion → GATE 4: Fixes Applied
 
-   TIER 5: Production, Docker & GitHub Validation [P, D, G] - CONDITIONAL
+   TIER 5: Verification [12] - Run SEQUENTIALLY
    ──────────────────────────────────────────────────────────────────
+   Wait for completion → GATE 5: Verified
+   If tests fail, loop back to TIER 4 (Fix) until clean
+
+   TIER 6: Documentation [13] - ALWAYS RUNS
+   ──────────────────────────────────────────────────────────────────
+   ✅ ALWAYS runs - documentation must stay current
+   ✅ Fixes ALL doc issues: versions, paths, obsolete content
+   Wait for completion → GATE 6: Docs Complete
+
+   TIER 7: App, Production, Docker & GitHub Validation [A, P, D, G] - CONDITIONAL
+   ──────────────────────────────────────────────────────────────────
+   **Phase A** - App Testing:
+     - Sandbox installation & deployment testing
+     - Runs if project has deployable app components
+
    **Phase P** - Check Phase P Recommendation from Discovery:
      - SKIP: Log "No installable app or not installed" and proceed to Phase D
      - RUN: Execute Phase P, fix any issues found
@@ -1029,23 +1060,19 @@ ELSE (Autonomous - DEFAULT):
      (No prompts - fully autonomous)
 
    **Phase G** - Check Phase G Recommendation from Discovery:
-     - SKIP: Log "No GitHub remote or gh not authenticated" and proceed to Tier 6
+     - SKIP: Log "No GitHub remote or gh not authenticated" and proceed to Tier 8
      - RUN: Execute Phase G, audit and fix GitHub security settings
      (No prompts - fully autonomous)
-   Wait for completion (or skip) → GATE 6: Production/Docker/GitHub Validated
+   Wait for completion (or skip) → GATE 7: App/Production/Docker/GitHub Done
 
-   TIER 6: Verification [12] - Run SEQUENTIALLY
+   TIER 8: VM Testing [V, VM] - CONDITIONAL
    ──────────────────────────────────────────────────────────────────
-   Wait for completion → GATE 7: Verified
-   If tests fail, loop back to TIER 4 (Fix) until clean
+   Conditional on isolation level or staged release detection
+   V: Heavy isolation testing in VM
+   VM: VM lifecycle snapshot management
+   Wait for completion (or skip) → GATE 8: VM Complete
 
-   TIER 7: Documentation [13] - ALWAYS RUNS
-   ──────────────────────────────────────────────────────────────────
-   ✅ ALWAYS runs - documentation must stay current
-   ✅ Fixes ALL doc issues: versions, paths, obsolete content
-   Wait for completion → GATE 8: Docs Complete
-
-   TIER 8: Cleanup [C] - Run LAST (never parallel, always runs)
+   CLEANUP: [C] - Run LAST (never parallel, always runs)
    ──────────────────────────────────────────────────────────────────
    Always runs regardless of prior failures (cleanup is mandatory)
    ```
@@ -1057,8 +1084,8 @@ ELSE (Autonomous - DEFAULT):
    - Each returns summary with Status, Issue count, Key findings
    - **Model selection per phase** (use `model` parameter on Task tool):
      - `opus`: Phases 1, 5, 7, 10, A, P, D, G, H, ST
-     - `sonnet`: Phases 0, 2, 2a, 6, 8, 9, 11, 12, 13, V
-     - `haiku`: Phases S, M, 3, 4, C
+     - `sonnet`: Phases 0, 2, 2a, 6, 12, 13, I, V, VM
+     - `haiku`: Phases S, C
    - Use `run_in_background: true` for long-running phases where appropriate
 
 7. **Gate validation between tiers:**
@@ -1072,27 +1099,26 @@ ELSE (Autonomous - DEFAULT):
 ### Special Phase Handling
 
 **Phase A (App Testing):**
+- Position: Tier 7 (after Docs, alongside Production/Docker/GitHub)
 - Depends on: Tier 1 (Discovery) completing
-- Independent of: Testing tiers (2, 3)
-- Can run parallel with: Tier 3 analysis phases
 - Runs in sandbox - separate from production validation
 
 **Phase P (Production) - Autonomous:**
-- Position: Tier 5 (after Fixes, before Verify)
+- Position: Tier 7 (after Docs, before VM)
 - Conditional execution based on Discovery results
 - Two possible outcomes (no prompts):
   1. **SKIP**: No installable app or not installed → proceed to Phase D
   2. **RUN**: Production app is installed → validate and fix issues
 
 **Phase D (Docker) - Autonomous:**
-- Position: Tier 5 (after Phase P, before Phase G)
+- Position: Tier 7 (after Phase P, before Phase G)
 - Conditional execution based on Discovery results
 - Two possible outcomes (no prompts):
   1. **SKIP**: No Dockerfile or registry package → proceed to Phase G
   2. **RUN**: Dockerfile + registry package found → validate and fix version sync
 
 **Phase G (GitHub) - Autonomous:**
-- Position: Tier 5 (after Phase D, before Verify)
+- Position: Tier 7 (after Phase D, before VM)
 - Conditional execution based on Discovery results
 - Two possible outcomes (no prompts):
   1. **SKIP**: No GitHub remote or gh CLI not authenticated → proceed to Tier 6
@@ -1101,7 +1127,7 @@ ELSE (Autonomous - DEFAULT):
 - Auto-enables missing security features when possible
 
 **Phase 13 (Docs) - ALWAYS Runs:**
-- Position: Tier 7 (after Verify, before Cleanup)
+- Position: Tier 6 (after Verify, before App/Production/Docker)
 - ALWAYS runs regardless of prior phase status
 - Fixes ALL documentation issues: version refs, obsolete paths, outdated content
 - Documentation MUST match current codebase state
@@ -1112,7 +1138,7 @@ ELSE (Autonomous - DEFAULT):
 - Cleanup is mandatory for environment hygiene
 
 **Phase V (VM Testing) - Conditional on Isolation Level OR Staged Release:**
-- Position: Special - replaces Phase M when VM isolation is needed
+- Position: Tier 8 - VM isolation when sandbox is insufficient
 - Conditional execution based on Discovery `ISOLATION_LEVEL` output OR staged release detection
 - Two independent triggers (either activates Phase V):
   1. **Isolation Level**: `vm-required` or `vm-recommended` with VM available
@@ -1122,7 +1148,7 @@ ELSE (Autonomous - DEFAULT):
   2. **RUN**: Either trigger active AND VM available
   3. **ABORT**: `ISOLATION_LEVEL` is `vm-required` AND no VM available
 - Project-VM routing via `~/.claude/config/project-vm-map.json`:
-  - Projects with dedicated VMs are routed automatically (e.g., Audiobook-Manager → test-audiobook-cachyos)
+  - Projects with dedicated VMs are routed automatically based on `exclusive_to` mappings
   - Exclusivity enforced — reserved VMs cannot be used by other projects
   - Default VM used for projects without explicit mapping
 - Capabilities:
@@ -1148,7 +1174,7 @@ ELSE (Autonomous - DEFAULT):
 - Still enforce tier dependencies
 - Example: `/test --phase=5` still requires 1 (Discovery) to run first
 - Example: `/test --phase=P` requires Discovery AND all prior tiers
-- Example: `/test --phase=13` requires ALL phases 0-12,P to have passed
+- Example: `/test --phase=13` requires ALL phases 0-12 to have passed
 
 ---
 
@@ -1161,7 +1187,7 @@ For full audit:
 
 For quick check:
 ```
-/test --phase=0-3
+/test --phase=0-2
 ```
 
 For app deployment testing only:
@@ -1274,4 +1300,4 @@ To skip auto-enable behavior, use:
 
 ---
 
-*Document Version: 3.1.0 — Staged release detection, project-VM routing, installation lifecycle testing*
+*Document Version: 4.0.0 — Phase consolidation (27→21), project-agnostic refactor, bloat reduction*

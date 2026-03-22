@@ -1,6 +1,6 @@
 # Phase 13: Documentation
 
-> **Model**: `sonnet` | **Tier**: 7 (Docs) | **Modifies Files**: YES (fixes docs)
+> **Model**: `sonnet` | **Tier**: 6 (Docs) | **Modifies Files**: YES (fixes docs)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Read`, `Edit`, `Write` for doc fixes. Use `NotebookEdit` for Jupyter notebook documentation. Use `WebSearch` to verify external URLs still resolve. In `--interactive` mode, use `AskUserQuestion` for doc style decisions.
 
@@ -80,7 +80,7 @@ grep -rn "/hddRaid1/ClaudeCodeProjects" --include="*.md" --include="*.sh"
 
 **Fix by:**
 - Replacing dev paths with generic placeholders (`<project-root>`, `<install-dir>`)
-- Using production paths where appropriate (`/opt/audiobooks/`)
+- Using production paths where appropriate (from install manifest or project config)
 - Removing references to deleted files/directories
 
 ### 3. README Completeness
@@ -219,16 +219,16 @@ For code that changed in this audit:
 ═══════════════════════════════════════════════════════════════════
 
 Git Commit Analysis:
-  Last documented version: v3.1.0
+  Last documented version: <from VERSION file>
   Commits since last release: 12
   Features (feat:): 3 → all documented in CHANGELOG ✅
   Fixes (fix:): 7 → all documented in CHANGELOG ✅
   Breaking changes: 0
 
 Version Sync:
-  VERSION file: 3.2.0
-  Fixed CLAUDE.md: 3.0.5 → 3.2.0
-  Fixed README.md changelog: added v3.2.0, v3.1.x entries
+  VERSION file: 1.5.0
+  Fixed CLAUDE.md: 1.4.2 → 1.5.0
+  Fixed README.md changelog: added v1.5.0, v1.4.x entries
 
 Path Fixes:
   Fixed 4 dev path references in MIGRATION.md
@@ -241,7 +241,7 @@ Content Updates:
   Updated README for new features from commits
 
 Obsolete Removal:
-  Removed 2 references to audiobook-toolkit (old repo name)
+  Removed 2 references to old-project-name (old repo name)
   Removed deprecated --legacy flag documentation
 
 Documentation Files Modified: 8

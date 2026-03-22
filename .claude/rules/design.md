@@ -19,7 +19,6 @@ After ANY fix applied by /test:
 
 **Implemented**: QA module discovery for `qaapp`, `qadocker`, `qaall` shortcuts.
 Dispatcher looks for `test-*-qa-{app,docker,all}.md` in project root.
-First project using this: Audiobook-Manager.
 
 **Architecture**:
 ```

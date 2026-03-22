@@ -1,8 +1,8 @@
 # Phase C: Cleanup/Restore
 
-> **Model**: `haiku` | **Tier**: 8 (Final) | **Modifies Files**: Cleans up
+> **Model**: `haiku` | **Tier**: last (Final) | **Modifies Files**: Cleans up
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for cleanup. Use `KillShell` to terminate any lingering test processes.
+> **Key Tools**: `Bash` for cleanup. Use `Bash` with `kill` to terminate any lingering test processes.
 
 Clean up test artifacts and optionally restore from snapshot.
 
@@ -67,16 +67,27 @@ shutdown_test_vm() {
     echo "───────────────────────────────────────────────────────────────────"
     echo ""
 
-    # Check if state file exists
+    # Check if state file exists and is readable
     if [[ ! -f "$STATE_FILE" ]]; then
         echo "  ✓ No VM was managed by /test (no state file)"
         return 0
     fi
 
-    # Read state file
-    local VM_NAME=$(grep "^vm_name=" "$STATE_FILE" | cut -d= -f2)
-    local STARTED_BY_TEST=$(grep "^started_by_test=" "$STATE_FILE" | cut -d= -f2)
-    local ORIGINAL_STATE=$(grep "^original_state=" "$STATE_FILE" | cut -d= -f2)
+    if [[ ! -r "$STATE_FILE" ]]; then
+        echo "  ⚠️ State file exists but is not readable: $STATE_FILE"
+        return 1
+    fi
+
+    # Read state file with validation
+    local VM_NAME=$(grep "^vm_name=" "$STATE_FILE" 2>/dev/null | cut -d= -f2)
+    local STARTED_BY_TEST=$(grep "^started_by_test=" "$STATE_FILE" 2>/dev/null | cut -d= -f2)
+    local ORIGINAL_STATE=$(grep "^original_state=" "$STATE_FILE" 2>/dev/null | cut -d= -f2)
+
+    if [[ -z "$VM_NAME" ]]; then
+        echo "  ⚠️ State file missing vm_name — removing stale state file"
+        rm -f "$STATE_FILE"
+        return 0
+    fi
 
     echo "  VM: $VM_NAME"
     echo "  Started by /test: $STARTED_BY_TEST"
@@ -145,8 +156,9 @@ shutdown_test_vm() {
 
     echo ""
     echo "VM Cleanup Complete:"
-    echo "  - VM $VM_NAME stopped"
+    echo "  - VM $VM_NAME stopped (was: running, original: $ORIGINAL_STATE)"
     echo "  - System resources freed (4GB RAM, 4 vCPUs)"
+    echo "  - State file removed: $STATE_FILE"
 }
 
 shutdown_test_vm
@@ -190,10 +202,28 @@ restore_mcp_servers() {
 
         # Check if still enabled (might have been manually disabled)
         if grep -q "\"$plugin_key\": true" "$SETTINGS_FILE" 2>/dev/null; then
-            echo "  🔌 Disabling $plugin..."
+            echo "  Disabling $plugin..."
 
-            # Use sed to disable (replace true with false)
-            sed -i "s/\"$plugin_key\": true/\"$plugin_key\": false/" "$SETTINGS_FILE"
+            # Use python3 for safe JSON manipulation (sed on JSON is brittle)
+            if command -v python3 &>/dev/null; then
+                python3 -c "
+import json, sys
+with open('$SETTINGS_FILE', 'r') as f:
+    data = json.load(f)
+if '$plugin_key' in data.get('mcpServers', {}):
+    data['mcpServers']['$plugin_key'] = False
+elif '$plugin_key' in data:
+    data['$plugin_key'] = False
+with open('$SETTINGS_FILE', 'w') as f:
+    json.dump(data, f, indent=2)
+" 2>/dev/null
+            elif command -v jq &>/dev/null; then
+                local tmp_file=$(mktemp)
+                jq ".[\"$plugin_key\"] = false" "$SETTINGS_FILE" > "$tmp_file" && mv "$tmp_file" "$SETTINGS_FILE"
+            else
+                echo "    ⚠️ No python3 or jq available — cannot safely modify JSON"
+                continue
+            fi
 
             echo "    ✅ Disabled $plugin"
             ((disabled_count++))
@@ -248,13 +278,23 @@ fi
 ### 5. Clean Up Snapshots (Optional)
 
 ```bash
-# List audit snapshots
-ls -la /snapshots/audit/ 2>/dev/null
+# Snapshot location: Phase S creates snapshots inside the project's .snapshots/ directory.
+# Verify the snapshot directory exists before attempting cleanup.
+PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+SNAPSHOT_DIR="${PROJECT_DIR}/.snapshots"
 
-# Delete old snapshots (keep last 3)
-ls -t /snapshots/audit/audit-* 2>/dev/null | tail -n +4 | while read snap; do
-  sudo btrfs subvolume delete "$snap"
-done
+if [[ -d "$SNAPSHOT_DIR" ]]; then
+    echo "Audit snapshots in $SNAPSHOT_DIR:"
+    ls -la "$SNAPSHOT_DIR"/snap-* 2>/dev/null || echo "  (none found)"
+
+    # Delete old snapshots (keep last 3)
+    ls -t "$SNAPSHOT_DIR"/snap-* 2>/dev/null | tail -n +4 | while read snap; do
+        echo "  Deleting old snapshot: $(basename "$snap")"
+        sudo btrfs subvolume delete "$snap" 2>/dev/null || rm -rf "$snap"
+    done
+else
+    echo "  ℹ️ No snapshot directory found at $SNAPSHOT_DIR — nothing to clean up"
+fi
 ```
 
 ## Output Format
@@ -282,8 +322,8 @@ MCP Servers:
   ✅ 2 servers restored to pre-test state
 
 Snapshots:
-  📸 /snapshots/audit/audit-20231215-143022-myproject
-  📸 /snapshots/audit/audit-20231214-091545-myproject
+  📸 .snapshots/snap-pre-test-20231215-143022
+  📸 .snapshots/snap-pre-test-20231214-091545
   🗑️ Deleted 2 old snapshots
 
 Project restored to clean state.

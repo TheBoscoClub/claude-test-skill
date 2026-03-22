@@ -2,7 +2,7 @@
 
 > **Model**: `opus` | **Tier**: Special (Isolated) | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash`, `Read`, `Glob`, `Grep` for framework validation. Verify all 16 allowed tools are accessible. Validate model tiering configuration matches dispatcher.
+> **Key Tools**: `Bash`, `Read`, `Glob`, `Grep` for framework validation. Verify all 15 allowed tools are accessible. Validate model tiering configuration matches dispatcher.
 
 **Meta-testing phase** - validates the test-skill framework itself.
 
@@ -51,21 +51,16 @@ echo "║  SECTION 1: PHASE FILE VALIDATION                                 ║"
 echo "╚═══════════════════════════════════════════════════════════════════╝"
 echo ""
 
-# Expected phase files
+# Expected phase files — 21 phases
 EXPECTED_PHASES=(
     "phase-0-preflight.md"
     "phase-1-discovery.md"
     "phase-2-execute.md"
     "phase-2a-runtime.md"
-    "phase-3-report.md"
-    "phase-4-cleanup.md"
     "phase-5-security.md"
     "phase-6-dependencies.md"
     "phase-7-quality.md"
-    "phase-8-coverage.md"
-    "phase-9-debug.md"
     "phase-10-fix.md"
-    "phase-11-config.md"
     "phase-12-verify.md"
     "phase-13-docs.md"
     "phase-A-app-testing.md"
@@ -74,7 +69,6 @@ EXPECTED_PHASES=(
     "phase-G-github.md"
     "phase-H-holistic.md"
     "phase-I-infrastructure.md"
-    "phase-M-mocking.md"
     "phase-P-production.md"
     "phase-S-snapshot.md"
     "phase-ST-self-test.md"
@@ -83,7 +77,7 @@ EXPECTED_PHASES=(
 )
 
 echo "───────────────────────────────────────────────────────────────────"
-echo "  1.1 Phase File Existence"
+echo "  1.1 Phase File Existence (21 expected)"
 echo "───────────────────────────────────────────────────────────────────"
 
 MISSING_PHASES=()
@@ -147,6 +141,28 @@ done
 
 if [[ "$EMPTY_PHASES" -eq 0 ]]; then
     echo "  ✅ All phase files have substantial content"
+fi
+
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  1.4 No Deleted Phase Files Present"
+echo "───────────────────────────────────────────────────────────────────"
+
+DELETED_PHASES=("phase-3-report.md" "phase-4-cleanup.md" "phase-8-coverage.md" "phase-9-debug.md" "phase-11-config.md" "phase-M-mocking.md")
+STALE_FOUND=0
+for stale in "${DELETED_PHASES[@]}"; do
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    if [[ -f "$SKILLS_DIR/$stale" ]]; then
+        echo "  ❌ Stale phase file found: $stale (should have been deleted in v4.0.0)"
+        FAILED_CHECKS=$((FAILED_CHECKS + 1))
+        STALE_FOUND=$((STALE_FOUND + 1))
+    else
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    fi
+done
+
+if [[ "$STALE_FOUND" -eq 0 ]]; then
+    echo "  ✅ No deleted phase files lingering"
 fi
 ```
 
@@ -347,7 +363,7 @@ SYNTAX_ERRORS=0
 for phase_file in "$SKILLS_DIR"/phase-*.md; do
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     PHASE_NAME=$(basename "$phase_file")
-    
+
     # Extract bash blocks and check syntax
     # This is a simplified check - just validates the file is readable markdown
     if grep -q '```bash' "$phase_file" 2>/dev/null; then
@@ -398,38 +414,32 @@ fi
 
 echo ""
 echo "───────────────────────────────────────────────────────────────────"
-echo "  6.2 Model Tiering Validation"
+echo "  6.2 Model Tiering Validation (21 phases)"
 echo "───────────────────────────────────────────────────────────────────"
 
-# Validate expected model assignments
+# Validate expected model assignments — 21 phases
 declare -A EXPECTED_MODELS=(
+    ["phase-0-preflight.md"]="sonnet"
     ["phase-1-discovery.md"]="opus"
+    ["phase-2-execute.md"]="sonnet"
+    ["phase-2a-runtime.md"]="sonnet"
     ["phase-5-security.md"]="opus"
+    ["phase-6-dependencies.md"]="sonnet"
     ["phase-7-quality.md"]="opus"
     ["phase-10-fix.md"]="opus"
+    ["phase-12-verify.md"]="sonnet"
+    ["phase-13-docs.md"]="sonnet"
     ["phase-A-app-testing.md"]="opus"
-    ["phase-P-production.md"]="opus"
+    ["phase-C-restore.md"]="haiku"
     ["phase-D-docker.md"]="opus"
     ["phase-G-github.md"]="opus"
     ["phase-H-holistic.md"]="opus"
-    ["phase-ST-self-test.md"]="opus"
-    ["phase-0-preflight.md"]="sonnet"
-    ["phase-2-execute.md"]="sonnet"
-    ["phase-2a-runtime.md"]="sonnet"
-    ["phase-6-dependencies.md"]="sonnet"
-    ["phase-8-coverage.md"]="sonnet"
-    ["phase-9-debug.md"]="sonnet"
-    ["phase-11-config.md"]="sonnet"
-    ["phase-12-verify.md"]="sonnet"
-    ["phase-13-docs.md"]="sonnet"
-    ["phase-V-vm-testing.md"]="sonnet"
     ["phase-I-infrastructure.md"]="sonnet"
-    ["phase-VM-lifecycle.md"]="sonnet"
+    ["phase-P-production.md"]="opus"
     ["phase-S-snapshot.md"]="haiku"
-    ["phase-M-mocking.md"]="haiku"
-    ["phase-3-report.md"]="haiku"
-    ["phase-4-cleanup.md"]="haiku"
-    ["phase-C-restore.md"]="haiku"
+    ["phase-ST-self-test.md"]="opus"
+    ["phase-V-vm-testing.md"]="sonnet"
+    ["phase-VM-lifecycle.md"]="sonnet"
 )
 
 MODEL_MISMATCHES=0
@@ -455,7 +465,7 @@ echo "────────────────────────�
 echo "  6.3 Dispatcher Allowed Tools (16 expected)"
 echo "───────────────────────────────────────────────────────────────────"
 
-EXPECTED_TOOLS=("Bash" "Read" "Write" "Edit" "Glob" "Grep" "Task" "TaskOutput" "TaskStop" "TaskCreate" "TaskUpdate" "TaskList" "AskUserQuestion" "KillShell" "NotebookEdit" "WebSearch")
+EXPECTED_TOOLS=("Bash" "Read" "Write" "Edit" "Glob" "Grep" "TaskGet" "TaskOutput" "TaskStop" "TaskCreate" "TaskUpdate" "TaskList" "AskUserQuestion" "NotebookEdit" "WebSearch" "WebFetch")
 TOOLS_FOUND=0
 for tool in "${EXPECTED_TOOLS[@]}"; do
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
@@ -468,7 +478,7 @@ for tool in "${EXPECTED_TOOLS[@]}"; do
     fi
 done
 
-echo "  ✅ Dispatcher declares $TOOLS_FOUND/16 core allowed tools"
+echo "  ✅ Dispatcher declares $TOOLS_FOUND/15 core allowed tools"
 
 echo ""
 echo "───────────────────────────────────────────────────────────────────"

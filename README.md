@@ -1,6 +1,6 @@
 # Claude Code Test Skill
 
-A comprehensive 27-phase autonomous project audit system for Claude Code with full GitHub integration.
+A comprehensive 21-phase autonomous project audit system for Claude Code with full GitHub integration.
 
 [![Security Scan](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml/badge.svg)](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/TheBoscoClub/claude-test-skill)](https://github.com/TheBoscoClub/claude-test-skill/releases)
@@ -9,12 +9,11 @@ A comprehensive 27-phase autonomous project audit system for Claude Code with fu
 
 | Version | Status | Release |
 |---------|--------|---------|
-| ![3](https://img.shields.io/badge/3-brightgreen)![0](https://img.shields.io/badge/0-darkgreen)![1](https://img.shields.io/badge/1-green) | Latest patch | [v3.0.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v3.0.1) |
+| ![4](https://img.shields.io/badge/4-brightgreen)![0](https://img.shields.io/badge/0-darkgreen)![0](https://img.shields.io/badge/0-green) | Latest major | [v4.0.0](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v4.0.0) |
+| ![3](https://img.shields.io/badge/3-brightred)![0](https://img.shields.io/badge/0-darkred)![1](https://img.shields.io/badge/1-red) | Prior patch | [v3.0.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v3.0.1) |
 | ![3](https://img.shields.io/badge/3-brightred)![0](https://img.shields.io/badge/0-darkred)![0](https://img.shields.io/badge/0-red) | Prior major | [v3.0.0](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v3.0.0) |
 | ![2](https://img.shields.io/badge/2-brightred)![0](https://img.shields.io/badge/0-darkred)![1](https://img.shields.io/badge/1-red) | Prior patch | [v2.0.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v2.0.1) |
 | ![2](https://img.shields.io/badge/2-brightred)![0](https://img.shields.io/badge/0-darkred)![0](https://img.shields.io/badge/0-red) | Prior major | [v2.0.0](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v2.0.0) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![5](https://img.shields.io/badge/5-red) | Prior patch | [v1.0.5](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v1.0.5) |
-| ![1](https://img.shields.io/badge/1-brightred)![0](https://img.shields.io/badge/0-darkred)![4](https://img.shields.io/badge/4-red) | Prior patch | [v1.0.4](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v1.0.4) |
 
 <details>
 <summary>Badge Color Convention</summary>
@@ -53,7 +52,7 @@ The `/test` skill performs a complete autonomous audit of any software project -
 ```bash
 /test                    # Full audit (autonomous - fixes everything)
 /test security           # Comprehensive security audit (Phase 5)
-/test --phase=0-3        # Pre-flight through reporting
+/test --phase=0-2        # Pre-flight through testing
 /test prodapp            # Validate installed production app
 /test docker             # Validate Docker image and registry
 /test github             # Audit GitHub repository settings
@@ -69,38 +68,33 @@ The `/test` skill performs a complete autonomous audit of any software project -
 
 | Phase | Name | Description |
 |-------|------|-------------|
-| **Safety &amp; Setup** |||
+| **Safety & Setup** |||
 | S | Snapshot | BTRFS safety snapshot before modifications |
-| M | Mocking | Sandbox environment for safe testing |
-| 0 | Pre-Flight | Environment validation, dependencies, permissions |
+| 0 | Pre-Flight | Environment validation, config audit, sandbox setup |
 | 1 | Discovery | Detect project type, test frameworks, tools, GitHub remote |
 | **Testing** |||
-| 2 | Execute | Run project tests (pytest, npm test, go test, cargo test) |
+| 2 | Execute | Run tests, analyze results, measure coverage |
 | 2a | Runtime | Service health checks, stuck process detection |
-| 3 | Report | Detailed test results and failure analysis |
 | **Analysis** |||
-| 4 | Cleanup | Deprecation detection, dead code removal |
 | 5 | Security | Comprehensive security (7 tools: bandit, semgrep, CodeQL, pip-audit, trivy, grype, checkov) |
 | 6 | Dependencies | Package health, outdated/unused/vulnerable packages |
-| 7 | Quality | Linting, complexity analysis (ruff, pylint, eslint, hadolint, yamllint) |
-| 8 | Coverage | Test coverage enforcement (85% default) |
-| 9 | Debug | Autonomous failure root cause analysis |
+| 7 | Quality | Linting, complexity analysis, dead code cleanup |
+| H | Holistic | Full-stack cross-component analysis |
+| I | Infrastructure | Infrastructure and runtime issue detection |
 | **Remediation** |||
 | 10 | Fix | Auto-fix issues (ruff --fix, black, isort, shfmt, codespell) |
-| 11 | Config | Configuration audit, env vars, secrets management |
 | **Validation** |||
 | A | App Test | Deployable application testing in sandbox |
 | P | Production | Validate live installed application |
 | D | Docker | Validate Docker image and registry package |
 | G | GitHub | Audit GitHub repo security (Dependabot, CodeQL, branch protection) |
-| H | Holistic | Full-stack cross-component analysis |
-| I | Infrastructure | Infrastructure and runtime issue detection |
 | 12 | Verify | Re-run tests, confirm no regressions |
 | **Finalization** |||
 | 13 | Docs | Update documentation to match codebase |
 | C | Restore | Cleanup temp files, restore environment |
 | **Special** |||
 | V | VM Testing | Heavy isolation testing in libvirt/QEMU VMs |
+| VM | Lifecycle | VM startup/shutdown management |
 | ST | Self-Test | Validate test-skill framework (explicit only: `--phase=ST`) |
 
 ---
@@ -238,7 +232,7 @@ tools:
 Phases execute in tiers with strict dependencies:
 
 ```
-TIER 0: Safety [S, M, 0] ──────────────── Can run in parallel
+TIER 0: Safety [S, 0] ─────────────────── Can run in parallel
            │
            ▼
 TIER 1: Discovery [1] ──────────────────── GATE: Project Known
@@ -247,7 +241,7 @@ TIER 1: Discovery [1] ───────────────────�
 TIER 2: Testing [2, 2a] ────────────────── Can run in parallel
            │
            ▼
-TIER 3: Analysis [3-9, 11, H, I] ──────── Can run in parallel (read-only)
+TIER 3: Analysis [5, 6, 7, H, I] ──────── Can run in parallel (read-only)
            │
            ▼
 TIER 4: Fix [10] ───────────────────────── MODIFIES FILES (sequential)
@@ -310,25 +304,18 @@ Phase G performs a comprehensive GitHub repository audit:
 ```
 claude-test-skill/
 ├── commands/
-│   ├── test.md              # Main dispatcher (~1,000 lines)
-│   └── test-legacy.md       # Original monolithic version (backup)
+│   └── test.md              # Main dispatcher (~1,000 lines)
 ├── skills/
-│   └── test-phases/         # 27 phase files (each with Opus 4.6 config header)
+│   └── test-phases/         # 21 phase files (each with Opus 4.6 config header)
 │       ├── phase-S-snapshot.md       # [haiku]
-│       ├── phase-M-mocking.md        # [haiku]
 │       ├── phase-0-preflight.md      # [sonnet]
 │       ├── phase-1-discovery.md      # [opus]
 │       ├── phase-2-execute.md        # [sonnet]
 │       ├── phase-2a-runtime.md       # [sonnet]
-│       ├── phase-3-report.md         # [haiku]
-│       ├── phase-4-cleanup.md        # [haiku]
 │       ├── phase-5-security.md       # [opus]
 │       ├── phase-6-dependencies.md   # [sonnet]
 │       ├── phase-7-quality.md        # [opus]
-│       ├── phase-8-coverage.md       # [sonnet]
-│       ├── phase-9-debug.md          # [sonnet]
 │       ├── phase-10-fix.md           # [opus]
-│       ├── phase-11-config.md        # [sonnet]
 │       ├── phase-12-verify.md        # [sonnet]
 │       ├── phase-13-docs.md          # [sonnet]
 │       ├── phase-A-app-testing.md    # [opus]
@@ -341,10 +328,10 @@ claude-test-skill/
 │       ├── phase-ST-self-test.md     # [opus]
 │       ├── phase-V-vm-testing.md     # [sonnet]
 │       └── phase-VM-lifecycle.md     # [sonnet]
-├── agents/
-│   ├── coverage-reviewer.md
-│   ├── security-scanner.md
-│   └── test-analyzer.md
+├── agents/                  # Integrated into phases (reference docs)
+│   ├── coverage-reviewer.md # → Phase 2
+│   ├── security-scanner.md  # → Phase 5
+│   └── test-analyzer.md     # → Phase 2
 ├── docs/
 │   └── ARCHITECTURE.md      # System architecture
 ├── .github/
@@ -387,9 +374,9 @@ Runs comprehensive security audit with 8 tools (GitHub + local + installed app).
 
 ### Pre-Commit Check
 ```bash
-/test --phase=0-3,7
+/test --phase=0-2,7
 ```
-Quick validation: Pre-flight, Discovery, Execute, Report, and Quality.
+Quick validation: Pre-flight, Discovery, Execute, and Quality.
 
 ### Production Validation
 ```bash
@@ -490,12 +477,11 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
 ### Recent Releases
 
+- **v4.0.0** - Phase consolidation (27 to 21), bloat reduction, project-agnostic, agents integrated (BREAKING)
 - **v3.0.1** - Canonical help block, Phase ST grep fix, argument-hint update
 - **v3.0.0** - Dispatcher execution fixes, Phase I/H integration, documentation consistency audit (BREAKING)
 - **v2.0.1** - Opus 4.6 phase configuration headers, Phase ST integration validation
 - **v2.0.0** - Opus 4.6 model pinning, subagent tiering, 16 tools, task tracking (BREAKING)
-- **v1.0.5** - Consolidated security phases, Phase ST (self-test), 8-tool security suite
-- **v1.0.4** - Phase SEC (standalone security), Phase P enhancements
 
 ---
 

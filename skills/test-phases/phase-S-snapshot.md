@@ -2,7 +2,7 @@
 
 > **Model**: `haiku` | **Tier**: 0 (Pre-test) | **Modifies Files**: No (creates snapshot)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for btrfs/virsh commands. Use `KillShell` if a snapshot command hangs.
+> **Key Tools**: `Bash` for btrfs/virsh commands. Use `Bash` with `timeout` if a snapshot command hangs.
 
 Create read-only safety snapshots before making changes.
 
@@ -10,33 +10,45 @@ Create read-only safety snapshots before making changes.
 
 - Project must be on a BTRFS filesystem
 - User must have sudo access for btrfs and virsh commands
-- Snapshot directory must exist: `/snapshots/audit/`
 
 ## Execution
 
 ### BTRFS Project Snapshot
 
+Snapshots are stored inside the project directory at `.snapshots/` to avoid polluting the top-level projects directory.
+
+**Naming convention**: `snap-pre-test-YYYYMMDD-HHMMSS` (enforced below).
+
 ```bash
 PROJECT_DIR="$(pwd)"
 PROJECT_NAME="$(basename $PROJECT_DIR)"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-SNAPSHOT_DIR="/snapshots/audit"
-SNAPSHOT_PATH="$SNAPSHOT_DIR/audit-$TIMESTAMP-$PROJECT_NAME"
+SNAPSHOT_DIR="${PROJECT_DIR}/.snapshots"
+SNAPSHOT_PATH="$SNAPSHOT_DIR/snap-pre-test-$TIMESTAMP"
 
-# Verify BTRFS (use stat -f which works reliably for nested subvolumes)
-# Note: df -T can fail for nested subvolumes, showing "-" instead of "btrfs"
-FSTYPE=$(stat -f -c %T "$PROJECT_DIR" 2>/dev/null || echo "unknown")
+# Verify BTRFS filesystem
+# Use df -T as primary method, fall back to btrfs subvolume show
+FSTYPE=$(df -T "$PROJECT_DIR" 2>/dev/null | tail -1 | awk '{print $2}')
 if [[ "$FSTYPE" != "btrfs" ]]; then
-  # Fallback: check if btrfs subvolume show succeeds
+  # Fallback: check if btrfs subvolume show succeeds (works for nested subvolumes)
   if ! sudo btrfs subvolume show "$PROJECT_DIR" &>/dev/null; then
     echo "Not a BTRFS filesystem ($FSTYPE) - skipping BTRFS snapshot"
     SNAPSHOT_PATH=""
+  else
+    echo "BTRFS detected via subvolume check (df reported: $FSTYPE)"
   fi
 fi
 
 if [[ -n "$SNAPSHOT_PATH" ]]; then
+  # Check available disk space before creating snapshot (need at least 1 GB free)
+  AVAIL_KB=$(df "$PROJECT_DIR" 2>/dev/null | tail -1 | awk '{print $4}')
+  if [[ -n "$AVAIL_KB" ]] && [[ "$AVAIL_KB" -lt 1048576 ]]; then
+    echo "⚠️ Low disk space ($(( AVAIL_KB / 1024 )) MB free) — snapshot may fail"
+    echo "   Proceeding anyway (BTRFS snapshots are COW and initially use no extra space)"
+  fi
+
   # Create snapshot directory if needed
-  sudo mkdir -p "$SNAPSHOT_DIR"
+  mkdir -p "$SNAPSHOT_DIR"
 
   # Create read-only snapshot
   sudo btrfs subvolume snapshot -r "$PROJECT_DIR" "$SNAPSHOT_PATH"
@@ -97,6 +109,15 @@ sudo virsh snapshot-delete $VM_NAME "pre-test-YYYYMMDD-HHMMSS"
 # the Phase C cleanup automatically restores the VM to its pristine
 # snapshot (e.g., pristine-275g-2026-02-25) after testing completes.
 ```
+
+## Snapshot Naming Convention
+
+All BTRFS snapshots created by Phase S follow this pattern:
+- **Location**: `$PROJECT_DIR/.snapshots/`
+- **Name**: `snap-pre-test-YYYYMMDD-HHMMSS`
+- **Type**: Read-only (`-r` flag)
+
+Phase C (Cleanup) looks for snapshots in `.snapshots/` for cleanup. Using a different location or naming pattern will cause Phase C to miss them.
 
 ## Output
 

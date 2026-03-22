@@ -1,8 +1,8 @@
 # VM Lifecycle Management Module
 
-> **Model**: `sonnet` | **Tier**: Support (VM infrastructure) | **Modifies Files**: No (manages VMs)
+> **Model**: `sonnet` | **Tier**: 8 (VM infrastructure) | **Modifies Files**: No (manages VMs)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for virsh commands. Use `KillShell` to terminate hung VM operations. Use `AskUserQuestion` if VM fails to start and user needs to choose alternative.
+> **Key Tools**: `Bash` for virsh commands (use `timeout` for hung operations). Use `AskUserQuestion` if VM fails to start and user needs to choose alternative.
 
 Manages automatic VM startup and shutdown for isolated testing.
 
@@ -291,11 +291,11 @@ When a VM starts from a pristine snapshot (OS + deps only, no application instal
 the test framework must bootstrap the application before tests can run.
 
 This function:
-1. Detects whether the app is installed (checks for the `audiobooks` service user)
+1. Detects whether the app is installed (using the `detects_pristine_by` check from `vm-test-manifest.json`)
 2. If pristine AND `vm-test-manifest.json` has an `install` section with `required_on_pristine: true`:
    - Copies the project to the VM
-   - Runs the install command non-interactively (`install.sh --system`)
-3. The `audiobooks` user/group is a no-login service account that owns the app and data
+   - Runs the install command non-interactively (e.g., `install.sh --system`)
+3. The service user/group (if any) is a no-login service account created by the install script
 
 ```bash
 install_on_pristine_vm() {
@@ -321,8 +321,8 @@ install_on_pristine_vm() {
 
     local SSH_CMD="ssh -i $SSH_KEY -o ConnectTimeout=10 -o StrictHostKeyChecking=no $SSH_USER@$VM_IP"
 
-    # Detect pristine state: check if audiobooks service user exists on VM
-    local DETECT_CMD=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('vm_testing',{}).get('install',{}).get('detects_pristine_by','getent passwd audiobooks'))" 2>/dev/null)
+    # Detect pristine state using manifest's detects_pristine_by field (defaults to checking if install dir exists)
+    local DETECT_CMD=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('vm_testing',{}).get('install',{}).get('detects_pristine_by','test -d /opt/\$(basename(\"$(pwd)\"))'))" 2>/dev/null)
 
     if $SSH_CMD "$DETECT_CMD" &>/dev/null 2>&1; then
         echo "  ✅ Application already installed on VM (not pristine)"
@@ -361,17 +361,20 @@ install_on_pristine_vm() {
         return 1
     fi
 
-    # Verify: check that audiobooks user now exists
+    # Verify: check that the pristine detection now passes (app is installed)
     if $SSH_CMD "$DETECT_CMD" &>/dev/null 2>&1; then
-        echo "  ✅ Verified: audiobooks service account created"
+        echo "  ✅ Verified: application installed successfully"
     else
-        echo "  ⚠️ Install completed but audiobooks user not found"
+        echo "  ⚠️ Install completed but pristine detection still fails"
     fi
 
-    # Verify: check VERSION file
-    local REMOTE_VERSION=$($SSH_CMD "cat /opt/audiobooks/VERSION 2>/dev/null" 2>/dev/null)
-    if [[ -n "$REMOTE_VERSION" ]]; then
-        echo "  ✅ Verified: version $REMOTE_VERSION installed"
+    # Verify: check VERSION file if install dir is defined in manifest
+    local INSTALL_DIR=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('vm_testing',{}).get('install',{}).get('install_dir',''))" 2>/dev/null)
+    if [[ -n "$INSTALL_DIR" ]]; then
+        local REMOTE_VERSION=$($SSH_CMD "cat ${INSTALL_DIR}/VERSION 2>/dev/null" 2>/dev/null)
+        if [[ -n "$REMOTE_VERSION" ]]; then
+            echo "  ✅ Verified: version $REMOTE_VERSION installed"
+        fi
     fi
 
     # Clean up staging area

@@ -1,4 +1,10 @@
 {
+  "_note": "SSH key authentication is REQUIRED. Never use password-based SSH for test VMs. Configure key-based auth before using /test.",
+
+  "_docs_dangerous_operations": "Lists system-level operations that trigger Phase V (VM-isolated testing). When a project modifies PAM, systemd services, kernel parameters, or requires reboots, /test routes these operations to a VM instead of running them on the host. Add entries here to force VM isolation for specific operation types.",
+
+  "_docs_test_sequences": "Defines named multi-step test workflows executed inside the VM. Each sequence is an ordered list of steps (deploy, install, validate, reboot, etc.) that /test runs sequentially. Use these to codify repeatable test scenarios — e.g., 'install-and-reboot' deploys the app, installs it, reboots the VM, then validates the installation survived the reboot.",
+
   "vm_testing": {
     "enabled": true,
     "default_vm": "test-vm-cachyos",
@@ -36,13 +42,10 @@
       }
     ],
 
-    "ssh_config": {
-      "user": "testuser",
-      "password": "/test 0nly!",
+    "ssh": {
+      "user": "test-user",
       "key": "~/.ssh/id_ed25519",
-      "port": 22,
-      "sudo": "NOPASSWD",
-      "static_ip": "192.168.122.100"
+      "port": 22
     },
 
     "test_sequences": [
