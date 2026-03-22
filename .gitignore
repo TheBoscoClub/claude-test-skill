@@ -147,6 +147,8 @@ nohup.out
 # Context recovery files
 .claude-checkpoint.md
 .claude-recovery-plan.md
+# Wallet card — ephemeral task state for context recovery
+.claude-task-state.md
 
 # Session exit timestamps
 exit.*
