@@ -149,6 +149,10 @@ nohup.out
 .claude-recovery-plan.md
 # Wallet card — ephemeral task state for context recovery
 .claude-task-state.md
+# Session context — curated conversation memory for compaction/crash recovery
+.claude-session-context.md
+# Ring buffer — 128KB trailing I/O window for ground-truth recovery
+.claude-session-ring.jsonl
 
 # Session exit timestamps
 exit.*
