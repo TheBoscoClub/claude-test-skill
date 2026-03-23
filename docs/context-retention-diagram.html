@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Context Retention Architecture</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --orange: #f0883e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+  }
+  h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+  .subtitle { color: var(--text-dim); margin-bottom: 2rem; font-size: 0.95rem; }
+
+  .tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-family: inherit;
+    transition: all 0.2s;
+    position: relative;
+    bottom: -1px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--accent);
+    background: var(--surface);
+    border-color: var(--border);
+    border-bottom-color: var(--surface);
+    border-radius: 6px 6px 0 0;
+  }
+  .tab-content {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 2rem;
+    min-height: 500px;
+  }
+  .tab-content.active { display: block; }
+
+  .arch-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .component {
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+  .component:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(88, 166, 255, 0.15);
+  }
+  .component.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .component-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  .component-name { font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; }
+  .component-path {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+  }
+  .component-role { font-size: 0.85rem; color: var(--text-dim); }
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-primary { background: rgba(88, 166, 255, 0.15); color: var(--accent); }
+  .badge-audit { background: rgba(188, 140, 255, 0.15); color: var(--purple); }
+  .badge-hook { background: rgba(63, 185, 80, 0.15); color: var(--green); }
+  .badge-rule { background: rgba(210, 153, 34, 0.15); color: var(--yellow); }
+
+  .detail-panel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    min-height: 120px;
+  }
+  .detail-panel h3 { color: var(--accent); margin-bottom: 0.75rem; }
+  .detail-panel code {
+    background: rgba(88, 166, 255, 0.1);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: 'SF Mono', Monaco, monospace;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .flow-node {
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1.25rem;
+    text-align: center;
+    font-size: 0.85rem;
+    min-width: 180px;
+  }
+  .flow-node.event { border-color: var(--orange); }
+  .flow-node.action { border-color: var(--accent); }
+  .flow-node.source { border-color: var(--green); }
+  .flow-node.result { border-color: var(--purple); }
+  .flow-node.silent { border-color: var(--text-dim); border-style: dashed; }
+  .flow-arrow { color: var(--text-dim); font-size: 1.5rem; flex-shrink: 0; }
+  .flow-arrow.down { display: flex; justify-content: center; margin: 0.25rem 0; }
+  .flow-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-align: center;
+    margin: 0.25rem 0;
+  }
+  .flow-group {
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin: 1rem 0;
+  }
+  .flow-group-title {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.75rem;
+  }
+
+  .scenario-btns {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .scenario-btn {
+    padding: 0.5rem 1rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .scenario-btn:hover { border-color: var(--accent); color: var(--text); }
+  .scenario-btn.active {
+    background: rgba(88, 166, 255, 0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .scenario-content { display: none; }
+  .scenario-content.active { display: block; }
+
+  .meter-container { margin: 1.5rem 0; }
+  .meter-bar {
+    height: 40px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: flex;
+    overflow: hidden;
+  }
+  .meter-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .meter-segment:hover { filter: brightness(1.3); }
+  .meter-segment.normal { background: rgba(63, 185, 80, 0.2); color: var(--green); flex: 3; }
+  .meter-segment.elevated { background: rgba(210, 153, 34, 0.2); color: var(--yellow); flex: 2; }
+  .meter-segment.high { background: rgba(240, 136, 62, 0.2); color: var(--orange); flex: 2; }
+  .meter-segment.critical { background: rgba(248, 81, 73, 0.2); color: var(--red); flex: 3; }
+  .meter-labels {
+    display: flex;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+  .meter-labels span { flex: 1; text-align: center; }
+  .meter-detail {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    min-height: 80px;
+  }
+
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+  }
+  .compare-table th, .compare-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+  }
+  .compare-table th {
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+  }
+  .compare-table .old { color: var(--red); }
+  .compare-table .new { color: var(--green); }
+  .compare-table tr:hover { background: rgba(88, 166, 255, 0.05); }
+
+  .brain-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .brain-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+  }
+  .brain-card h4 { font-size: 0.85rem; margin-bottom: 0.5rem; }
+  .brain-card .analogy { color: var(--purple); font-size: 0.8rem; margin-bottom: 0.25rem; }
+  .brain-card .system { color: var(--text-dim); font-size: 0.8rem; }
+
+  .dim { color: var(--text-dim); }
+  .mono { font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; }
+
+  .sources-row {
+    display: flex;
+    gap: 1rem;
+    margin: 1rem 0;
+    justify-content: center;
+  }
+  .source-box {
+    background: var(--bg);
+    border: 2px solid var(--green);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    flex: 1;
+    max-width: 220px;
+  }
+  .source-box .priority {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 0.25rem;
+  }
+  .source-box .name { font-weight: 600; font-size: 0.95rem; }
+  .source-box .what { font-size: 0.8rem; color: var(--text-dim); margin-top: 0.25rem; }
+</style>
+</head>
+<body>
+
+<h1>Context Retention Architecture</h1>
+<p class="subtitle">Brain-inspired redesign: distributed recovery with graduated pressure response</p>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab(this, 'overview')">Overview</button>
+  <button class="tab" onclick="showTab(this, 'components')">Components</button>
+  <button class="tab" onclick="showTab(this, 'recovery')">Recovery Flows</button>
+  <button class="tab" onclick="showTab(this, 'pressure')">Pressure Response</button>
+  <button class="tab" onclick="showTab(this, 'comparison')">Old vs New</button>
+</div>
+
+<!-- OVERVIEW TAB -->
+<div id="tab-overview" class="tab-content active">
+  <h2 style="margin-bottom: 1rem;">Three-Source Recovery Model</h2>
+  <p class="dim" style="margin-bottom: 1.5rem;">
+    No single file is the recovery mechanism. Three independent sources combine to reconstruct full working state after compaction or crash.
+  </p>
+
+  <div class="sources-row">
+    <div class="source-box">
+      <div class="priority">Source 1 &mdash; Intent</div>
+      <div class="name">Wallet Card</div>
+      <div class="what">.claude-task-state.md<br>~30 lines, what &amp; why</div>
+    </div>
+    <div class="source-box">
+      <div class="priority">Source 2 &mdash; Actual Changes</div>
+      <div class="name">Git State</div>
+      <div class="what">git diff + git log<br>ground truth of modifications</div>
+    </div>
+    <div class="source-box">
+      <div class="priority">Source 3 &mdash; History</div>
+      <div class="name">Session Record</div>
+      <div class="what">SESSION_RECORD_*.md<br>audit trail, not recovery</div>
+    </div>
+  </div>
+
+  <div class="flow-arrow down" style="font-size: 2rem;">&#8595;</div>
+
+  <div style="text-align: center; margin: 1rem 0;">
+    <div class="flow-node result" style="display: inline-block; min-width: 300px;">
+      <strong>Full Context Reconstructed</strong><br>
+      <span class="dim" style="font-size: 0.8rem;">Current task + files touched + next step + actual diffs</span>
+    </div>
+  </div>
+
+  <div class="brain-grid" style="margin-top: 2rem;">
+    <div class="brain-card">
+      <h4>Distributed Memory</h4>
+      <div class="analogy">Brain: hippocampus + cortex + cerebellum</div>
+      <div class="system">System: wallet card + git + session record</div>
+    </div>
+    <div class="brain-card">
+      <h4>Consolidate During Idle</h4>
+      <div class="analogy">Brain: sleep consolidation, not constant journaling</div>
+      <div class="system">System: write at milestones, not every tool call</div>
+    </div>
+    <div class="brain-card">
+      <h4>Emergency Card</h4>
+      <div class="analogy">Brain: medical ID bracelet (name, meds, contacts)</div>
+      <div class="system">System: wallet card (~30 lines of structured state)</div>
+    </div>
+    <div class="brain-card">
+      <h4>Quiet Under Pressure</h4>
+      <div class="analogy">Brain: goes quiet during stroke, not louder</div>
+      <div class="system">System: context monitor goes silent at Critical (&gt;7 MB)</div>
+    </div>
+  </div>
+</div>
+
+<!-- COMPONENTS TAB -->
+<div id="tab-components" class="tab-content">
+  <p class="dim" style="margin-bottom: 1rem;">Click a component to see details.</p>
+  <div class="arch-grid">
+    <div class="component" data-detail="wallet" onclick="showDetail(this)">
+      <div class="component-icon">&#128179;</div>
+      <div class="component-name">Wallet Card <span class="badge badge-primary">Primary</span></div>
+      <div class="component-path">$PROJECT/.claude-task-state.md</div>
+      <div class="component-role">~30 line structured recovery target</div>
+    </div>
+    <div class="component" data-detail="monitor" onclick="showDetail(this)">
+      <div class="component-icon">&#128065;</div>
+      <div class="component-name">Context Monitor <span class="badge badge-hook">Hook</span></div>
+      <div class="component-path">~/.claude/hooks/context-monitor.sh</div>
+      <div class="component-role">Observes transcript size, graduated response</div>
+    </div>
+    <div class="component" data-detail="precompact" onclick="showDetail(this)">
+      <div class="component-icon">&#9889;</div>
+      <div class="component-name">PreCompact Hook <span class="badge badge-hook">Hook</span></div>
+      <div class="component-path">~/.claude/hooks/pre-compact.sh</div>
+      <div class="component-role">Fires once at compaction, injects recovery instructions</div>
+    </div>
+    <div class="component" data-detail="session" onclick="showDetail(this)">
+      <div class="component-icon">&#128214;</div>
+      <div class="component-name">Session Record <span class="badge badge-audit">Audit</span></div>
+      <div class="component-path">$PROJECT/SESSION_RECORD_*.md</div>
+      <div class="component-role">Milestone-only audit trail, NOT recovery</div>
+    </div>
+    <div class="component" data-detail="rules" onclick="showDetail(this)">
+      <div class="component-icon">&#128220;</div>
+      <div class="component-name">Workflow Rules <span class="badge badge-rule">Rules</span></div>
+      <div class="component-path">~/.claude/rules/session-workflow.md</div>
+      <div class="component-role">Instructs Claude on milestone-only cadence</div>
+    </div>
+    <div class="component" data-detail="close" onclick="showDetail(this)">
+      <div class="component-icon">&#128682;</div>
+      <div class="component-name">/close Command <span class="badge badge-rule">Command</span></div>
+      <div class="component-path">~/.claude/commands/close.md</div>
+      <div class="component-role">Clean session shutdown with wallet card cleanup</div>
+    </div>
+  </div>
+
+  <div class="detail-panel" id="detail-panel">
+    <h3 id="detail-title">Select a component</h3>
+    <div id="detail-body"><p class="dim">Click any component above to see how it fits into the architecture.</p></div>
+  </div>
+</div>
+
+<!-- RECOVERY FLOWS TAB -->
+<div id="tab-recovery" class="tab-content">
+  <div class="scenario-btns">
+    <button class="scenario-btn active" onclick="showScenario(this, 'compaction')">After Compaction</button>
+    <button class="scenario-btn" onclick="showScenario(this, 'crash')">After Crash</button>
+    <button class="scenario-btn" onclick="showScenario(this, 'close')">After /close</button>
+    <button class="scenario-btn" onclick="showScenario(this, 'no-wallet')">No Wallet Card</button>
+  </div>
+
+  <div id="scenario-compaction" class="scenario-content active">
+    <div class="flow-group">
+      <div class="flow-group-title">Phase 1: Before Compaction</div>
+      <div class="flow-row">
+        <div class="flow-node event">Transcript &gt; 7 MB</div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="flow-node action">PreCompact hook fires</div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="flow-node action">Captures git state<br><span class="dim">audit entry to session record</span></div>
+      </div>
+    </div>
+    <div class="flow-arrow down">&#8595;</div>
+    <div class="flow-group">
+      <div class="flow-group-title">Phase 2: Compaction Occurs</div>
+      <div class="flow-row">
+        <div class="flow-node event">Context window compressed</div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="flow-node action">systemMessage injected</div>
+      </div>
+      <div class="flow-label">
+        <code>"Read your task state file at: .claude-task-state.md<br>Then run: git diff --stat &amp;&amp; git log --oneline -5"</code>
+      </div>
+    </div>
+    <div class="flow-arrow down">&#8595;</div>
+    <div class="flow-group">
+      <div class="flow-group-title">Phase 3: Recovery (~30 seconds)</div>
+      <div class="flow-row">
+        <div class="flow-node source">Read wallet card<br><span class="dim">task, files, next step</span></div>
+        <div class="flow-node source">git diff --stat<br><span class="dim">actual changes</span></div>
+        <div class="flow-node source">git log --oneline -5<br><span class="dim">recent commits</span></div>
+      </div>
+      <div class="flow-arrow down">&#8595;</div>
+      <div class="flow-row">
+        <div class="flow-node result">Claude resumes work<br><span class="dim">without asking user what it was doing</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="scenario-crash" class="scenario-content">
+    <div class="flow-group">
+      <div class="flow-group-title">No hooks fire &mdash; process died</div>
+      <div class="flow-row">
+        <div class="flow-node event" style="border-color: var(--red);">Crash / Kill / Network Loss</div>
+      </div>
+    </div>
+    <div class="flow-arrow down">&#8595;</div>
+    <div class="flow-group">
+      <div class="flow-group-title">New Session Starts</div>
+      <div class="flow-row">
+        <div class="flow-node action">Claude checks for wallet card</div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="flow-node source">Found! Last milestone state<br><span class="dim">may be minutes old &mdash; that's OK</span></div>
+      </div>
+      <div class="flow-arrow down">&#8595;</div>
+      <div class="flow-row">
+        <div class="flow-node source">git diff<br><span class="dim">everything since last commit</span></div>
+        <div class="flow-node source">git log<br><span class="dim">recent commits</span></div>
+      </div>
+      <div class="flow-arrow down">&#8595;</div>
+      <div class="flow-row">
+        <div class="flow-node result">Context reconstructed from 2 sources<br><span class="dim">session record available as fallback if needed</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="scenario-close" class="scenario-content">
+    <div class="flow-group">
+      <div class="flow-group-title">Clean Shutdown via /close</div>
+      <div class="flow-row">
+        <div class="flow-node action">Wallet card updated<br><span class="dim">"Session closed normally"<br>"No pending work"</span></div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="flow-node action">Session record finalized<br><span class="dim">Claude's summary + git state</span></div>
+      </div>
+    </div>
+    <div class="flow-arrow down">&#8595;</div>
+    <div class="flow-group">
+      <div class="flow-group-title">Next Session</div>
+      <div class="flow-row">
+        <div class="flow-node source">Wallet card says "closed normally"</div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="flow-node result">Claude knows: clean start, no recovery needed</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="scenario-no-wallet" class="scenario-content">
+    <div class="flow-group">
+      <div class="flow-group-title">Edge Case: Crash Before First Milestone</div>
+      <div class="flow-row">
+        <div class="flow-node event" style="border-color: var(--red);">Crash before wallet card created</div>
+      </div>
+    </div>
+    <div class="flow-arrow down">&#8595;</div>
+    <div class="flow-group">
+      <div class="flow-group-title">Fallback Recovery</div>
+      <div class="flow-row">
+        <div class="flow-node action">Check for wallet card</div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="flow-node silent">Not found</div>
+      </div>
+      <div class="flow-arrow down">&#8595;</div>
+      <div class="flow-row">
+        <div class="flow-node source">git diff --stat<br><span class="dim">shows all modifications</span></div>
+        <div class="flow-node source">git log --oneline -10<br><span class="dim">extended history</span></div>
+        <div class="flow-node source">Previous session record<br><span class="dim">if one exists</span></div>
+      </div>
+      <div class="flow-arrow down">&#8595;</div>
+      <div class="flow-row">
+        <div class="flow-node result">Reconstruct from git + old session record<br><span class="dim">then create fresh wallet card</span></div>
+      </div>
+    </div>
+    <p class="dim" style="margin-top: 1rem; text-align: center; font-size: 0.85rem;">
+      Also handled: if PreCompact fires before any milestone, the hook creates a minimal wallet card from git state automatically.
+    </p>
+  </div>
+</div>
+
+<!-- PRESSURE RESPONSE TAB -->
+<div id="tab-pressure" class="tab-content">
+  <h2 style="margin-bottom: 0.5rem;">Graduated Context Pressure Response</h2>
+  <p class="dim" style="margin-bottom: 1.5rem;">
+    Thresholds calibrated from actual <code>compaction-sizes.log</code> data. Compaction fires at 1.4&ndash;12 MB (median ~6&ndash;7 MB).
+    Old thresholds (600 KB / 800 KB) were 5&ndash;10x too low.
+  </p>
+
+  <div class="meter-container">
+    <div class="meter-bar">
+      <div class="meter-segment normal" onclick="showMeterDetail('normal')">Normal<br>&lt; 3 MB</div>
+      <div class="meter-segment elevated" onclick="showMeterDetail('elevated')">Elevated<br>3&ndash;5 MB</div>
+      <div class="meter-segment high" onclick="showMeterDetail('high')">High<br>5&ndash;7 MB</div>
+      <div class="meter-segment critical" onclick="showMeterDetail('critical')">Critical<br>&gt; 7 MB</div>
+    </div>
+    <div class="meter-labels">
+      <span>0 MB</span>
+      <span>3 MB</span>
+      <span>5 MB</span>
+      <span>7 MB &#8594; compaction</span>
+    </div>
+  </div>
+
+  <div class="meter-detail" id="meter-detail">
+    <p class="dim">Click a zone above to see what happens at each pressure level.</p>
+  </div>
+
+  <h3 style="margin-top: 2rem; margin-bottom: 1rem;">What Was Eliminated</h3>
+  <table class="compare-table">
+    <tr>
+      <th>Old Behavior</th>
+      <th>Problem</th>
+      <th>New Behavior</th>
+    </tr>
+    <tr>
+      <td class="old"><code>additionalContext</code> injection</td>
+      <td>Feedback loop: hook tells Claude to write, write triggers hook</td>
+      <td class="new">Never used at any level</td>
+    </tr>
+    <tr>
+      <td class="old">Session record writes from hook</td>
+      <td>5,000+ line records filled with duplicate monitor entries</td>
+      <td class="new">Hook never touches session record</td>
+    </tr>
+    <tr>
+      <td class="old">No cooldown at CRITICAL</td>
+      <td>Fires every tool call, spamming the dying context window</td>
+      <td class="new">Goes completely silent at Critical</td>
+    </tr>
+    <tr>
+      <td class="old">600 KB / 800 KB thresholds</td>
+      <td>Triggered panic at ~10% of actual compaction distance</td>
+      <td class="new">3 / 5 / 7 MB based on real calibration data</td>
+    </tr>
+  </table>
+</div>
+
+<!-- COMPARISON TAB -->
+<div id="tab-comparison" class="tab-content">
+  <h2 style="margin-bottom: 1rem;">Old System vs New System</h2>
+  <table class="compare-table">
+    <tr>
+      <th style="width: 25%;">Aspect</th>
+      <th style="width: 37%;">Old System</th>
+      <th style="width: 37%;">New System</th>
+    </tr>
+    <tr>
+      <td>Recovery target</td>
+      <td class="old">Session record (monolithic, 5,000+ lines)</td>
+      <td class="new">Wallet card (~30 lines) + git state</td>
+    </tr>
+    <tr>
+      <td>Write cadence</td>
+      <td class="old">Every tool call / every ~3 minutes</td>
+      <td class="new">Milestones only (commits, errors, decisions)</td>
+    </tr>
+    <tr>
+      <td>Context monitor</td>
+      <td class="old">Writes to session record, injects additionalContext, no cooldown</td>
+      <td class="new">Observe-only, one-time actions, silent at Critical</td>
+    </tr>
+    <tr>
+      <td>Feedback loops</td>
+      <td class="old">Hook &#8594; Claude writes &#8594; hook fires again &#8594; infinite</td>
+      <td class="new">Impossible &mdash; no additionalContext, no session record writes</td>
+    </tr>
+    <tr>
+      <td>Session record role</td>
+      <td class="old">Recovery mechanism + audit trail + monitor dump</td>
+      <td class="new">Audit trail only (milestone entries)</td>
+    </tr>
+    <tr>
+      <td>Under pressure</td>
+      <td class="old">Gets louder (more writes, more injection)</td>
+      <td class="new">Goes quiet (trusts PreCompact hook)</td>
+    </tr>
+    <tr>
+      <td>Recovery time</td>
+      <td class="old">Read 5,000+ line file, parse through noise</td>
+      <td class="new">~30 seconds: wallet card + git diff + git log</td>
+    </tr>
+    <tr>
+      <td>Concurrency</td>
+      <td class="old">flock-based locking for session record writes</td>
+      <td class="new">No locking &mdash; only master session writes wallet card</td>
+    </tr>
+    <tr>
+      <td>Subagent writes</td>
+      <td class="old">Write to session record continuously</td>
+      <td class="new">Append summary on completion only</td>
+    </tr>
+    <tr>
+      <td>Thresholds</td>
+      <td class="old">600 KB / 800 KB (guessed)</td>
+      <td class="new">3 / 5 / 7 MB (calibrated from compaction-sizes.log)</td>
+    </tr>
+  </table>
+
+  <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Files Modified</h3>
+  <table class="compare-table">
+    <tr><th>File</th><th>Change</th></tr>
+    <tr><td><code>context-monitor.sh</code></td><td>Rewritten &mdash; graduated observe-only model</td></tr>
+    <tr><td><code>pre-compact.sh</code></td><td>Updated &mdash; points recovery at wallet card</td></tr>
+    <tr><td><code>session-workflow.md</code></td><td>Rewritten &mdash; 148 lines &#8594; 71 lines</td></tr>
+    <tr><td><code>CLAUDE.md</code></td><td>Updated &mdash; removed PID tracking, added wallet card</td></tr>
+    <tr><td><code>close.md</code></td><td>Updated &mdash; removed flock, added wallet card cleanup</td></tr>
+    <tr><td><code>customization-manifest.md</code></td><td>Updated &mdash; added hook entries</td></tr>
+    <tr><td><code>gitignore-claude</code></td><td>Updated &mdash; added .claude-task-state.md</td></tr>
+  </table>
+</div>
+
+<script>
+function showTab(btn, id) {
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function showScenario(btn, id) {
+  document.querySelectorAll('.scenario-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.scenario-content').forEach(function(c) { c.classList.remove('active'); });
+  document.getElementById('scenario-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+var details = {
+  wallet: {
+    title: 'Wallet Card &mdash; Primary Recovery Target',
+    body: '<p>A <strong>~30 line</strong> structured file that captures <em>intent</em>: what you\'re working on, which files you touched, what decision you\'re in the middle of, and what to do next.</p>'
+      + '<p style="margin-top:0.75rem"><strong>Updated at milestones only:</strong> task completion, commits, errors, decision points, phase boundaries. Never on a timer.</p>'
+      + '<p style="margin-top:0.75rem"><strong>Only the master session writes it.</strong> Subagents write to the session record instead, because the wallet card is a fixed-structure file (not append-only) and concurrent writes would clobber each other.</p>'
+      + '<p style="margin-top:0.75rem"><strong>Path resolution:</strong> git repo &#8594; <code>$cwd/.claude-task-state.md</code> | ClaudeCodeProjects dir &#8594; same | otherwise &#8594; <code>~/.claude/task-state.md</code></p>'
+      + '<p style="margin-top:0.75rem"><strong>.gitignore\'d</strong> &mdash; ephemeral working state, not project content.</p>'
+  },
+  monitor: {
+    title: 'Context Monitor &mdash; Graduated Observer',
+    body: '<p>A <code>PostToolUse</code> hook that measures transcript file size via <code>stat -c%s</code>. It has <strong>four graduated levels</strong> with calibrated thresholds.</p>'
+      + '<p style="margin-top:0.75rem"><strong>Key design:</strong> It <em>never</em> writes to the session record. It <em>never</em> injects <code>additionalContext</code>. At Critical level, it goes <strong>completely silent</strong> and trusts the PreCompact hook.</p>'
+      + '<p style="margin-top:0.75rem"><strong>Cooldown:</strong> Elevated and High actions fire exactly <em>once per session</em> (tracked via flag files in <code>~/.claude/cache/context-monitor/</code>).</p>'
+      + '<p style="margin-top:0.75rem">See the <strong>Pressure Response</strong> tab for the full threshold breakdown.</p>'
+  },
+  precompact: {
+    title: 'PreCompact Hook &mdash; Last Line of Defense',
+    body: '<p>Fires <strong>exactly once</strong> when Claude Code is about to compact the context window. This is the critical moment.</p>'
+      + '<p style="margin-top:0.75rem"><strong>What it does:</strong></p>'
+      + '<ul style="margin-left:1.5rem; margin-top:0.5rem;"><li>Captures git state (branch, uncommitted files, recent commits)</li><li>Writes one audit entry to session record (for history)</li><li>If no wallet card exists, creates a minimal one from git state</li><li>Injects a <code>systemMessage</code> telling Claude to read the wallet card + run git commands</li></ul>'
+      + '<p style="margin-top:0.75rem">The <code>systemMessage</code> is what Claude sees <em>after</em> compaction &mdash; it\'s the bridge between old context and new.</p>'
+  },
+  session: {
+    title: 'Session Record &mdash; Audit Trail Only',
+    body: '<p><strong>Role changed:</strong> From "recovery mechanism" to "audit trail." It still exists but is no longer the thing Claude reads to recover.</p>'
+      + '<p style="margin-top:0.75rem"><strong>Written at milestones:</strong> task completion, commits, errors, decisions, phase boundaries. Not on a timer, not after every tool call.</p>'
+      + '<p style="margin-top:0.75rem"><strong>Subagents:</strong> Append a summary when they <em>complete</em>, not continuously during execution.</p>'
+      + '<p style="margin-top:0.75rem"><strong>What\'s NOT in it anymore:</strong> PIDs, process trees, VM IPs, context monitor entries, "Session record update: [HH:MM:SS]" timestamps.</p>'
+      + '<p style="margin-top:0.75rem"><strong>Expected size:</strong> &lt; 200 lines for a normal session (was 5,000+).</p>'
+  },
+  rules: {
+    title: 'Workflow Rules &mdash; Behavioral Instructions',
+    body: '<p>The file that tells Claude <em>how</em> to behave regarding session management. Rewritten from 148 lines to 71 lines.</p>'
+      + '<p style="margin-top:0.75rem"><strong>Key sections:</strong></p>'
+      + '<ul style="margin-left:1.5rem; margin-top:0.5rem;"><li><strong>Session Record:</strong> Create at start, write at milestones, audit trail only</li><li><strong>Recovery: Wallet Card:</strong> Maintain ~30 lines, primary recovery target</li><li><strong>What NOT to Do:</strong> Explicit prohibitions on old patterns (timers, flock, PIDs)</li><li><strong>Session Lifecycle:</strong> How hooks interact</li></ul>'
+  },
+  close: {
+    title: '/close Command &mdash; Clean Shutdown',
+    body: '<p>Updated to work with the new system:</p>'
+      + '<ul style="margin-left:1.5rem; margin-top:0.5rem;"><li><strong>Wallet card cleanup:</strong> Writes "Session closed normally" / "No pending work" before finalizing</li><li><strong>Session record:</strong> Claude appends its own summary, then automated closing entry</li><li><strong>Removed:</strong> flock-based session record writes (milestone-only cadence eliminates write races)</li></ul>'
+      + '<p style="margin-top:0.75rem">Next session sees the wallet card says "closed" &mdash; knows it\'s a clean start, no recovery needed.</p>'
+  }
+};
+
+function showDetail(el) {
+  var key = el.getAttribute('data-detail');
+  document.querySelectorAll('.component').forEach(function(c) { c.classList.remove('selected'); });
+  el.classList.add('selected');
+  var titleEl = document.getElementById('detail-title');
+  var bodyEl = document.getElementById('detail-body');
+  titleEl.textContent = '';
+  bodyEl.textContent = '';
+  // Use DOM parsing for safe HTML insertion
+  var parser = new DOMParser();
+  var titleDoc = parser.parseFromString('<div>' + details[key].title + '</div>', 'text/html');
+  var bodyDoc = parser.parseFromString('<div>' + details[key].body + '</div>', 'text/html');
+  titleEl.appendChild(document.importNode(titleDoc.body.firstChild, true));
+  bodyEl.appendChild(document.importNode(bodyDoc.body.firstChild, true));
+}
+
+var meterData = {
+  normal: {
+    content: '<h4 style="color: var(--green); margin-bottom: 0.5rem;">Normal (&lt; 3 MB)</h4>'
+      + '<p><strong>Action:</strong> Nothing. Complete silence. No writes, no messages, no overhead.</p>'
+      + '<p style="margin-top:0.5rem" class="dim">This is where most sessions spend their entire lifetime. The monitor is invisible.</p>'
+  },
+  elevated: {
+    content: '<h4 style="color: var(--yellow); margin-bottom: 0.5rem;">Elevated (3&ndash;5 MB) &mdash; ~50% to compaction</h4>'
+      + '<p><strong>Action:</strong> One-time <code>stderr</code> note: "Context at ~50%." No file writes. No injection.</p>'
+      + '<p style="margin-top:0.5rem"><strong>Cooldown:</strong> Never repeats. Flag file tracks that this session already saw the message.</p>'
+      + '<p style="margin-top:0.5rem" class="dim">Just awareness. Claude knows context is getting used. No pressure to do anything.</p>'
+  },
+  high: {
+    content: '<h4 style="color: var(--orange); margin-bottom: 0.5rem;">High (5&ndash;7 MB) &mdash; Compaction approaching</h4>'
+      + '<p><strong>Action:</strong> Updates wallet card\'s git-state fields <em>once</em> (branch, uncommitted files, recent commits).</p>'
+      + '<p style="margin-top:0.5rem"><strong>Does NOT:</strong> Populate semantic fields (Current Work, Next Step) &mdash; those are Claude\'s responsibility. Does NOT write to session record.</p>'
+      + '<p style="margin-top:0.5rem"><strong>Cooldown:</strong> Never repeats. One and done.</p>'
+  },
+  critical: {
+    content: '<h4 style="color: var(--red); margin-bottom: 0.5rem;">Critical (&gt; 7 MB) &mdash; Compaction imminent</h4>'
+      + '<p><strong>Action: SILENT.</strong> No writes. No injection. No additionalContext. Nothing.</p>'
+      + '<p style="margin-top:0.5rem"><strong>Why:</strong> At this point, any write consumes the context it\'s trying to protect. The PreCompact hook will fire momentarily and handle recovery properly.</p>'
+      + '<p style="margin-top:0.5rem" class="dim">This is the core insight: a person having a stroke doesn\'t start journaling faster. The system goes quiet and trusts the emergency mechanism.</p>'
+  }
+};
+
+function showMeterDetail(level) {
+  var el = document.getElementById('meter-detail');
+  el.textContent = '';
+  var parser = new DOMParser();
+  var doc = parser.parseFromString('<div>' + meterData[level].content + '</div>', 'text/html');
+  el.appendChild(document.importNode(doc.body.firstChild, true));
+}
+</script>
+
+</body>
+</html>
