@@ -399,11 +399,11 @@ fi
 
 If tests still fail after Phase 10:
 
-1. **Do NOT loop** -- Phase 12 is verification only, it does not apply fixes
+1. **Do NOT fix within Phase 12** — Phase 12 is verification only, it does not apply fixes itself
 2. Report each still-failing test with its output
 3. For each failure, state whether it was a Phase 10 fix target (fix didn't work) or a regression (new failure introduced by Phase 10 changes)
-4. Include the specific error messages so the user can decide next steps
-5. Set overall result to FAIL with a clear summary
+4. Include the specific error messages for diagnostic context
+5. Set overall result to FAIL — the dispatcher loops back to Phase 10 to fix the remaining issues (per the Governing Law: all errors must be fixed, none may be deferred)
 
 ## Output Format
 

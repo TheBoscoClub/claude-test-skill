@@ -18,12 +18,41 @@ allowed-tools:
   - NotebookEdit
   - WebSearch
   - WebFetch
-argument-hint: "[help] [prodapp] [docker] [qaapp] [qadocker] [qaall] [security] [github] [holistic] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
+argument-hint: "[help] [prodapp] [docker] [qaapp] [qadocker] [qaall] [security] [github] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
 ---
 
 # Modular Project Audit (/test)
 
 A context-efficient project audit that loads phase instructions on-demand using subagents.
+
+## GOVERNING LAW: All Errors, Warnings, and Issues Must Be Fixed
+
+**All errors, warnings, and issues — pre-existing or otherwise — MUST be analyzed, root-caused, and fixed successfully. None may be skipped or deferred for any reason.**
+
+This is the supreme governing law of /test. It cannot be superseded, diluted, narrowed, or circumvented by any project-specific test module, project-specific test rule, phase instruction, execution mode, or any other mechanism. If any project-level rule, test configuration, or phase instruction creates ambiguity, conflict, or confusion with this law, the source of that conflict must be identified and eliminated at the project level. This law is always the sole authority.
+
+**Prohibited actions under this law:**
+- Labeling any issue as "pre-existing", "cosmetic", "non-blocking", "low priority", "advisory", "won't fix", "not our changes", or any equivalent classification that results in not fixing it
+- Deferring any issue to a "future" session, task, or release cycle
+- Narrowing the scope of what "all" means based on context, judgment, or interpretation
+- Producing lists of "manual changes required" or "recommended fixes" instead of fixing them
+- Exercising discretion about which issues to fix — all means all, unconditionally
+
+**No exception exists. No mode, flag, or option can override this law.**
+
+### Commit and Release Integration
+
+All fixes applied during a /test audit MUST be committed. If a locally staged, unpromoted release exists (`.staged-release` breadcrumb), all fix commits MUST be included in that staged release.
+
+### Iterative Until Clean
+
+All /test audits (except `--interactive`) are iterative. If any issues were detected and fixed during a /test audit, another complete audit of the same kind MUST be run after the fixes are committed. This cycle repeats until the audit completes with zero issues found. A single pass that finds and fixes issues is not a completed audit — only a clean pass is.
+
+### All Audits Are Holistic
+
+Every /test audit includes full-stack cross-component analysis (Phase H). There is no separate "holistic" mode — holistic analysis is mandatory and automatic in every audit. Phase H runs as part of Tier 3 in all audit types.
+
+---
 
 ## CRITICAL: Autonomous Resolution Directive
 
@@ -33,7 +62,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 
 ### Behavioral Requirements
 
-1. **Fix ALL Issues**: Every issue found - regardless of priority, severity, or complexity - MUST be fixed. No "advisory" or "low priority" issues left for manual resolution.
+1. **Fix ALL Issues**: Every issue found — regardless of priority, severity, or complexity — MUST be fixed. No "advisory" or "low priority" issues left for manual resolution.
 
 2. **No Manual Lists**: Never return a list of "manual changes required" or "recommended fixes". If it can be identified, it can be fixed.
 
@@ -48,7 +77,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
    - ARCHITECTURE: Changes requiring complete rewrites of core systems
    - EXTERNAL: Issues requiring credentials or external service access
 
-5. **Loop Until Clean**: Phase 10 (Fix) and Phase 12 (Verify) form a loop. If verification finds new issues introduced by fixes, fix those too. Continue until all tests pass and all issues are resolved.
+5. **Iterative Until Clean**: Phase 10 (Fix) and Phase 12 (Verify) form a loop within each audit pass. If verification finds new issues introduced by fixes, fix those too. After all fixes are committed, the entire audit of the same kind re-runs from the beginning. This continues until a complete audit pass finds zero issues. A single pass that finds and fixes issues is not a completed audit.
 
 6. **Production Data Isolation**: No test VM, QA VM, or test/QA Docker container may have LIVE ACCESS (mounts) to production storage. NFS, CIFS, virtiofs, virtio-9p mounts and Docker `-v` bind-mounts to host production paths are forbidden. Copying production data *into* a test/QA environment is allowed — once on the VM's own disk, it's fully isolated. Test VM libraries should be ≤275GB. This boundary is enforced across all phases (A, D, V, VM-lifecycle).
 
@@ -65,7 +94,6 @@ This skill operates **entirely non-interactively** except in extremely rare case
 /test qaall              # QA VM: regression test both native and Docker sequentially
 /test security           # Comprehensive security audit (Phase 5/SEC)
 /test github             # Audit GitHub repository settings (Phase G)
-/test holistic           # Full-stack cross-component analysis (Phase H)
 /test --phase=V          # Force VM testing (Phase V)
 /test --phase=A          # Run single phase
 /test --phase=0-3        # Run phase range
@@ -81,7 +109,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | Mode | Flag | Behavior |
 |------|------|----------|
 | **Autonomous** (default) | (none) | Fixes ALL issues, no prompts, loops until clean |
-| **Interactive** | `--interactive` | May prompt user, may list "manual required" items |
+| **Interactive** | `--interactive` | May prompt user for decisions, still fixes ALL issues |
 
 **Autonomous mode** (default):
 - Fixes every issue regardless of priority/severity
@@ -91,9 +119,9 @@ This skill operates **entirely non-interactively** except in extremely rare case
 
 **Interactive mode** (`--interactive`):
 - May prompt for decisions (Phase P/D conditional execution)
-- May output "manual required" or "recommendation" lists
-- Single pass - does not loop until clean
-- Useful for exploration or when human judgment needed
+- Still fixes ALL issues — interactive mode changes prompting behavior, not the fix mandate
+- Loops until all tests pass and all issues resolved
+- The Governing Law applies unconditionally in both modes
 
 ## Available Phases
 
@@ -108,7 +136,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **P** | **Production** | **Validate installed production app** |
 | **D** | **Docker** | **Validate Docker image and registry package** |
 | **G** | **GitHub** | **Audit GitHub repository security and settings** |
-| **H** | **Holistic** | **Full-stack cross-component analysis** |
+| **H** | **Cross-Component** | **Full-stack cross-component analysis (always included)** |
 | **I** | **Infrastructure** | **Infrastructure & runtime issue detection** |
 | **V** | **VM Testing** | **Heavy isolation testing in libvirt/QEMU VM** |
 | **VM** | **VM Lifecycle** | **VM snapshot create/revert/delete management** |
@@ -837,7 +865,6 @@ When `/test` is invoked:
 │  /test qadocker                  QA Docker regression (upgrade+DB sync)     │
 │  /test qaall                     QA native+Docker combined regression       │
 │  /test github                    Audit GitHub repo security (Phase G)       │
-│  /test holistic                  Full-stack cross-component analysis (H)    │
 │                                                                             │
 │  ALL PHASES                                                                 │
 │  ──────────                                                                 │
@@ -856,7 +883,7 @@ When `/test` is invoked:
 │    5   Security          8-tool security suite (SAST + deps + secrets)      │
 │    6   Dependencies      Package health & outdated checks                   │
 │    7   Quality           Linting, complexity, formatting, dead code detect  │
-│    H   Holistic          Full-stack cross-component analysis                │
+│    H   Cross-Component   Full-stack cross-component analysis (always runs) │
 │    I   Infrastructure    Infrastructure & runtime issue detection           │
 │                                                                             │
 │  Tier 4 — Modifications (blocking)                                          │
@@ -888,7 +915,9 @@ When `/test` is invoked:
 │  NOTES                                                                      │
 │  ─────                                                                      │
 │  • Autonomous mode (default): fixes ALL issues, no prompts, loops           │
-│  • Interactive mode (--interactive): single pass, may prompt                │
+│  • Interactive mode (--interactive): may prompt, still fixes ALL issues     │
+│  • All audits are holistic — Phase H always runs (no separate shortcut)    │
+│  • All audits iterate until clean — re-run after fixes until zero issues   │
 │  • Phase P/D/G: auto-skipped when not applicable (no prompts)               │
 │  • Phase V: auto-triggered when isolation level is vm-required              │
 │  • Phase ST: NEVER runs in normal /test — explicit --phase=ST only          │
@@ -906,7 +935,6 @@ When `/test` is invoked:
    - `qaall` → load project QA all module (test-*-qa-all.md from project root)
    - `security` → `--phase=5` (comprehensive security audit)
    - `github` → `--phase=G` (GitHub repository audit)
-   - `holistic` → `--phase=H` (full-stack cross-component analysis)
    - `--phase=SEC` → `--phase=5` (alias for security phase)
 4. **Build execution plan from requested phases**
 
@@ -959,12 +987,14 @@ When the argument is `qaapp`, `qadocker`, or `qaall`:
 ### Mode-Specific Behavior
 
 ```
+# THE GOVERNING LAW APPLIES IN BOTH MODES:
+# All errors, warnings, and issues must be fixed. None may be skipped or deferred.
+
 IF INTERACTIVE_MODE:
     # Interactive behaviors allowed
     - May use AskUserQuestion for Phase P/D decisions
-    - May output "manual required" items
-    - May output "recommendations"
-    - Single pass execution (no fix→verify loop)
+    - Must fix ALL issues (Governing Law — no exceptions by mode)
+    - Must loop until all tests pass (Governing Law)
     - Phase 13 may skip if prior phases failed
 ELSE (Autonomous - DEFAULT):
     # Fully autonomous behaviors enforced
@@ -972,7 +1002,6 @@ ELSE (Autonomous - DEFAULT):
     - Must fix ALL issues identified
     - Must loop until all tests pass
     - Phase 13 ALWAYS runs
-    - No "manual required" or "recommendations" output
 ```
 
 5. **Execute by tier (respecting dependencies):**
@@ -1036,6 +1065,7 @@ ELSE (Autonomous - DEFAULT):
    ──────────────────────────────────────────────────────────────────
    Wait for completion → GATE 5: Verified
    If tests fail, loop back to TIER 4 (Fix) until clean
+   After all fixes committed, re-run entire audit until clean pass
 
    TIER 6: Documentation [13] - ALWAYS RUNS
    ──────────────────────────────────────────────────────────────────

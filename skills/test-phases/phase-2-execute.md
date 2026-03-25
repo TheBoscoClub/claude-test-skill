@@ -362,12 +362,11 @@ FAILURE 3/3:
   Error:      TimeoutError after 30s
   Root Cause: Race condition in connection pool under load
   Complexity: HIGH
-  Suggestion: Redesign connection pool locking; mark as @pytest.mark.flaky for now
+  Suggestion: Redesign connection pool locking to eliminate race condition
 
 --- SUMMARY VERDICT ---
 Status: FAIL
-Blocking Issues: 2 (failures 1, 2)
-Non-Blocking Issues: 1 (failure 3 — flaky)
+Issues Requiring Fix: 3 (all failures must be fixed per Governing Law)
 Coverage Gap: 5.8% below target
 
 ===============================================================
