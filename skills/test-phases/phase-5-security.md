@@ -2,7 +2,7 @@
 
 > **Model**: `opus` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for security scanners, `WebSearch` to look up CVE details and check for known exploits for flagged vulnerabilities. Use `AskUserQuestion` in `--interactive` mode for security remediation decisions (e.g., breaking change vs. patching). Parallelize with other Tier 3 phases.
+> **Key Tools**: `Bash` for security scanners, `WebSearch` to look up CVE details and check for known exploits for flagged vulnerabilities. Use `AskUserQuestion` in `--interactive` mode for security remediation decisions (e.g., breaking change vs. patching). Parallelize with other Tier 3 phases. Includes cross-component data flow tracing and unvalidated input detection.
 > **Rate Limiting**: GitHub API calls are subject to rate limits. Use `gh api --cache 60s` where possible. Check `gh api rate_limit` before bulk API operations.
 
 **THE security phase** - tests and mitigates all security issues across:
@@ -487,6 +487,99 @@ else
         echo "  ℹ️ No SQLite databases found"
     fi
 fi
+```
+
+---
+
+## Cross-Component Data Flow Analysis
+
+Every phase must analyze security holistically — not just within individual files but across the entire project's data flows. This section is mandatory for all /test audits.
+
+### 3a. Map Entry Points
+
+```bash
+# API endpoints (Python Flask/FastAPI/Django)
+grep -rn "@app\.route\|@router\.\|@api_view\|path(" --include="*.py" "$PROJECT_ROOT" \
+  | grep -v ".venv\|.snapshots\|test" | sort
+
+# API endpoints (Node.js Express/Fastify)
+grep -rn "app\.\(get\|post\|put\|delete\|patch\)\|router\.\(get\|post\|put\|delete\|patch\)" \
+  --include="*.js" --include="*.ts" "$PROJECT_ROOT" | grep -v "node_modules\|.snapshots\|test" | sort
+
+# CLI entry points
+grep -rn "argparse\|click\.command\|typer\.\|clap::Parser\|flag\.Parse\|cobra" \
+  --include="*.py" --include="*.go" --include="*.rs" "$PROJECT_ROOT" \
+  | grep -v ".venv\|.snapshots\|vendor" | sort
+
+# File reads (data ingestion)
+grep -rn "open(\|read_file\|readFileSync\|os\.ReadFile\|fs::read" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.go" --include="*.rs" \
+  "$PROJECT_ROOT" | grep -v ".venv\|node_modules\|.snapshots\|test" | sort
+```
+
+### 3b. Map Storage Points
+
+```bash
+# Database writes
+grep -rn "\.execute\|\.commit\|\.insert\|\.update\|\.save\|\.create\|INSERT INTO\|UPDATE .* SET" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.go" "$PROJECT_ROOT" \
+  | grep -v ".venv\|node_modules\|.snapshots\|test" | sort
+
+# File writes
+grep -rn "open(.*['\"]w\|write(\|writeFileSync\|os\.WriteFile\|fs::write" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.go" --include="*.rs" \
+  "$PROJECT_ROOT" | grep -v ".venv\|node_modules\|.snapshots\|test" | sort
+
+# Environment/state writes
+grep -rn "os\.environ\[.*\]\s*=\|process\.env\.\S*\s*=\|os\.Setenv" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.go" "$PROJECT_ROOT" \
+  | grep -v ".venv\|node_modules\|.snapshots" | sort
+```
+
+### 3c. Map Exit Points
+
+```bash
+# API responses
+grep -rn "return.*jsonify\|return.*Response\|res\.json\|res\.send\|json\.NewEncoder\|HttpResponse" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.go" "$PROJECT_ROOT" \
+  | grep -v ".venv\|node_modules\|.snapshots\|test" | sort
+
+# Logging (potential data leakage)
+grep -rn "logger\.\|logging\.\|console\.log\|log\.\(Print\|Info\|Warn\|Error\)" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.go" "$PROJECT_ROOT" \
+  | grep -v ".venv\|node_modules\|.snapshots\|test" | wc -l
+# Count only — read selectively if count is high
+```
+
+### 3d. Flag Unvalidated Flows
+
+```bash
+# API endpoints that read request data without validation
+# Python: request.form/json/args without schema validation
+grep -rn "request\.\(form\|json\|args\|data\)\[" --include="*.py" "$PROJECT_ROOT" \
+  | grep -v ".venv\|.snapshots\|test" | while IFS=: read -r file line rest; do
+    # Check if the same function has validation (marshmallow, pydantic, wtforms)
+    func_start=$(grep -n "^def \|^async def " "$file" | awk -F: -v ln="$line" '$1 < ln {last=$1} END {print last}')
+    has_validation=$(sed -n "${func_start},${line}p" "$file" | grep -c "validate\|schema\|Schema\|BaseModel\|Form")
+    if [ "$has_validation" -eq 0 ]; then
+      echo "UNVALIDATED: $file:$line $rest"
+    fi
+  done 2>/dev/null
+
+# Node.js: req.body/params/query without validation
+grep -rn "req\.\(body\|params\|query\)\." --include="*.js" --include="*.ts" "$PROJECT_ROOT" \
+  | grep -v "node_modules\|.snapshots\|test" | head -30
+```
+
+Report: List each data flow (entry -> storage -> exit) and flag unvalidated paths.
+
+### Data Flow Checklist
+
+```
+[ ] Data entry points mapped (API, CLI, file reads)
+[ ] Data storage points mapped (DB, file writes)
+[ ] Data exit points mapped (API responses, logs, file writes)
+[ ] Unvalidated data flows flagged
 ```
 
 ---
