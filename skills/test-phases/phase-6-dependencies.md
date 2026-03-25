@@ -2,7 +2,7 @@
 
 > **Model**: `sonnet` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for audit commands. Use `WebSearch` to look up CVE details for flagged vulnerabilities. Parallelize with other Tier 3 phases.
+> **Key Tools**: `Bash` for audit commands. Use `WebSearch` to look up CVE details for flagged vulnerabilities. Parallelize with other Tier 3 phases. Includes cross-component import mapping, circular import detection, and unused export analysis.
 
 Detect all dependency ecosystems present in the project, audit each for outdated packages, known vulnerabilities, dependency conflicts, and license compliance. Produce a structured severity-classified report for Phase 10 consumption.
 
@@ -416,6 +416,82 @@ if [ -f Dockerfile ]; then
 fi
 ```
 
+## Cross-Component Dependency Analysis
+
+Every phase must analyze dependencies holistically — not just within individual files but across the entire project. This section is mandatory for all /test audits.
+
+### Import & Dependency Mapping
+
+Build a concrete dependency graph showing which modules depend on which.
+
+```bash
+# Python imports
+grep -rn "^from .* import\|^import " --include="*.py" "$PROJECT_ROOT" \
+  | grep -v ".venv\|.snapshots\|__pycache__\|node_modules" \
+  | sort > /tmp/phase-6-crosscomp-py-imports.txt
+
+# JavaScript/TypeScript imports
+grep -rn "require(\|import .* from " --include="*.js" --include="*.ts" --include="*.jsx" --include="*.tsx" "$PROJECT_ROOT" \
+  | grep -v "node_modules\|.snapshots\|dist\|build" \
+  | sort > /tmp/phase-6-crosscomp-js-imports.txt
+
+# Go imports
+grep -rn '"[^"]*"' --include="*.go" "$PROJECT_ROOT" \
+  | grep -v vendor\|.snapshots \
+  | sort > /tmp/phase-6-crosscomp-go-imports.txt
+
+# Rust use statements
+grep -rn "^use \|^pub use " --include="*.rs" "$PROJECT_ROOT" \
+  | grep -v target\|.snapshots \
+  | sort > /tmp/phase-6-crosscomp-rs-imports.txt
+
+# Shell script sourcing
+grep -rn "source \|^\. " --include="*.sh" "$PROJECT_ROOT" \
+  | grep -v .snapshots \
+  | sort > /tmp/phase-6-crosscomp-sh-sources.txt
+```
+
+```bash
+# Python: find pairs where A imports B and B imports A
+python3 -c "
+import re, sys, pathlib, collections
+
+imports = collections.defaultdict(set)
+for line in open('/tmp/phase-6-crosscomp-py-imports.txt'):
+    match = re.match(r'(.+?\.py):\d+:(from (\S+) import|import (\S+))', line)
+    if match:
+        src = match.group(1)
+        mod = match.group(3) or match.group(4)
+        if mod:
+            imports[src].add(mod.split('.')[0])
+
+# Check for cycles (simplified: direct A<->B)
+for src, deps in imports.items():
+    src_mod = pathlib.Path(src).stem
+    for dep in deps:
+        for other_src, other_deps in imports.items():
+            if pathlib.Path(other_src).stem == dep and src_mod in other_deps:
+                print(f'CIRCULAR: {src} <-> {other_src}')
+" 2>/dev/null || true
+```
+
+```bash
+# Python: find defined functions/classes never imported elsewhere
+grep -rn "^def \|^class " --include="*.py" "$PROJECT_ROOT" \
+  | grep -v test\|.venv\|.snapshots\|__pycache__ \
+  | while IFS=: read -r file line defn; do
+    name=$(echo "$defn" | sed 's/^def \|^class //' | sed 's/[(:].*//')
+    # Check if this name is imported or referenced elsewhere
+    count=$(grep -rn "$name" --include="*.py" "$PROJECT_ROOT" \
+      | grep -v ".venv\|.snapshots\|__pycache__\|$file" | wc -l)
+    if [ "$count" -eq 0 ]; then
+      echo "UNUSED: $file:$line $name"
+    fi
+  done 2>/dev/null | head -50
+```
+
+Report: List all import relationships, flag circular imports and unused exports.
+
 ## Severity Classification Reference
 
 | Severity | Criteria | Examples |
@@ -424,6 +500,12 @@ fi
 | **HIGH** | Known CVE, no known exploit yet | pip-audit/npm audit/cargo audit findings |
 | **MEDIUM** | Outdated major version, missing lock file, unpinned deps | Major version behind, no Gemfile.lock |
 | **LOW** | Outdated minor/patch, copyleft license in permissive project | Minor updates, GPL dependency |
+
+## Checklist
+
+- [ ] Import/dependency map built for all source files
+- [ ] Circular imports checked and flagged
+- [ ] Unused exports identified
 
 ## Output Format
 
