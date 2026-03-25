@@ -97,7 +97,7 @@ For the Claude.ai web interface (not Claude Code CLI):
 2. Go to [claude.ai](https://claude.ai) → Settings → Skills
 3. Upload the `SKILL.md` file
 
-> **Note:** The web version provides the skill reference only. Full autonomous execution with all 21 phases requires Claude Code (Methods 1 or 2).
+> **Note:** The web version provides the skill reference only. Full autonomous execution with all 20 phases requires Claude Code (Methods 1 or 2).
 
 ---
 
@@ -111,7 +111,7 @@ ls -la ~/.claude/commands/test.md
 
 # 2. Check that phase files are accessible
 ls ~/.claude/skills/test-phases/ | wc -l
-# Expected: 21 files
+# Expected: 20 files
 
 # 3. Run the self-test (validates the framework)
 # In Claude Code:
@@ -119,7 +119,7 @@ ls ~/.claude/skills/test-phases/ | wc -l
 ```
 
 Phase ST checks:
-- All 21 phase files exist and are readable
+- All 20 phase files exist and are readable
 - Symlinks point to correct targets
 - Dispatcher references all phases
 - Security tools are installed
@@ -209,7 +209,6 @@ tools:
         ├── phase-C-restore.md
         ├── phase-D-docker.md
         ├── phase-G-github.md
-        ├── phase-H-holistic.md
         ├── phase-I-infrastructure.md
         ├── phase-P-production.md
         ├── phase-S-snapshot.md

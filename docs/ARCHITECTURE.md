@@ -1,14 +1,14 @@
 # Test-Skill Architecture
 
-> Version: 4.0.0
+> Version: 4.1.0
 
-This document describes the architecture of the claude-test-skill plugin for Claude Code, a modular 21-phase autonomous project audit system.
+This document describes the architecture of the claude-test-skill plugin for Claude Code, a modular 20-phase autonomous project audit system.
 
 ---
 
 ## Overview
 
-The test-skill follows a **dispatcher + subagent** architecture that achieves ~93% context reduction compared to a monolithic approach. Instead of loading all 21 phases into context, only the dispatcher (~1,000 lines) is loaded, and individual phases are invoked on-demand via Task tool subagents with per-phase model selection.
+The test-skill follows a **dispatcher + subagent** architecture that achieves ~93% context reduction compared to a monolithic approach. Instead of loading all 20 phases into context, only the dispatcher (~1,000 lines) is loaded, and individual phases are invoked on-demand via Task tool subagents with per-phase model selection.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -25,8 +25,8 @@ The test-skill follows a **dispatcher + subagent** architecture that achieves ~9
 │        │ spawn (parallel, model varies per phase)                   │
 │        ▼                                                            │
 │  ┌──────────────────────────────────────────────────────────────┐  │
-│  │  [Phase 5]   [Phase 6]   [Phase 7]   [Phase H]   [Phase I]  │  │
-│  │   opus       sonnet      opus        opus         sonnet     │  │
+│  │  [Phase 5]   [Phase 6]   [Phase 7]   [Phase I]              │  │
+│  │   opus       sonnet      opus        sonnet                  │  │
 │  │  Running in parallel — each in its own subagent context      │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │        │                                                            │
@@ -49,7 +49,7 @@ claude-test-skill/
 │   └── test.md                 # Main dispatcher (~1,000 lines)
 │
 ├── skills/
-│   └── test-phases/            # 21 phase files
+│   └── test-phases/            # 20 phase files
 │       │
 │       │  ── TIER 0: Safety Gates ──
 │       ├── phase-S-snapshot.md       # BTRFS safety snapshot          [haiku]
@@ -66,7 +66,6 @@ claude-test-skill/
 │       ├── phase-5-security.md       # Comprehensive security         [opus]
 │       ├── phase-6-dependencies.md   # Package health                 [sonnet]
 │       ├── phase-7-quality.md        # Linting, complexity, cleanup   [opus]
-│       ├── phase-H-holistic.md       # Cross-component analysis       [opus]
 │       ├── phase-I-infrastructure.md # Infrastructure issues          [sonnet]
 │       │
 │       │  ── TIER 4: Modifications ──
@@ -195,7 +194,7 @@ Each phase is assigned to an optimal model based on task complexity:
 │                      MODEL TIER ASSIGNMENTS                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  OPUS (10 phases)         Complex analysis, multi-step reasoning    │
+│  OPUS (9 phases)          Complex analysis, multi-step reasoning    │
 │  ├── Phase 1  Discovery   Architecture detection, framework ID     │
 │  ├── Phase 5  Security    8-tool security suite, CVE analysis       │
 │  ├── Phase 7  Quality     LSP integration, complexity analysis      │
@@ -204,7 +203,6 @@ Each phase is assigned to an optimal model based on task complexity:
 │  ├── Phase P  Production  Live system validation                    │
 │  ├── Phase D  Docker      Image/registry validation                 │
 │  ├── Phase G  GitHub      Repository security audit                 │
-│  ├── Phase H  Cross-Comp  Cross-component reasoning (always runs)   │
 │  └── Phase ST Self-Test   Framework meta-validation                 │
 │                                                                     │
 │  SONNET (9 phases)        Standard testing and verification         │
@@ -247,7 +245,7 @@ Phases execute in **9 tiers** with strict dependencies:
 │  TIER 2   [2] [2a]  ───────────────────────────────────  PARALLEL  │
 │              │                                                      │
 │              ▼ GATE 3: Tests Complete                              │
-│  TIER 3   [5][6][7][H][I] ────────────────────────────  PARALLEL   │
+│  TIER 3   [5][6][7][I] ───────────────────────────────  PARALLEL   │
 │              │                                                      │
 │              ▼ GATE 4: Analysis Complete                           │
 │  TIER 4   [10] Fix  ───────────────────────────────────  BLOCKING  │
@@ -278,7 +276,7 @@ Phases execute in **9 tiers** with strict dependencies:
 | 0 | S, 0 | Parallel | haiku, sonnet | Independent safety setup |
 | 1 | 1 | Sequential | opus | Everything depends on discovery |
 | 2 | 2, 2a | Parallel | sonnet, sonnet | Independent test execution |
-| 3 | 5,6,7,H,I | Parallel | mixed | All read-only analysis |
+| 3 | 5,6,7,I | Parallel | mixed | All read-only analysis |
 | 4 | 10 | Sequential | opus | Modifies files — must be isolated |
 | 5 | A, P, D, G | Conditional | opus | Based on discovery results |
 | 6 | 12 | Sequential | sonnet | Final verification |
@@ -373,8 +371,8 @@ Phase ST is a **meta-testing** phase that validates the test-skill framework its
 - **Only** runs when explicitly called: `/test --phase=ST`
 - **No dependencies** — runs completely standalone
 
-**Validates (6 sections):**
-1. All 21 phase files exist and are readable
+**Validates (10 sections):**
+1. All 20 phase files exist and are readable
 2. Symlinks point to correct targets
 3. Dispatcher contains all phase references and shortcuts
 4. All security and core tools are installed
@@ -426,8 +424,8 @@ Context consumed: ~93% reduction for single-phase runs
 By assigning cheaper models to simpler phases:
 
 ```
-Without tiering: 21 phases x opus cost = $$$
-With tiering:    10 x opus + 9 x sonnet + 2 x haiku = ~45% cost reduction
+Without tiering: 20 phases x opus cost = $$$
+With tiering:    9 x opus + 9 x sonnet + 2 x haiku = ~45% cost reduction
 ```
 
 ---
@@ -534,6 +532,7 @@ The v4.0.0 release consolidated the phase inventory from 27 to 21 phases:
 
 | Version | Key Changes |
 |---------|-------------|
+| 4.1.0 | Phase H dissolved (21 to 20 phases), cross-component analysis distributed to Phases 5, 6, 7, I |
 | 4.0.0 | Phase consolidation (27 to 21), bloat reduction, project-agnostic, agents integrated |
 | 3.0.1 | Canonical help block, Phase ST grep fix, argument-hint update |
 | 3.0.0 | Phase I/H dispatcher fixes, Tier 3 execution lists corrected, documentation audit |

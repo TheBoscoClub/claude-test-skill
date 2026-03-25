@@ -1,6 +1,6 @@
 # Claude Code Test Skill
 
-A comprehensive 21-phase autonomous project audit system for Claude Code with full GitHub integration.
+A comprehensive 20-phase autonomous project audit system for Claude Code with full GitHub integration.
 
 [![Security Scan](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml/badge.svg)](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/TheBoscoClub/claude-test-skill)](https://github.com/TheBoscoClub/claude-test-skill/releases)
@@ -78,7 +78,6 @@ The `/test` skill performs a complete autonomous audit of any software project -
 | 5 | Security | Comprehensive security (7 tools: bandit, semgrep, CodeQL, pip-audit, trivy, grype, checkov) |
 | 6 | Dependencies | Package health, outdated/unused/vulnerable packages |
 | 7 | Quality | Linting, complexity analysis, dead code cleanup |
-| H | Cross-Component | Full-stack cross-component analysis (always included) |
 | I | Infrastructure | Infrastructure and runtime issue detection |
 | **Remediation** |||
 | 10 | Fix | Auto-fix issues (ruff --fix, black, isort, shfmt, codespell) |
@@ -240,7 +239,7 @@ TIER 1: Discovery [1] ───────────────────�
 TIER 2: Testing [2, 2a] ────────────────── Can run in parallel
            │
            ▼
-TIER 3: Analysis [5, 6, 7, H, I] ──────── Can run in parallel (read-only)
+TIER 3: Analysis [5, 6, 7, I] ─────────── Can run in parallel (read-only)
            │
            ▼
 TIER 4: Fix [10] ───────────────────────── MODIFIES FILES (sequential)
@@ -305,7 +304,7 @@ claude-test-skill/
 ├── commands/
 │   └── test.md              # Main dispatcher (~1,000 lines)
 ├── skills/
-│   └── test-phases/         # 21 phase files (each with Opus 4.6 config header)
+│   └── test-phases/         # 20 phase files (each with Opus 4.6 config header)
 │       ├── phase-S-snapshot.md       # [haiku]
 │       ├── phase-0-preflight.md      # [sonnet]
 │       ├── phase-1-discovery.md      # [opus]
@@ -321,7 +320,6 @@ claude-test-skill/
 │       ├── phase-P-production.md     # [opus]
 │       ├── phase-D-docker.md         # [opus]
 │       ├── phase-G-github.md         # [opus]
-│       ├── phase-H-holistic.md       # [opus]
 │       ├── phase-I-infrastructure.md # [sonnet]
 │       ├── phase-C-restore.md        # [haiku]
 │       ├── phase-ST-self-test.md     # [opus]

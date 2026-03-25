@@ -1,11 +1,11 @@
 ---
 name: project-audit
-description: Autonomous 21-phase project audit with testing, security scanning, code quality, GitHub auditing, and auto-fixing
+description: Autonomous 20-phase project audit with testing, security scanning, code quality, GitHub auditing, and auto-fixing
 ---
 
 # /test - Modular Project Audit
 
-A comprehensive 21-phase autonomous project audit system with full GitHub integration.
+A comprehensive 20-phase autonomous project audit system with full GitHub integration.
 
 ## Quick Reference
 
@@ -24,7 +24,7 @@ A comprehensive 21-phase autonomous project audit system with full GitHub integr
 ## Key Features
 
 - **Autonomous**: Fixes ALL issues without prompting, loops until clean
-- **21 Phases**: Complete coverage from safety snapshots to documentation sync
+- **20 Phases**: Complete coverage from safety snapshots to documentation sync
 - **Multi-Language**: Python, Node.js, Go, Rust, Shell, Docker, YAML
 - **20+ Tools**: ruff, pylint, bandit, trivy, CodeQL, and more
 - **GitHub Integration**: Dependabot, CodeQL workflows, branch protection audit
@@ -47,7 +47,6 @@ A comprehensive 21-phase autonomous project audit system with full GitHub integr
 | P | Production | Live app validation |
 | D | Docker | Image validation |
 | G | GitHub | Repo security audit |
-| H | Cross-Component | Cross-component analysis (always included) |
 | I | Infrastructure | Runtime issue detection |
 | 12 | Verify | Re-run tests |
 | 13 | Docs | Documentation sync |
@@ -62,7 +61,7 @@ The skill operates **entirely non-interactively**:
 
 1. **Fix ALL Issues** - No "manual required" lists, no deferrals, no exceptions
 2. **Iterative Until Clean** - After fixes are committed, the entire audit re-runs until a clean pass with zero issues
-3. **All Audits Are Holistic** - Phase H (cross-component analysis) runs in every audit
+3. **All Audits Are Holistic** - Cross-component analysis is a structural property of every analysis phase
 4. **Documentation Sync** - Docs always match codebase state
 5. **Commit and Stage** - All fixes committed; added to staged release if one exists
 
@@ -87,7 +86,7 @@ Upload this `SKILL.md` file directly to your Claude.ai account:
 
 ### Claude Code (CLI)
 
-For full autonomous execution with all 21 phases:
+For full autonomous execution with all 20 phases:
 
 ```bash
 # Clone and symlink
@@ -100,4 +99,4 @@ ln -s ~/claude-test-skill/skills/test-phases ~/.claude/skills/test-phases
 
 - **Repository**: https://github.com/TheBoscoClub/claude-test-skill
 - **Full Documentation**: See README.md and INSTALL.md
-- **Version**: 4.0.0
+- **Version**: 4.1.0
