@@ -7,11 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
 ### Changed
+- **Phase H dissolved** — Cross-component analysis distributed to every Tier 3 phase:
+  - Phase H Step 1 (import/dependency mapping) → Phase 6 (Dependencies)
+  - Phase H Step 2 (config sprawl) + Step 4 (quality issues) → Phase 7 (Quality)
+  - Phase H Step 3 (data flow tracing) → Phase 5 (Security)
+  - Phase H Step 5 (integration surface audit) → Phase I (Infrastructure)
+- Phase count reduced from 21 to 20
+- All audits now holistic by design — cross-component analysis is a structural property of every analysis phase, not a separate optional phase
+- Opus phase count reduced from 10 to 9
 
-### Fixed
+### Added
+- **Phase ST Section 7**: Governing Law validation (presence of all 5 governing rules)
+- **Phase ST Section 8**: Phase directive compliance (prohibited language scan, cross-component verification, Phase H absence check)
+- **Phase ST Section 9**: Tier dependency validation (Tier 3 composition, gate count, conditional logic)
+- **Phase ST Section 10**: Flag and shortcut validation (all CLI flags, all 7 shortcuts, no stale holistic shortcut)
+
+### Removed
+- `phase-H-holistic.md` — dissolved into Phases 5, 6, 7, I (no functionality lost)
+- `holistic` as a concept separate from normal analysis — all analysis is now inherently holistic
 
 ## [4.0.0] - 2026-03-22
 
