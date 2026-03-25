@@ -10,12 +10,14 @@ Fix ALL issues found by prior phases. Three categories, executed in order: auto-
 
 ## Execution Mode
 
+The **Governing Law** applies unconditionally in both modes: all errors, warnings, and issues must be fixed. None may be skipped or deferred.
+
 | Mode | Behavior |
 |------|----------|
-| **Autonomous** (default) | Fix ALL issues. No "manual required" items. No skipping. |
-| **Interactive** (`--interactive`) | May use `AskUserQuestion` for ambiguous logic or architectural decisions. |
+| **Autonomous** (default) | Fix ALL issues. No prompts except safety/architecture/external. |
+| **Interactive** (`--interactive`) | Fix ALL issues. May use `AskUserQuestion` for ambiguous logic or architectural decisions. |
 
-In autonomous mode, the only valid reasons to skip a fix are: (1) requires credentials/access you don't have, (2) requires an explicit architectural decision from the user. Everything else gets fixed.
+The only valid reasons to prompt the user are: (1) requires credentials/access you don't have, (2) requires an explicit architectural decision from the user. Everything else gets fixed without prompting.
 
 ---
 
@@ -263,6 +265,8 @@ If ANY check fails, go back and fix. Do not proceed to Phase 12 with known failu
 
 ## Rules
 
+Per the **Governing Law** (see test.md): all errors, warnings, and issues must be fixed. None may be skipped or deferred.
+
 1. **Fix everything** — no "pre-existing", no "cosmetic", no "non-blocking" dismissals. If an issue was identified by a prior phase, it gets fixed.
 2. **Verify every fix** — after each fix, run the relevant test(s). A fix without verification is not a fix.
 3. **Don't break passing tests** — if a fix causes a previously passing test to fail, revert the fix and try a different approach. Record it in the output.
@@ -307,4 +311,4 @@ Commits:
 Status: PASS - All issues resolved
 ```
 
-In `--interactive` mode, append a `MANUAL REQUIRED` section listing skipped items with reasons. Status becomes: `PARTIAL - N fixed, M require manual review`.
+In `--interactive` mode, if a fix requires user input (credentials, architectural decision), append a `BLOCKED` section listing those items with the specific blocker. These are not deferred — they are actively blocked and must be resolved before /test can complete. Status becomes: `BLOCKED - N fixed, M awaiting user input`.

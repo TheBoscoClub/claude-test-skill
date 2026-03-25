@@ -280,7 +280,7 @@ echo "────────────────────────�
 echo "  3.3 Shortcut Definitions"
 echo "───────────────────────────────────────────────────────────────────"
 
-SHORTCUTS=("prodapp" "docker" "security" "github" "holistic")
+SHORTCUTS=("prodapp" "docker" "security" "github")
 MISSING_SHORTCUTS=0
 for shortcut in "${SHORTCUTS[@]}"; do
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))

@@ -1,6 +1,7 @@
-# Phase H: Holistic Cross-Component Analysis
+# Phase H: Cross-Component Analysis
 
 > **Model**: `opus` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only analysis; fixes go to Phase 10)
+> **Always Included**: This phase runs in every /test audit — all audits are holistic by default.
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Grep`, `Glob`, `Read`, `Bash` for cross-component analysis. Parallelize with Phases 7, 5 (after Discovery).
 

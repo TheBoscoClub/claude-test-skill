@@ -56,7 +56,6 @@ The `/test` skill performs a complete autonomous audit of any software project -
 /test prodapp            # Validate installed production app
 /test docker             # Validate Docker image and registry
 /test github             # Audit GitHub repository settings
-/test holistic           # Full-stack cross-component analysis
 /test --phase=ST         # Validate test-skill framework (meta-testing)
 /test --interactive      # Enable prompts for decisions
 /test help               # Show all options
@@ -79,7 +78,7 @@ The `/test` skill performs a complete autonomous audit of any software project -
 | 5 | Security | Comprehensive security (7 tools: bandit, semgrep, CodeQL, pip-audit, trivy, grype, checkov) |
 | 6 | Dependencies | Package health, outdated/unused/vulnerable packages |
 | 7 | Quality | Linting, complexity analysis, dead code cleanup |
-| H | Holistic | Full-stack cross-component analysis |
+| H | Cross-Component | Full-stack cross-component analysis (always included) |
 | I | Infrastructure | Infrastructure and runtime issue detection |
 | **Remediation** |||
 | 10 | Fix | Auto-fix issues (ruff --fix, black, isort, shfmt, codespell) |
@@ -114,9 +113,9 @@ The `/test` skill performs a complete autonomous audit of any software project -
 
 ### Interactive Mode
 - May prompt for decisions (e.g., Phase P/D conditional execution)
-- May output "manual required" or "recommendation" lists
-- Single pass - does not loop until clean
-- Useful for exploration or when human judgment needed
+- Still fixes ALL issues — interactive mode changes prompting behavior, not the fix mandate
+- Loops until all tests pass and all issues resolved
+- Useful when architectural decisions require human judgment
 
 ---
 

@@ -204,7 +204,7 @@ Each phase is assigned to an optimal model based on task complexity:
 │  ├── Phase P  Production  Live system validation                    │
 │  ├── Phase D  Docker      Image/registry validation                 │
 │  ├── Phase G  GitHub      Repository security audit                 │
-│  ├── Phase H  Holistic    Cross-component reasoning                 │
+│  ├── Phase H  Cross-Comp  Cross-component reasoning (always runs)   │
 │  └── Phase ST Self-Test   Framework meta-validation                 │
 │                                                                     │
 │  SONNET (9 phases)        Standard testing and verification         │
