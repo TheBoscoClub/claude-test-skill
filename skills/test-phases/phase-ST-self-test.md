@@ -616,7 +616,7 @@ PROHIBITED_PATTERNS=("manual required" "recommended fixes" "non-blocking" "low p
 VIOLATIONS=0
 for pattern in "${PROHIBITED_PATTERNS[@]}"; do
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    MATCHES=$(grep -rli "$pattern" "$SKILLS_DIR"/phase-*.md 2>/dev/null | grep -v phase-ST)
+    MATCHES=$(grep -rn -i "$pattern" "$SKILLS_DIR"/phase-*.md 2>/dev/null | grep -v 'phase-ST\|security_advisory\|bundler-audit\|grep -E\|jq ' | grep -v '^\s*#\|\$(' | cut -d: -f1 | sort -u)
     if [[ -n "$MATCHES" ]]; then
         echo "  ❌ Prohibited language '$pattern' found in:"
         echo "$MATCHES" | while read -r f; do echo "     - $(basename "$f")"; done

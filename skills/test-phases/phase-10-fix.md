@@ -267,7 +267,7 @@ If ANY check fails, go back and fix. Do not proceed to Phase 12 with known failu
 
 Per the **Governing Law** (see test.md): all errors, warnings, and issues must be fixed. None may be skipped or deferred.
 
-1. **Fix everything** — no "pre-existing", no "cosmetic", no "non-blocking" dismissals. If an issue was identified by a prior phase, it gets fixed.
+1. **Fix everything** — every identified issue gets fixed. No dismissals based on prior state, cosmetic nature, or severity classification.
 2. **Verify every fix** — after each fix, run the relevant test(s). A fix without verification is not a fix.
 3. **Don't break passing tests** — if a fix causes a previously passing test to fail, revert the fix and try a different approach. Record it in the output.
 4. **Commit in batches by category** — auto-fixes together, test fixes together, audit fixes together. This makes rollback possible if a batch causes problems.

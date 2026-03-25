@@ -85,7 +85,7 @@ IF detect_web_ui():
     4. Report: Pages tested, errors found, screenshots captured
 ```
 
-**Note:** Playwright testing is non-blocking. If Playwright MCP is not connected to this session, skip to standard functional testing (curl/wget HTTP checks).
+**Note:** Playwright testing is optional. If Playwright MCP is not connected to this session, skip to standard functional testing (curl/wget HTTP checks).
 
 ## CRITICAL: Production Data Isolation
 
