@@ -2,7 +2,7 @@
 
 > **Model**: `opus` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for linters/formatters. Parallelize with other Tier 3 phases.
+> **Key Tools**: `Bash` for linters/formatters. Parallelize with other Tier 3 phases. Includes cross-component config sprawl detection, version mismatch identification, and hardcoded path analysis.
 
 Comprehensive linting, formatting, dead code detection, complexity analysis, and style checks.
 
@@ -501,3 +501,127 @@ collect_quality_issues() {
 
 collect_quality_issues
 ```
+
+## Cross-Component Quality Analysis
+
+Every phase must analyze quality holistically — not just within individual files but across the entire project. This section is mandatory for all /test audits.
+
+### Shared Config Detection
+
+Find configuration files and detect sprawl (same setting defined in multiple places).
+
+```bash
+# Find config files
+find "$PROJECT_ROOT" -type f \( \
+  -name "*.env" -o -name "*.env.*" -o -name "*.ini" -o -name "*.cfg" -o \
+  -name "*.toml" -o -name "*.yaml" -o -name "*.yml" -o -name "*.conf" -o \
+  -name "*.json" -o -name "config.*" -o -name "settings.*" \
+\) | grep -v "node_modules\|.venv\|.snapshots\|__pycache__\|.git/" | sort
+
+# Find hardcoded config in source (env var reads)
+grep -rn "os\.environ\|os\.getenv\|process\.env\.\|env::var\|viper\.Get" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.go" --include="*.rs" \
+  "$PROJECT_ROOT" | grep -v ".venv\|node_modules\|.snapshots" | sort
+```
+
+```bash
+# Find variables/settings defined in multiple config files
+# Extract key=value or KEY: value patterns from all config files
+find "$PROJECT_ROOT" -type f \( -name "*.env" -o -name "*.env.*" -o -name "*.ini" -o -name "*.conf" \) \
+  -not -path "*/.snapshots/*" -not -path "*/.venv/*" -not -path "*/.git/*" \
+  -exec grep -Hn "^[A-Z_]*=" {} \; 2>/dev/null \
+  | awk -F= '{print $1}' | awk -F: '{key=$NF; file=$1; keys[key]=keys[key] " " file}
+  END {for (k in keys) {n=split(keys[k], arr, " "); if (n > 1) print "SPRAWL:", k, "defined in", n, "files:", keys[k]}}'
+
+# Check for port/host/path constants defined in multiple source files
+for pattern in "PORT\s*=" "HOST\s*=" "DATABASE\s*=" "DB_PATH\s*=" "API_URL\s*="; do
+  hits=$(grep -rn "$pattern" --include="*.py" --include="*.js" --include="*.ts" --include="*.sh" \
+    "$PROJECT_ROOT" | grep -v ".venv\|node_modules\|.snapshots\|test" | wc -l)
+  if [ "$hits" -gt 1 ]; then
+    echo "CONFIG SPRAWL: '$pattern' defined in $hits locations:"
+    grep -rn "$pattern" --include="*.py" --include="*.js" --include="*.ts" --include="*.sh" \
+      "$PROJECT_ROOT" | grep -v ".venv\|node_modules\|.snapshots\|test"
+  fi
+done
+```
+
+```bash
+# Find all port references and verify consistency
+echo "=== Port definitions ==="
+grep -rn "port\s*[:=]\s*[0-9]" --include="*.py" --include="*.js" --include="*.ts" \
+  --include="*.yaml" --include="*.yml" --include="*.toml" --include="*.env" --include="*.sh" \
+  --include="*.service" "$PROJECT_ROOT" | grep -v ".venv\|node_modules\|.snapshots\|test" | sort
+
+# Find all database path references and verify consistency
+echo "=== Database paths ==="
+grep -rn "\.db\b\|\.sqlite\|database.*=\|DB_PATH\|DB_FILE\|DATABASE_URL" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.sh" --include="*.env" \
+  --include="*.toml" --include="*.yaml" "$PROJECT_ROOT" \
+  | grep -v ".venv\|node_modules\|.snapshots\|test\|__pycache__" | sort
+```
+
+Report: List each setting, all locations where it appears, and flag mismatches.
+
+### Cross-Component Issues
+
+```bash
+# Absolute paths that should be configurable
+grep -rn "\"\/opt\/\|\"\/var\/\|\"\/etc\/\|\"\/srv\/\|\"\/home\/" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.go" --include="*.rs" \
+  --include="*.sh" "$PROJECT_ROOT" \
+  | grep -v ".venv\|node_modules\|.snapshots\|test\|__pycache__\|.git/" \
+  | grep -v "# \|// \|/\*" | sort
+```
+
+```bash
+# Check for version strings defined in multiple places
+grep -rn "version\s*[:=]\s*['\"][0-9]" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.toml" \
+  --include="*.json" --include="*.yaml" --include="*.yml" --include="*.cfg" \
+  "$PROJECT_ROOT" | grep -v ".venv\|node_modules\|.snapshots\|.git/" | sort
+
+# Flag if multiple different version values exist
+grep -rn "version\s*[:=]\s*['\"][0-9]" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.toml" \
+  --include="*.json" --include="*.yaml" --include="*.yml" \
+  "$PROJECT_ROOT" | grep -v ".venv\|node_modules\|.snapshots\|.git/" \
+  | grep -oP "['\"][0-9]+\.[0-9]+[^'\"]*['\"]" | sort -u | wc -l
+# If count > 1, versions are out of sync
+```
+
+```bash
+# Python: functions defined but never called (excluding test files)
+grep -rn "^def " --include="*.py" "$PROJECT_ROOT" \
+  | grep -v ".venv\|.snapshots\|test\|__pycache__" \
+  | while IFS=: read -r file line defn; do
+    name=$(echo "$defn" | sed 's/^def //' | sed 's/(.*//')
+    # Skip dunder methods and private methods
+    echo "$name" | grep -q "^__\|^_" && continue
+    refs=$(grep -rn "\b${name}\b" --include="*.py" "$PROJECT_ROOT" \
+      | grep -v ".venv\|.snapshots\|__pycache__" | grep -v "^$file:$line:" | wc -l)
+    if [ "$refs" -eq 0 ]; then
+      echo "DEAD CODE: $file:$line def $name()"
+    fi
+  done 2>/dev/null | head -30
+
+# JavaScript: exported functions never imported elsewhere
+grep -rn "^export \(function\|const\|class\) " --include="*.js" --include="*.ts" "$PROJECT_ROOT" \
+  | grep -v "node_modules\|.snapshots\|dist\|build\|test" \
+  | while IFS=: read -r file line defn; do
+    name=$(echo "$defn" | sed 's/^export \(function\|const\|class\) //' | sed 's/[( {=].*//')
+    refs=$(grep -rn "\b${name}\b" --include="*.js" --include="*.ts" "$PROJECT_ROOT" \
+      | grep -v "node_modules\|.snapshots\|dist\|build" | grep -v "^$file:" | wc -l)
+    if [ "$refs" -eq 0 ]; then
+      echo "UNUSED EXPORT: $file:$line $name"
+    fi
+  done 2>/dev/null | head -30
+```
+
+## Checklist
+
+- [ ] Config files enumerated and cross-referenced
+- [ ] Config sprawl (duplicate settings) detected
+- [ ] Cross-language config consistency verified (ports, paths, DB)
+- [ ] Hardcoded paths detected
+- [ ] Version string consistency verified
+- [ ] Cross-component dead code identified
