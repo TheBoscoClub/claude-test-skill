@@ -1,5 +1,5 @@
 ---
-description: Modular project audit - testing, security, debugging, fixing (phase-based loading for context efficiency) (user)
+description: Modular project audit - testing, security, debugging, fixing (phase-based loading for context efficiency, holistic by design) (user)
 model: opus
 allowed-tools:
   - Bash
@@ -40,6 +40,10 @@ This is the supreme governing law of /test. It cannot be superseded, diluted, na
 
 **No exception exists. No mode, flag, or option can override this law.**
 
+### One-Way Ratchet
+
+Project-specific test modules, rules, configurations, and definitions may strengthen the Governing Law's requirements for their respective project (e.g., stricter coverage thresholds, additional security checks, tighter config consistency). However, nothing at the project level may weaken, dilute, supersede, skip, or be interpreted in a way whose outcome would weaken any provision of this law. If a project-level rule creates ambiguity or appears to conflict with the Governing Law, the Governing Law prevails unconditionally — the project-level rule must be amended or removed.
+
 ### Commit and Release Integration
 
 All fixes applied during a /test audit MUST be committed. If a locally staged, unpromoted release exists (`.staged-release` breadcrumb), all fix commits MUST be included in that staged release.
@@ -50,7 +54,9 @@ All /test audits (except `--interactive`) are iterative. If any issues were dete
 
 ### All Audits Are Holistic
 
-Every /test audit includes full-stack cross-component analysis (Phase H). There is no separate "holistic" mode — holistic analysis is mandatory and automatic in every audit. Phase H runs as part of Tier 3 in all audit types.
+Every /test analysis phase (5, 6, 7, I) includes mandatory cross-component analysis. There is no separate "holistic" mode or phase — holistic analysis is a structural property of every analysis phase, not an optional add-on. Cross-component checks cannot be excluded from any audit.
+
+**One-way ratchet:** Project-specific test modules, rules, configurations, and definitions may strengthen cross-component requirements for their respective project (e.g., require additional contract checks, stricter config consistency), but nothing at the project level may weaken, dilute, supersede, skip, or be interpreted in a way whose outcome would weaken the global law. The Governing Law is always the sole and final authority.
 
 ---
 
@@ -136,7 +142,6 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **P** | **Production** | **Validate installed production app** |
 | **D** | **Docker** | **Validate Docker image and registry package** |
 | **G** | **GitHub** | **Audit GitHub repository security and settings** |
-| **H** | **Cross-Component** | **Full-stack cross-component analysis (always included)** |
 | **I** | **Infrastructure** | **Infrastructure & runtime issue detection** |
 | **V** | **VM Testing** | **Heavy isolation testing in libvirt/QEMU VM** |
 | **VM** | **VM Lifecycle** | **VM snapshot create/revert/delete management** |
@@ -158,7 +163,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **1** | **1** | **S,0** | **No** | **None (GATE)** |
 | 2 | 2 | 1 | No (runs tests + analysis) | 2a |
 | 2a | 2 | 1 | No | 2 |
-| 5,6,7,H,I | 3 | 1,2 | No (read-only) | Each other |
+| 5,6,7,I | 3 | 1,2 | No (read-only) | Each other |
 | **10** | **4** | **ALL Tier 3** | **YES** | **None (BLOCKING)** |
 | 12 | 5 | 10 | No (re-tests) | None |
 | **13** | **6** | **12** | **YES (fixes docs)** | **None (ALWAYS RUNS)** |
@@ -166,8 +171,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 | **P** | **7** | **10 + Discovery** | **No (validates live)** | **None (CONDITIONAL)** |
 | **D** | **7** | **10 + Discovery** | **No (validates registry)** | **P (CONDITIONAL)** |
 | **G** | **7** | **10 + Discovery** | **No (audits GitHub)** | **P, D (CONDITIONAL)** |
-| **H** | **3** | **1** | **No (read-only analysis)** | **7, 5, I (after Discovery)** |
-| **I** | **3** | **1** | **No (read-only)** | **H, 7, 5 (after Discovery)** |
+| **I** | **3** | **1** | **No (read-only)** | **7, 5 (after Discovery)** |
 | **V** | **8** | **1 (isolation-required)** | **VM only** | **None (CONDITIONAL)** |
 | **VM** | **8** | **V** | **VM snapshots** | **None** |
 | **C** | **last** | **ALL** | **Cleans up** | **None (LAST)** |
@@ -323,7 +327,7 @@ invalidated rollback points.
 │  TIER 3: READ-ONLY ANALYSIS (Can parallelize - no file modifications)      │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │ These phases ONLY READ files - safe to run in parallel:             │   │
-│  │ [5, 6, 7, H, I]  ← Note: 13 moved to Tier 6                        │   │
+│  │ [5, 6, 7, I]  ← Note: 13 moved to Tier 6                        │   │
 │  │                   └──> GATE 3: Analysis Complete                    │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              │                                              │
@@ -409,7 +413,7 @@ invalidated rollback points.
 | 0 | S | ❌ No (single) | Snapshot complete |
 | 1 | 0, 1 | ❌ No (sequential) | Preflight + Discovery complete (+ P decision made) |
 | 2 | 2, 2a | ✅ Yes | Tests complete |
-| 3 | 5,6,7,H,I | ✅ Yes | All analysis complete |
+| 3 | 5,6,7,I | ✅ Yes | All analysis complete |
 | 4 | 10 | ❌ No | Fixes complete |
 | 5 | 12 | ❌ No | Verification complete |
 | 6 | 13 | ❌ No (success gate) | Docs complete - ONLY if all prior passed |
@@ -451,7 +455,7 @@ function executeAudit(requestedPhases):
         executionPlan.append({phases: tier2, parallel: true, gate: "TESTS"})
 
     # TIER 3: Analysis (parallel - all read-only, EXCLUDES 13)
-    tier3 = intersection(requestedPhases, [5,6,7,H,I])
+    tier3 = intersection(requestedPhases, [5,6,7,I])
     if tier3:
         executionPlan.append({phases: tier3, parallel: true, gate: "ANALYSIS"})
 
@@ -633,7 +637,7 @@ To proceed:
 ✅ S completes → snapshot is clean baseline
 ✅ 0, 1 complete → config validated, project type known
 ✅ 2, 2a complete → test results + coverage + failure analysis available
-✅ 5, 6, 7, H, I run parallel (read-only) → safe
+✅ 5, 6, 7, I run parallel (read-only) → safe
 ✅ 10 runs alone → no race conditions
 ✅ 12 verifies → confirms fixes work
 ✅ C runs last → clean exit
@@ -660,7 +664,7 @@ When spawning Task subagents for phases, specify the `model` parameter based on 
 
 | Model | Phases | Rationale |
 |-------|--------|-----------|
-| **opus** | 1, 5, 7, 10, A, P, D, G, H, ST | Complex analysis, multi-step fixes, security audit, cross-component reasoning |
+| **opus** | 1, 5, 7, 10, A, P, D, G, ST | Complex analysis, multi-step fixes, security audit, cross-component reasoning |
 | **sonnet** | 0, 2, 2a, 6, 12, 13, I, V, VM | Moderate complexity: test execution, dependency checks, verification |
 | **haiku** | S, C | Lightweight: snapshots, cleanup |
 
@@ -840,7 +844,7 @@ When `/test` is invoked:
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  /test — Modular Project Audit                                              │
-│  Autonomous, context-efficient project testing with 21 phases in 9 tiers    │
+│  Autonomous, context-efficient project testing with 20 phases in 9 tiers    │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  USAGE                                                                      │
@@ -854,7 +858,7 @@ When `/test` is invoked:
 │  /test --force-sandbox           DANGEROUS: bypass VM requirement           │
 │  /test --no-mcp-enable           Skip auto-enabling MCP servers             │
 │  /test help                      This help                                  │
-│  /test --list-phases             Show all 21 phases                         │
+│  /test --list-phases             Show all 20 phases                         │
 │                                                                             │
 │  SHORTCUTS                                                                  │
 │  ─────────                                                                  │
@@ -883,7 +887,6 @@ When `/test` is invoked:
 │    5   Security          8-tool security suite (SAST + deps + secrets)      │
 │    6   Dependencies      Package health & outdated checks                   │
 │    7   Quality           Linting, complexity, formatting, dead code detect  │
-│    H   Cross-Component   Full-stack cross-component analysis (always runs) │
 │    I   Infrastructure    Infrastructure & runtime issue detection           │
 │                                                                             │
 │  Tier 4 — Modifications (blocking)                                          │
@@ -916,7 +919,7 @@ When `/test` is invoked:
 │  ─────                                                                      │
 │  • Autonomous mode (default): fixes ALL issues, no prompts, loops           │
 │  • Interactive mode (--interactive): may prompt, still fixes ALL issues     │
-│  • All audits are holistic — Phase H always runs (no separate shortcut)    │
+│  • All audits are holistic — every analysis phase includes cross-component │
 │  • All audits iterate until clean — re-run after fixes until zero issues   │
 │  • Phase P/D/G: auto-skipped when not applicable (no prompts)               │
 │  • Phase V: auto-triggered when isolation level is vm-required              │
@@ -1048,7 +1051,7 @@ ELSE (Autonomous - DEFAULT):
       (empty string if no flags selected)
    Wait for all to complete → GATE 2: Tests Complete
 
-   TIER 3: Analysis [5,6,7,H,I] - Run in PARALLEL
+   TIER 3: Analysis [5,6,7,I] - Run in PARALLEL
    ──────────────────────────────────────────────────────────────────
    All are READ-ONLY, safe to parallelize
    Phase 7 now includes dead code detection
@@ -1113,7 +1116,7 @@ ELSE (Autonomous - DEFAULT):
    - Each subagent reads `~/.claude/skills/test-phases/phase-{X}-{name}.md`
    - Each returns summary with Status, Issue count, Key findings
    - **Model selection per phase** (use `model` parameter on Task tool):
-     - `opus`: Phases 1, 5, 7, 10, A, P, D, G, H, ST
+     - `opus`: Phases 1, 5, 7, 10, A, P, D, G, ST
      - `sonnet`: Phases 0, 2, 2a, 6, 12, 13, I, V, VM
      - `haiku`: Phases S, C
    - Use `run_in_background: true` for long-running phases where appropriate
@@ -1330,4 +1333,4 @@ To skip auto-enable behavior, use:
 
 ---
 
-*Document Version: 4.0.0 — Phase consolidation (27→21), project-agnostic refactor, bloat reduction*
+*Document Version: 4.1.0 — Phase H dissolved into analysis phases, self-test expanded*
