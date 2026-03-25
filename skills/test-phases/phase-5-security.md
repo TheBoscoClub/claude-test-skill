@@ -346,7 +346,7 @@ if [[ -f "$PROJECT_ROOT/Cargo.toml" ]] || [[ -f "$PROJECT_ROOT/indexer/Cargo.tom
         cargo audit 2>&1 | head -20
     fi
 
-    # cargo deny (license + advisory superset)
+    # cargo deny (license + vulnerability database superset)
     if command -v cargo-deny &>/dev/null; then
         echo "Running cargo deny check..."
         if cargo deny check 2>&1 | grep -q "advisories ok, bans ok, licenses ok, sources ok"; then
