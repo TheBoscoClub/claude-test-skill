@@ -2,7 +2,7 @@
 
 > **Model**: `sonnet` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for system checks. Use `WebSearch` to research infrastructure error patterns. Use `Bash` with `kill` or `timeout` for hung service probes. Parallelize with other Tier 3 phases.
+> **Key Tools**: `Bash` for system checks. Use `WebSearch` to research infrastructure error patterns. Use `Bash` with `kill` or `timeout` for hung service probes. Parallelize with other Tier 3 phases. Includes cross-component integration surface audit: API contracts, script interfaces, shared file interfaces.
 
 ## Purpose
 
@@ -205,6 +205,82 @@ for db in $(find /var/lib /srv /opt -name "*.db" -o -name "*.sqlite" 2>/dev/null
     [[ "$rotational" == "1" ]] && slow_db=$((slow_db + 1))
 done
 [[ "$slow_db" -gt 0 ]] && echo "WARN ($slow_db DBs on HDD)" || echo "OK"
+```
+
+## Cross-Component Integration Surface Audit
+
+Every phase must analyze infrastructure holistically — not just within individual files but across the entire project's integration boundaries. This section is mandatory for all /test audits.
+
+### API Contract Verification
+
+```bash
+# List all API route definitions with their HTTP methods and paths
+echo "=== Backend API Routes ==="
+grep -rn "@app\.route\|@router\.\(get\|post\|put\|delete\|patch\)" --include="*.py" "$PROJECT_ROOT" \
+  | grep -v ".venv\|.snapshots\|test" | sort
+
+# List all frontend API calls with their URLs and methods
+echo "=== Frontend API Calls ==="
+grep -rn "fetch(\|axios\.\|http\.\|\.get(\|\.post(\|\.put(\|\.delete(" \
+  --include="*.js" --include="*.ts" --include="*.jsx" --include="*.tsx" "$PROJECT_ROOT" \
+  | grep -v "node_modules\|.snapshots\|test" | sort
+
+# Cross-reference: extract URL paths from both sides and diff
+echo "=== Backend paths ==="
+grep -rn "@app\.route\|@router\." --include="*.py" "$PROJECT_ROOT" \
+  | grep -v ".venv\|.snapshots\|test" \
+  | grep -oP "['\"]\/[^'\"]*['\"]" | sort -u > /tmp/phase-I-integration-backend-routes.txt
+
+echo "=== Frontend paths ==="
+grep -rn "fetch(\|axios\." --include="*.js" --include="*.ts" "$PROJECT_ROOT" \
+  | grep -v "node_modules\|.snapshots\|test" \
+  | grep -oP "['\"]\/api[^'\"]*['\"]" | sort -u > /tmp/phase-I-integration-frontend-routes.txt
+
+# Show routes called by frontend but not defined in backend
+comm -23 /tmp/phase-I-integration-frontend-routes.txt /tmp/phase-I-integration-backend-routes.txt 2>/dev/null
+```
+
+### Shell Script Interface Audit
+
+```bash
+# Find scripts that call other scripts
+grep -rn "bash \|sh \|\.\/" --include="*.sh" "$PROJECT_ROOT" \
+  | grep -v ".snapshots\|.git/" | sort
+
+# Check that called scripts actually exist
+grep -rn "source \|^\. \|bash \|sh " --include="*.sh" "$PROJECT_ROOT" \
+  | grep -v ".snapshots\|.git/" \
+  | grep -oP "[\w./-]+\.sh" | sort -u | while read -r script; do
+    found=$(find "$PROJECT_ROOT" -name "$(basename "$script")" -type f 2>/dev/null | head -1)
+    if [ -z "$found" ]; then
+      echo "MISSING SCRIPT: $script"
+    fi
+  done
+```
+
+### Shared File Interface Audit
+
+```bash
+# Find files written by one component and read by another
+# Identify file paths mentioned in write operations
+echo "=== Write targets ==="
+grep -rn "open(.*['\"]w\|write_text\|with open" --include="*.py" "$PROJECT_ROOT" \
+  | grep -v ".venv\|.snapshots\|test\|__pycache__" \
+  | grep -oP "['\"][^'\"]*\.\(txt\|csv\|json\|log\|idx\|dat\|pid\)['\"]" | sort -u
+
+# Identify file paths mentioned in read operations
+echo "=== Read sources ==="
+grep -rn "open(.*['\"]r\|read_text\|with open" --include="*.py" "$PROJECT_ROOT" \
+  | grep -v ".venv\|.snapshots\|test\|__pycache__" \
+  | grep -oP "['\"][^'\"]*\.\(txt\|csv\|json\|log\|idx\|dat\|pid\)['\"]" | sort -u
+```
+
+### Integration Surface Checklist
+
+```
+[ ] API contracts verified (backend routes vs frontend calls)
+[ ] Script dependencies verified (called scripts exist)
+[ ] Shared file interfaces audited
 ```
 
 ## References
