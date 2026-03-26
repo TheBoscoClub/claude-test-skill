@@ -13,17 +13,62 @@ Create read-only safety snapshots before making changes.
 
 ## Execution
 
-### BTRFS Project Snapshot
+### Step 1: Clean Up Prior Audit Snapshots (MANDATORY)
 
-Snapshots are stored inside the project directory at `.snapshots/` to avoid polluting the top-level projects directory.
-
-**Naming convention**: `snap-pre-test-YYYYMMDD-HHMMSS` (enforced below).
+Before creating a new snapshot, scan for existing audit/pre-test snapshots and delete any whose purpose has been fulfilled. This is the **primary and authoritative** snapshot cleanup mechanism (see `~/.claude/rules/projects.md`).
 
 ```bash
 PROJECT_DIR="$(pwd)"
 PROJECT_NAME="$(basename $PROJECT_DIR)"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 SNAPSHOT_DIR="${PROJECT_DIR}/.snapshots"
+
+# Clean up prior snapshots whose fixes have been committed/released
+if [[ -d "$SNAPSHOT_DIR" ]]; then
+  HAS_REMOTE=$(git -C "$PROJECT_DIR" remote -v 2>/dev/null | head -1)
+
+  for snap in "$SNAPSHOT_DIR"/snap-pre-test-* "$SNAPSHOT_DIR"/audit-*; do
+    [[ -e "$snap" ]] || continue
+    SNAP_NAME="$(basename "$snap")"
+
+    if [[ -n "$HAS_REMOTE" ]]; then
+      # GitHub project: keep until fixes are in a release
+      # Check if any release tag exists that post-dates the snapshot
+      SNAP_DATE=$(echo "$SNAP_NAME" | grep -oP '\d{8}')
+      if [[ -n "$SNAP_DATE" ]]; then
+        LATEST_TAG=$(git -C "$PROJECT_DIR" tag --sort=-creatordate 2>/dev/null | head -1)
+        if [[ -n "$LATEST_TAG" ]]; then
+          TAG_DATE=$(git -C "$PROJECT_DIR" log -1 --format='%Y%m%d' "$LATEST_TAG" 2>/dev/null)
+          if [[ -n "$TAG_DATE" ]] && [[ "$TAG_DATE" -ge "$SNAP_DATE" ]]; then
+            echo "  Deleting $SNAP_NAME (fixes included in release $LATEST_TAG)"
+            sudo btrfs subvolume delete "$snap" 2>/dev/null
+            continue
+          fi
+        fi
+      fi
+      echo "  Keeping $SNAP_NAME (fixes not yet in a GitHub release)"
+    else
+      # Local-only project: keep until fixes are committed
+      # Check if there are uncommitted changes
+      UNCOMMITTED=$(git -C "$PROJECT_DIR" status --porcelain 2>/dev/null | wc -l)
+      if [[ "$UNCOMMITTED" -eq 0 ]]; then
+        echo "  Deleting $SNAP_NAME (all changes committed, local-only project)"
+        sudo btrfs subvolume delete "$snap" 2>/dev/null
+      else
+        echo "  Keeping $SNAP_NAME (uncommitted changes exist)"
+      fi
+    fi
+  done
+fi
+```
+
+### Step 2: Create BTRFS Project Snapshot
+
+Snapshots are stored inside the project directory at `.snapshots/` to avoid polluting the top-level projects directory.
+
+**Naming convention**: `snap-pre-test-YYYYMMDD-HHMMSS` (enforced below).
+
+```bash
 SNAPSHOT_PATH="$SNAPSHOT_DIR/snap-pre-test-$TIMESTAMP"
 
 # Verify BTRFS filesystem
@@ -117,7 +162,7 @@ All BTRFS snapshots created by Phase S follow this pattern:
 - **Name**: `snap-pre-test-YYYYMMDD-HHMMSS`
 - **Type**: Read-only (`-r` flag)
 
-Phase C (Cleanup) looks for snapshots in `.snapshots/` for cleanup. Using a different location or naming pattern will cause Phase C to miss them.
+Phase S (this phase) handles snapshot cleanup before creating new ones. Using a different location or naming pattern will cause the cleanup scan to miss old snapshots.
 
 ## Output
 
