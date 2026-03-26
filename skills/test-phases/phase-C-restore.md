@@ -275,27 +275,10 @@ if [ "$RESTORE_SNAPSHOT" = "true" ]; then
 fi
 ```
 
-### 5. Clean Up Snapshots (Optional)
+### 5. Snapshot Cleanup
 
-```bash
-# Snapshot location: Phase S creates snapshots inside the project's .snapshots/ directory.
-# Verify the snapshot directory exists before attempting cleanup.
-PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-SNAPSHOT_DIR="${PROJECT_DIR}/.snapshots"
-
-if [[ -d "$SNAPSHOT_DIR" ]]; then
-    echo "Audit snapshots in $SNAPSHOT_DIR:"
-    ls -la "$SNAPSHOT_DIR"/snap-* 2>/dev/null || echo "  (none found)"
-
-    # Delete old snapshots (keep last 3)
-    ls -t "$SNAPSHOT_DIR"/snap-* 2>/dev/null | tail -n +4 | while read snap; do
-        echo "  Deleting old snapshot: $(basename "$snap")"
-        sudo btrfs subvolume delete "$snap" 2>/dev/null || rm -rf "$snap"
-    done
-else
-    echo "  ℹ️ No snapshot directory found at $SNAPSHOT_DIR — nothing to clean up"
-fi
-```
+Audit/pre-test snapshot cleanup is handled by Phase S (before creating new snapshots).
+Phase C does not manage snapshots.
 
 ## Output Format
 
@@ -322,9 +305,8 @@ MCP Servers:
   ✅ 2 servers restored to pre-test state
 
 Snapshots:
-  📸 .snapshots/snap-pre-test-20231215-143022
-  📸 .snapshots/snap-pre-test-20231214-091545
-  🗑️ Deleted 2 old snapshots
+  ℹ️ 1 audit/pre-test snapshot(s) remain (cleanup deferred to Phase S)
+     snap-pre-test-20231215-143022 (fixes not yet released)
 
 Project restored to clean state.
 ```
