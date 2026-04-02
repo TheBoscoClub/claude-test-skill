@@ -502,6 +502,187 @@ collect_quality_issues() {
 collect_quality_issues
 ```
 
+## Schema Consistency Validation
+
+Detect divergence between a canonical database schema and all DDL/query statements across the codebase. This catches the class of bug where multiple components define their own `CREATE TABLE` with different column names, types, or constraints than the single source of truth.
+
+```bash
+echo ""
+echo "-------------------------------------------------------------------"
+echo "  Schema Consistency Validation"
+echo "-------------------------------------------------------------------"
+
+# Step 1: Find canonical schema file(s)
+# Look for the most authoritative schema definition
+CANONICAL_SCHEMA=""
+for candidate in \
+    "*/schema.sql" \
+    "*/migrations/*.sql" \
+    "*/db/schema.sql" \
+    "*/src/db/schema.sql" \
+    "*/database/schema.sql"; do
+    found=$(find "$PROJECT_ROOT" -path "$candidate" -not -path "*/.snapshots/*" -not -path "*/.venv/*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1)
+    if [[ -n "$found" ]]; then
+        CANONICAL_SCHEMA="$found"
+        break
+    fi
+done
+
+if [[ -z "$CANONICAL_SCHEMA" ]]; then
+    echo "No canonical schema file found — skipping schema consistency check."
+else
+    echo "Canonical schema: $CANONICAL_SCHEMA"
+
+    # Step 2: Extract table names and column names from canonical schema
+    CANONICAL_TABLES=$(grep -i "CREATE TABLE" "$CANONICAL_SCHEMA" | sed -E 's/.*CREATE TABLE (IF NOT EXISTS )?//' | sed 's/[( ].*//' | sort)
+    echo "Canonical tables: $(echo $CANONICAL_TABLES | tr '\n' ' ')"
+
+    SCHEMA_ISSUES=0
+
+    for table in $CANONICAL_TABLES; do
+        # Extract canonical column names for this table (between CREATE TABLE and closing paren/semicolon)
+        CANONICAL_COLS=$(sed -n "/CREATE TABLE.*$table/,/);/p" "$CANONICAL_SCHEMA" \
+            | grep -v "CREATE TABLE\|PRIMARY KEY\|UNIQUE(\|CHECK(\|INDEX\|FOREIGN KEY\|);" \
+            | sed -E 's/^\s+//' | cut -d' ' -f1 | grep -v '^$' | sort)
+
+        # Step 3: Find all other files that reference this table in DDL or queries
+        # Search Python, Rust, SQL, JS/TS files (excluding canonical, tests handled by Phase 2)
+        OTHER_DDL=$(grep -rn "CREATE TABLE.*$table\|INSERT INTO $table\|INSERT OR.*INTO $table\|UPDATE $table\|SELECT.*FROM $table" \
+            --include="*.py" --include="*.rs" --include="*.sql" --include="*.js" --include="*.ts" \
+            "$PROJECT_ROOT" 2>/dev/null \
+            | grep -v ".snapshots\|.venv\|node_modules\|__pycache__\|.git/" \
+            | grep -v "$CANONICAL_SCHEMA" \
+            | grep -v "/test\|_test\.\|tests/")
+
+        if [[ -n "$OTHER_DDL" ]]; then
+            # Check for CREATE TABLE with different columns
+            CREATE_REFS=$(echo "$OTHER_DDL" | grep -i "CREATE TABLE")
+            if [[ -n "$CREATE_REFS" ]]; then
+                while IFS= read -r ref; do
+                    ref_file=$(echo "$ref" | cut -d: -f1)
+                    # Extract columns from the non-canonical CREATE TABLE
+                    # Read multi-line DDL from the file starting at the CREATE TABLE line
+                    ref_linenum=$(echo "$ref" | cut -d: -f2)
+                    REF_COLS=$(sed -n "${ref_linenum},/);/p" "$ref_file" 2>/dev/null \
+                        | grep -v "CREATE TABLE\|PRIMARY KEY\|UNIQUE(\|CHECK(\|INDEX\|FOREIGN KEY\|);" \
+                        | sed -E 's/^\s+//' | cut -d' ' -f1 | grep -v '^$' | sort)
+
+                    # Diff the column lists
+                    MISSING_IN_REF=$(comm -23 <(echo "$CANONICAL_COLS") <(echo "$REF_COLS") 2>/dev/null | tr '\n' ', ')
+                    EXTRA_IN_REF=$(comm -13 <(echo "$CANONICAL_COLS") <(echo "$REF_COLS") 2>/dev/null | tr '\n' ', ')
+
+                    if [[ -n "$MISSING_IN_REF" || -n "$EXTRA_IN_REF" ]]; then
+                        echo "SCHEMA MISMATCH: table '$table' in $ref_file:$ref_linenum"
+                        [[ -n "$MISSING_IN_REF" ]] && echo "  Missing columns (in canonical but not here): $MISSING_IN_REF"
+                        [[ -n "$EXTRA_IN_REF" ]] && echo "  Extra columns (here but not in canonical): $EXTRA_IN_REF"
+                        SCHEMA_ISSUES=$((SCHEMA_ISSUES + 1))
+                    fi
+                done <<< "$CREATE_REFS"
+            fi
+
+            # Check for INSERT/UPDATE/SELECT referencing columns not in canonical schema
+            QUERY_REFS=$(echo "$OTHER_DDL" | grep -iv "CREATE TABLE")
+            if [[ -n "$QUERY_REFS" ]]; then
+                while IFS= read -r ref; do
+                    ref_file=$(echo "$ref" | cut -d: -f1)
+                    ref_line=$(echo "$ref" | cut -d: -f2-)
+                    # Look for column names in the query that aren't in canonical
+                    for col_candidate in $(echo "$ref_line" | grep -oE '[a-z_]+' | sort -u); do
+                        # Skip SQL keywords and common tokens
+                        echo "$col_candidate" | grep -qiE "^(select|from|where|insert|into|update|set|values|and|or|not|null|is|as|in|on|join|like|between|order|by|group|having|limit|offset|count|sum|avg|max|min|create|table|if|exists|integer|text|real|primary|key|autoincrement|default|unique|check|index|strftime|now|replace|ignore|delete|commit|begin|end|case|when|then|else|asc|desc|varchar|boolean|int|float|char|blob|date|time|timestamp|true|false|rowid|current)$" && continue
+                        # Check if this looks like a column reference for this table and isn't canonical
+                        if echo "$CANONICAL_COLS" | grep -qw "$col_candidate"; then
+                            continue  # Column exists in canonical — OK
+                        fi
+                    done
+                done <<< "$QUERY_REFS"
+            fi
+        fi
+    done
+
+    if [[ "$SCHEMA_ISSUES" -eq 0 ]]; then
+        echo "All non-test DDL matches canonical schema."
+    else
+        echo ""
+        echo "TOTAL SCHEMA MISMATCHES: $SCHEMA_ISSUES"
+    fi
+fi
+```
+
+## Python Version Syntax Validation
+
+Detect Python 2 syntax that is invalid in Python 3 but may not be caught by all linters with default configs. This catches bugs that cause `SyntaxError` at import time in production.
+
+```bash
+PYTHON_SOURCE=$(find "$PROJECT_ROOT" -name "*.py" \
+    -not -path "*/.venv/*" -not -path "*/venv/*" -not -path "*/.snapshots/*" \
+    -not -path "*/node_modules/*" -not -path "*/__pycache__/*" -not -path "*/.git/*" \
+    2>/dev/null)
+
+if [[ -n "$PYTHON_SOURCE" ]]; then
+    echo ""
+    echo "-------------------------------------------------------------------"
+    echo "  Python Version Syntax Validation"
+    echo "-------------------------------------------------------------------"
+
+    PY2_ISSUES=0
+
+    # 1. Python 2 except syntax: "except Type, var:" instead of "except Type as var:"
+    #    Also catches: "except TypeA, TypeB:" instead of "except (TypeA, TypeB):"
+    PY2_EXCEPT=$(echo "$PYTHON_SOURCE" | xargs grep -Hn 'except [A-Za-z_.]\+, [A-Za-z_]\+:' 2>/dev/null \
+        | grep -v '# noqa\|# type: ignore')
+    if [[ -n "$PY2_EXCEPT" ]]; then
+        echo "Python 2 except syntax (must use 'as' or tuple parentheses):"
+        echo "$PY2_EXCEPT"
+        PY2_ISSUES=$((PY2_ISSUES + $(echo "$PY2_EXCEPT" | wc -l)))
+    fi
+
+    # 2. print statement without parentheses: "print foo" instead of "print(foo)"
+    PY2_PRINT=$(echo "$PYTHON_SOURCE" | xargs grep -Hn '^\s*print [^(]' 2>/dev/null \
+        | grep -v '# noqa\|\.print \|print_\|#.*print ')
+    if [[ -n "$PY2_PRINT" ]]; then
+        echo "Python 2 print statement (must use print() function):"
+        echo "$PY2_PRINT" | head -10
+        PY2_ISSUES=$((PY2_ISSUES + $(echo "$PY2_PRINT" | wc -l)))
+    fi
+
+    # 3. "raise Type, value" instead of "raise Type(value)"
+    PY2_RAISE=$(echo "$PYTHON_SOURCE" | xargs grep -Hn 'raise [A-Za-z_]\+, ' 2>/dev/null \
+        | grep -v '# noqa')
+    if [[ -n "$PY2_RAISE" ]]; then
+        echo "Python 2 raise syntax (must use raise Type(value)):"
+        echo "$PY2_RAISE" | head -10
+        PY2_ISSUES=$((PY2_ISSUES + $(echo "$PY2_RAISE" | wc -l)))
+    fi
+
+    # 4. "has_key()" instead of "in" operator
+    PY2_HASKEY=$(echo "$PYTHON_SOURCE" | xargs grep -Hn '\.has_key(' 2>/dev/null)
+    if [[ -n "$PY2_HASKEY" ]]; then
+        echo "Python 2 dict.has_key() (must use 'in' operator):"
+        echo "$PY2_HASKEY" | head -10
+        PY2_ISSUES=$((PY2_ISSUES + $(echo "$PY2_HASKEY" | wc -l)))
+    fi
+
+    # 5. Recommend ruff UP rules if ruff is available but UP024 not enabled
+    if command -v ruff &>/dev/null; then
+        # Check if UP rules are enabled
+        UP_CHECK=$(ruff check --select UP024 . 2>&1 | head -5)
+        if echo "$UP_CHECK" | grep -q "UP024"; then
+            echo ""
+            echo "NOTE: ruff UP024 (Python 2 except syntax) findings:"
+            echo "$UP_CHECK"
+        fi
+    fi
+
+    if [[ "$PY2_ISSUES" -eq 0 ]]; then
+        echo "No Python 2 syntax detected."
+    else
+        echo ""
+        echo "TOTAL PYTHON 2 SYNTAX ISSUES: $PY2_ISSUES"
+    fi
+fi
+```
+
 ## Cross-Component Quality Analysis
 
 Every phase must analyze quality holistically — not just within individual files but across the entire project. This section is mandatory for all /test audits.

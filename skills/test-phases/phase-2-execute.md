@@ -307,6 +307,98 @@ For deep coverage analysis beyond these automated checks, the dispatcher may inv
 
 ---
 
+## Step 6: Test Fixture Schema Compliance
+
+If a canonical schema file exists (e.g., `schema.sql`, `migrations/`), verify that all test fixture DDL matches it exactly. Test fixtures with divergent schemas mask production bugs — tests pass against wrong table definitions while the real database uses different column names, types, or constraints.
+
+This check applies to **all languages** — Python `CREATE TABLE` in test fixtures, Go test helpers, Rust `#[test]` setup code, etc.
+
+```bash
+echo ""
+echo "-------------------------------------------------------------------"
+echo "  Test Fixture Schema Compliance"
+echo "-------------------------------------------------------------------"
+
+# Find canonical schema
+CANONICAL_SCHEMA=""
+for candidate in \
+    "*/schema.sql" \
+    "*/migrations/*.sql" \
+    "*/db/schema.sql" \
+    "*/src/db/schema.sql" \
+    "*/database/schema.sql"; do
+    found=$(find "$PROJECT_ROOT" -path "$candidate" -not -path "*/.snapshots/*" -not -path "*/.venv/*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1)
+    if [[ -n "$found" ]]; then
+        CANONICAL_SCHEMA="$found"
+        break
+    fi
+done
+
+if [[ -z "$CANONICAL_SCHEMA" ]]; then
+    echo "No canonical schema found — skipping fixture compliance check."
+else
+    echo "Canonical schema: $CANONICAL_SCHEMA"
+
+    # Find all CREATE TABLE in test files
+    TEST_DDL=$(grep -rn "CREATE TABLE" \
+        --include="*.py" --include="*.rs" --include="*.go" --include="*.js" --include="*.ts" --include="*.sql" \
+        "$PROJECT_ROOT" 2>/dev/null \
+        | grep -v ".snapshots\|.venv\|node_modules\|__pycache__\|.git/" \
+        | grep -v "$CANONICAL_SCHEMA" \
+        | grep -iE "test|fixture|spec|_test\.")
+
+    if [[ -z "$TEST_DDL" ]]; then
+        echo "No test fixture DDL found."
+    else
+        FIXTURE_ISSUES=0
+        CANONICAL_TABLES=$(grep -i "CREATE TABLE" "$CANONICAL_SCHEMA" | sed -E 's/.*CREATE TABLE (IF NOT EXISTS )?//' | sed 's/[( ].*//' | sort)
+
+        for table in $CANONICAL_TABLES; do
+            # Extract canonical columns
+            CANONICAL_COLS=$(sed -n "/CREATE TABLE.*$table/,/);/p" "$CANONICAL_SCHEMA" \
+                | grep -v "CREATE TABLE\|PRIMARY KEY\|UNIQUE(\|CHECK(\|INDEX\|FOREIGN KEY\|);" \
+                | sed -E 's/^\s+//' | cut -d' ' -f1 | grep -v '^$' | sort)
+
+            # Find test files with this table's DDL
+            TABLE_REFS=$(echo "$TEST_DDL" | grep "$table")
+            if [[ -z "$TABLE_REFS" ]]; then
+                continue
+            fi
+
+            while IFS= read -r ref; do
+                ref_file=$(echo "$ref" | cut -d: -f1)
+                ref_linenum=$(echo "$ref" | cut -d: -f2)
+
+                # Extract columns from the fixture's CREATE TABLE
+                REF_COLS=$(sed -n "${ref_linenum},/);/p" "$ref_file" 2>/dev/null \
+                    | grep -v "CREATE TABLE\|PRIMARY KEY\|UNIQUE(\|CHECK(\|INDEX\|FOREIGN KEY\|);" \
+                    | sed -E 's/^\s+//' | cut -d' ' -f1 | grep -v '^$' | sort)
+
+                MISSING=$(comm -23 <(echo "$CANONICAL_COLS") <(echo "$REF_COLS") 2>/dev/null | tr '\n' ', ')
+                EXTRA=$(comm -13 <(echo "$CANONICAL_COLS") <(echo "$REF_COLS") 2>/dev/null | tr '\n' ', ')
+
+                if [[ -n "$MISSING" || -n "$EXTRA" ]]; then
+                    echo "FIXTURE DRIFT: table '$table' in $ref_file:$ref_linenum"
+                    [[ -n "$MISSING" ]] && echo "  Missing (in canonical, not in fixture): $MISSING"
+                    [[ -n "$EXTRA" ]] && echo "  Extra (in fixture, not in canonical): $EXTRA"
+                    FIXTURE_ISSUES=$((FIXTURE_ISSUES + 1))
+                fi
+            done <<< "$TABLE_REFS"
+        done
+
+        if [[ "$FIXTURE_ISSUES" -eq 0 ]]; then
+            echo "All test fixture DDL matches canonical schema."
+        else
+            echo ""
+            echo "TOTAL FIXTURE DRIFT ISSUES: $FIXTURE_ISSUES"
+            echo "Fix: Update test fixtures to match $CANONICAL_SCHEMA exactly."
+        fi
+    fi
+fi
+```
+
+---
+
 ## Phase Output
 
 This phase MUST produce the following structured output. Downstream phases (especially Phase 10 Fix) depend on this exact format.
