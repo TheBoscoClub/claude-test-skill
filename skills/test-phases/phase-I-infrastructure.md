@@ -275,12 +275,103 @@ grep -rn "open(.*['\"]r\|read_text\|with open" --include="*.py" "$PROJECT_ROOT" 
   | grep -oP "['\"][^'\"]*\.\(txt\|csv\|json\|log\|idx\|dat\|pid\)['\"]" | sort -u
 ```
 
+### IPC / Message Protocol Validation
+
+For projects using inter-process communication (protobuf, gRPC, msgpack, JSON-over-socket, etc.), verify that all send/receive paths use the proper message envelope — not raw bytes or ad-hoc serialization.
+
+**Why**: A component that sends `b"\x05" + json_bytes` instead of a proper protobuf `IpcMessage` will cause `invalid tag` or deserialization errors in the receiver. These bugs are invisible to unit tests (which mock the transport) and only manifest in production.
+
+```bash
+echo ""
+echo "-------------------------------------------------------------------"
+echo "  IPC / Message Protocol Validation"
+echo "-------------------------------------------------------------------"
+
+# Step 1: Detect IPC protocol definitions
+PROTO_FILES=$(find "$PROJECT_ROOT" -name "*.proto" -not -path "*/.snapshots/*" -not -path "*/.git/*" 2>/dev/null)
+MSGPACK_USAGE=$(grep -rl "msgpack\|MessagePack" --include="*.py" --include="*.rs" --include="*.go" "$PROJECT_ROOT" 2>/dev/null | grep -v ".snapshots\|.venv\|node_modules" | head -1)
+
+IPC_ISSUES=0
+
+if [[ -n "$PROTO_FILES" ]]; then
+    echo "Protobuf definitions found:"
+    echo "$PROTO_FILES"
+
+    # Step 2: Find the envelope message type (top-level wrapper)
+    # Convention: a message with multiple "oneof" fields, or named *Message/*Envelope/*Request
+    ENVELOPE_TYPES=$(grep -h "^message " $PROTO_FILES | sed 's/message //' | sed 's/ {//' \
+        | grep -iE "Message$|Envelope$|Request$|Wrapper$|Ipc" | head -5)
+
+    if [[ -n "$ENVELOPE_TYPES" ]]; then
+        echo "Envelope message types: $ENVELOPE_TYPES"
+
+        # Step 3: Find all send() / write() calls on IPC channels
+        # Look for socket send, client.send, stream.write patterns
+        SEND_CALLS=$(grep -rn "\.send(\|\.write(\|\.send_message(\|\.write_all(" \
+            --include="*.py" --include="*.rs" --include="*.go" --include="*.js" --include="*.ts" \
+            "$PROJECT_ROOT" 2>/dev/null \
+            | grep -v ".snapshots\|.venv\|node_modules\|__pycache__\|.git/\|test\|_test\." \
+            | grep -iv "http\|smtp\|email\|log\|print\|websocket\|ws\.")
+
+        if [[ -n "$SEND_CALLS" ]]; then
+            echo ""
+            echo "Checking IPC send paths for proper envelope usage..."
+
+            # Step 4: Flag send calls that use raw bytes instead of protobuf serialization
+            # Pattern: sending b"..." or bytes directly instead of .SerializeToString()
+            RAW_SENDS=$(echo "$SEND_CALLS" | grep -E 'send\(b"|send\(b'\''|send\(bytes|send\(json\.|send\(str\.' | head -20)
+            if [[ -n "$RAW_SENDS" ]]; then
+                echo "RAW BYTE SENDS (should use protobuf envelope):"
+                echo "$RAW_SENDS"
+                IPC_ISSUES=$((IPC_ISSUES + $(echo "$RAW_SENDS" | wc -l)))
+            fi
+
+            # Pattern: sending with magic byte prefix (b"\x01" + payload, etc.)
+            MAGIC_SENDS=$(echo "$SEND_CALLS" | grep -E 'b"\\\\x[0-9a-f]+"|b'\''\\x[0-9a-f]+'\''' | head -20)
+            if [[ -n "$MAGIC_SENDS" ]]; then
+                echo "MAGIC BYTE PREFIX SENDS (should use protobuf message type):"
+                echo "$MAGIC_SENDS"
+                IPC_ISSUES=$((IPC_ISSUES + $(echo "$MAGIC_SENDS" | wc -l)))
+            fi
+
+            # Step 5: Verify send calls reference protobuf types
+            # Check that send paths import and use the generated protobuf module
+            SEND_FILES=$(echo "$SEND_CALLS" | cut -d: -f1 | sort -u)
+            for f in $SEND_FILES; do
+                # Check if this file imports protobuf types
+                HAS_PROTO_IMPORT=$(grep -c "import.*_pb2\|use.*proto\|proto::\|protobuf\|prost::" "$f" 2>/dev/null)
+                SEND_COUNT=$(echo "$SEND_CALLS" | grep "^$f:" | wc -l)
+                if [[ "$SEND_COUNT" -gt 0 && "$HAS_PROTO_IMPORT" -eq 0 ]]; then
+                    echo "WARNING: $f has $SEND_COUNT IPC send(s) but no protobuf import"
+                    IPC_ISSUES=$((IPC_ISSUES + 1))
+                fi
+            done
+        fi
+    else
+        echo "No clear envelope message type found in proto files."
+        echo "Consider defining a top-level IpcMessage with oneof fields."
+    fi
+elif [[ -n "$MSGPACK_USAGE" ]]; then
+    echo "MessagePack IPC detected — manual review recommended."
+else
+    echo "No IPC protocol definitions found — skipping."
+fi
+
+if [[ "$IPC_ISSUES" -eq 0 ]]; then
+    echo "IPC protocol validation: OK (or not applicable)"
+else
+    echo ""
+    echo "TOTAL IPC PROTOCOL ISSUES: $IPC_ISSUES"
+fi
+```
+
 ### Integration Surface Checklist
 
 ```
 [ ] API contracts verified (backend routes vs frontend calls)
 [ ] Script dependencies verified (called scripts exist)
 [ ] Shared file interfaces audited
+[ ] IPC protocol envelope usage verified
 ```
 
 ## References
