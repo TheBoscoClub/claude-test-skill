@@ -1,6 +1,6 @@
-# Phase G: GitHub Repository Audit
+# Phase 9d: GitHub Audit
 
-> **Model**: `opus` | **Tier**: 7 (Conditional) | **Modifies Files**: No (audits GitHub)
+> **Model**: `opus` | **Phase**: 9d | **Modifies Files**: No (audits GitHub)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for `gh` CLI commands. Use `WebSearch` to look up GitHub API changes or new security features. Use `AskUserQuestion` in `--interactive` mode for security remediation decisions (e.g., enabling features that may affect CI).
 
@@ -409,9 +409,9 @@ fi
 
 ---
 
-## Remediation Instructions (for Phase 10)
+## Remediation Instructions (for Phase 6)
 
-When Phase 10 (Auto-Fixing) runs, it should process GitHub issues:
+When Phase 6 (Auto-Fixing) runs, it should process GitHub issues:
 
 ### Enable Missing Security Features
 
@@ -463,15 +463,15 @@ create_security_workflow() {
 
 ---
 
-## Phase G Gate Decision
+## Phase 9d Gate Decision
 
 | GitHub Status | Action |
 |---------------|--------|
-| `not-a-repo` | **SKIP** Phase G |
-| `no-remote` | **SKIP** Phase G |
-| `not-github` | **SKIP** Phase G |
-| `gh-not-installed` | **SKIP** Phase G (warn) |
-| `not-authenticated` | **SKIP** Phase G (warn) |
-| `secure` | **RUN** Phase G (verify) |
-| `alerts-open` | **RUN** Phase G (remediate) |
-| `incomplete` | **RUN** Phase G (enable features) |
+| `not-a-repo` | **SKIP** Phase 9d |
+| `no-remote` | **SKIP** Phase 9d |
+| `not-github` | **SKIP** Phase 9d |
+| `gh-not-installed` | **SKIP** Phase 9d (warn) |
+| `not-authenticated` | **SKIP** Phase 9d (warn) |
+| `secure` | **RUN** Phase 9d (verify) |
+| `alerts-open` | **RUN** Phase 9d (remediate) |
+| `incomplete` | **RUN** Phase 9d (enable features) |

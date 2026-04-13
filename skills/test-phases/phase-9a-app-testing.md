@@ -1,8 +1,8 @@
-# Phase A: Deployable Application Testing
+# Phase 9a: Deployable Application Testing
 
-> **Model**: `opus` | **Tier**: 7 (Conditional) | **Modifies Files**: Sandbox only
+> **Model**: `opus` | **Phase**: 9a | **Modifies Files**: Sandbox only
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for install/test commands (use `Bash` with `kill` to terminate hung install processes). Use `AskUserQuestion` in `--interactive` mode if install paths or config choices are needed. Can parallel with Tier 3 phases.
+> **Key Tools**: `Bash` for install/test commands (use `Bash` with `kill` to terminate hung install processes). Use `AskUserQuestion` in `--interactive` mode if install paths or config choices are needed. Can parallel with phase 5 phases.
 
 ## Purpose
 
@@ -89,7 +89,7 @@ IF detect_web_ui():
 
 ## CRITICAL: Production Data Isolation
 
-**Sandbox environments created by Phase A must NEVER have live mounts to production storage.**
+**Sandbox environments created by Phase 9a must NEVER have live mounts to production storage.**
 
 - **NEVER** mount or symlink host production paths into the sandbox
 - The sandbox should use its own fresh databases (created by install scripts or synthetic data)
@@ -531,7 +531,7 @@ generate_app_issues_report() {
 }
 ```
 
-## Phase A Execution Order
+## Phase 9a Execution Order
 
 ```bash
 run_phase_A() {
@@ -541,7 +541,7 @@ run_phase_A() {
     # Detect deployable app
     local DEPLOY_TYPE=$(detect_deployable_app)
     if [[ $? -ne 0 ]]; then
-        echo "ℹ️ No deployable application detected - skipping Phase A"
+        echo "ℹ️ No deployable application detected - skipping Phase 9a"
         return 0
     fi
 
@@ -573,7 +573,7 @@ run_phase_A() {
 
 ## Cleanup (MANDATORY)
 
-**This cleanup MUST run at the end of Phase A, even if tests fail.**
+**This cleanup MUST run at the end of Phase 9a, even if tests fail.**
 
 ```bash
 cleanup_app_sandbox() {
@@ -641,14 +641,14 @@ cleanup_app_sandbox() {
     rm -f "$PROJECT_DIR"/*.install.log 2>/dev/null
 
     echo ""
-    echo "✅ Phase A cleanup complete"
+    echo "✅ Phase 9a cleanup complete"
 }
 ```
 
 ## Report Format
 
 ```markdown
-## Phase A: Application Testing Report
+## Phase 9a: Application Testing Report
 
 ### Deployment Detection
 | Attribute | Value |
@@ -675,5 +675,5 @@ cleanup_app_sandbox() {
 - [ ] [Fix 1]
 - [ ] [Fix 2]
 
-### Phase A Status: ✅ PASS / ❌ ISSUES FOUND (see app-test-issues.log)
+### Phase 9a Status: ✅ PASS / ❌ ISSUES FOUND (see app-test-issues.log)
 ```

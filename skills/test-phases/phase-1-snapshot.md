@@ -1,6 +1,6 @@
-# Phase S: Safety Snapshots (BTRFS + VM)
+# Phase 1: Safety Snapshots (BTRFS + VM)
 
-> **Model**: `haiku` | **Tier**: 0 (Pre-test) | **Modifies Files**: No (creates snapshot)
+> **Model**: `haiku` | **Phase**: 1 | **Modifies Files**: No (creates snapshot)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for btrfs/virsh commands. Use `Bash` with `timeout` if a snapshot command hangs.
 
@@ -151,18 +151,18 @@ sudo virsh snapshot-revert $VM_NAME "pre-test-YYYYMMDD-HHMMSS"
 sudo virsh snapshot-delete $VM_NAME "pre-test-YYYYMMDD-HHMMSS"
 
 # For projects with post_test_restore=true in vm-test-manifest.json,
-# the Phase C cleanup automatically restores the VM to its pristine
+# the Phase 11 cleanup automatically restores the VM to its pristine
 # snapshot (e.g., pristine-275g-2026-02-25) after testing completes.
 ```
 
 ## Snapshot Naming Convention
 
-All BTRFS snapshots created by Phase S follow this pattern:
+All BTRFS snapshots created by Phase 1 follow this pattern:
 - **Location**: `$PROJECT_DIR/.snapshots/`
 - **Name**: `snap-pre-test-YYYYMMDD-HHMMSS`
 - **Type**: Read-only (`-r` flag)
 
-Phase S (this phase) handles snapshot cleanup before creating new ones. Using a different location or naming pattern will cause the cleanup scan to miss old snapshots.
+Phase 1 (this phase) handles snapshot cleanup before creating new ones. Using a different location or naming pattern will cause the cleanup scan to miss old snapshots.
 
 ## Output
 

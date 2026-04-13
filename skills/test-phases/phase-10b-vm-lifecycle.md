@@ -1,6 +1,6 @@
-# VM Lifecycle Management Module
+# Phase 10b: VM Lifecycle Management
 
-> **Model**: `sonnet` | **Tier**: 8 (VM infrastructure) | **Modifies Files**: No (manages VMs)
+> **Model**: `sonnet` | **Phase**: 10b | **Modifies Files**: No (manages VMs)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for virsh commands (use `timeout` for hung operations). Use `AskUserQuestion` if VM fails to start and user needs to choose alternative.
 
@@ -8,10 +8,10 @@ Manages automatic VM startup and shutdown for isolated testing.
 
 ## Purpose
 
-- **Start** the test VM when Phase 0/1 determines VM isolation is needed
+- **Start** the test VM when Phase 2/3 determines VM isolation is needed
 - **Detect dirty VMs** — if a `post_test_restore=true` VM is running at startup, an interrupted test left it dirty; revert to pristine before proceeding
 - **Track** that the VM was started by `/test` (to know what to cleanup)
-- **Cleanup (Phase C)** — for `post_test_restore=true` VMs: ALWAYS revert to pristine, shut down, and leave shut down (regardless of who started it). For shared VMs: only shut down if `/test` started it
+- **Cleanup (Phase 11)** — for `post_test_restore=true` VMs: shut down only (do NOT revert to pristine — that happens at the START of the next test run, preserving post-test state for investigation). For shared VMs: only shut down if `/test` started it
 
 ### Expected VM States
 
@@ -19,7 +19,8 @@ Manages automatic VM startup and shutdown for isolated testing.
 |------|--------------------------|-----------|
 | Before `/test` starts | **Shut down + pristine** | Running or shut down |
 | During `/test` | Running (started by /test) | Running |
-| After Phase C cleanup | **Shut down + pristine** | Restored to original state |
+| After Phase 11 cleanup | **Shut down (dirty — preserves post-test state)** | Restored to original state |
+| Before next `/test` | **Reverted to pristine during startup** | Running or shut down |
 
 ## Default Test VM
 
@@ -137,30 +138,104 @@ start_test_vm() {
     fi
     PRISTINE_SNAP="${PRISTINE_SNAP:-clean-install}"
 
+    # Read external qcow2 pristine config from project-vm-map.json
+    local PRISTINE_TYPE=""
+    local PRISTINE_PATH=""
+    local ACTIVE_DISK=""
+    if [[ -f "$VM_MAP" ]]; then
+        local PROJECT_NAME_FOR_MAP=$(basename "$PROJECT_DIR")
+        PRISTINE_TYPE=$(python3 -c "
+import json; d=json.load(open('$VM_MAP'))
+# Check project-level first, then VM-level
+p = d.get('projects',{}).get('$PROJECT_NAME_FOR_MAP',{}).get('pristine_type','')
+if not p:
+    p = d.get('vms',{}).get('$VM_NAME',{}).get('pristine_type','')
+print(p)" 2>/dev/null)
+        PRISTINE_PATH=$(python3 -c "
+import json; d=json.load(open('$VM_MAP'))
+p = d.get('projects',{}).get('$PROJECT_NAME_FOR_MAP',{}).get('pristine_path','')
+if not p:
+    p = d.get('vms',{}).get('$VM_NAME',{}).get('pristine_path','')
+print(p)" 2>/dev/null)
+        ACTIVE_DISK=$(python3 -c "
+import json; d=json.load(open('$VM_MAP'))
+p = d.get('projects',{}).get('$PROJECT_NAME_FOR_MAP',{}).get('active_disk','')
+if not p:
+    p = d.get('vms',{}).get('$VM_NAME',{}).get('active_disk','')
+print(p)" 2>/dev/null)
+    fi
+
+    # ─── EXTERNAL QCOW2 VALIDATION (disaster recovery fallback) ────
+    if [[ "$PRISTINE_TYPE" == "external_qcow2" ]]; then
+        if [[ ! -f "$PRISTINE_PATH" ]]; then
+            echo "  ⛔ ABORT: External pristine qcow2 not found: $PRISTINE_PATH"
+            return 1
+        fi
+        local PRISTINE_SIZE=$(stat -c%s "$PRISTINE_PATH" 2>/dev/null || echo 0)
+        if [[ "$PRISTINE_SIZE" -lt 1073741824 ]]; then
+            echo "  ⛔ ABORT: External pristine qcow2 is too small ($(( PRISTINE_SIZE / 1048576 ))MB < 1GB): $PRISTINE_PATH"
+            echo "     Expected a full disk image > 1GB"
+            return 1
+        fi
+        echo "  Pristine type: external_qcow2"
+        echo "  Pristine path: $PRISTINE_PATH ($(( PRISTINE_SIZE / 1073741824 ))GB)"
+        echo "  Active disk:   $ACTIVE_DISK"
+    fi
+
     # ─── DIRTY VM DETECTION ─────────────────────────────────────────
-    # For post_test_restore=true projects, the VM should ALWAYS be
-    # pristine and shut down when we get here. If it's running, a
-    # previous test cycle was interrupted and left the VM dirty.
-    # Revert to pristine before proceeding.
-    if [[ "$CURRENT_STATE" == "running" && "$POST_TEST_RESTORE" == "true" ]]; then
+    # For post_test_restore=true projects, the VM may be dirty from
+    # a previous test cycle (shut down but not reverted, or still
+    # running from an interrupted run). Revert to pristine before
+    # proceeding. The post-test cleanup only shuts down — revert
+    # happens HERE at the start of the next test run.
+    if [[ "$POST_TEST_RESTORE" == "true" ]]; then
         echo ""
-        echo "  ⚠️  VM is running — likely dirty from an interrupted test cycle"
-        echo "     Reverting to pristine before proceeding..."
-        echo ""
+        echo "  🔄 post_test_restore=true — reverting to pristine before testing"
 
-        # Force stop the dirty VM
-        sudo virsh destroy "$VM_NAME" 2>/dev/null || true
+        if [[ "$CURRENT_STATE" == "running" ]]; then
+            echo "  ⚠️  VM is running — likely dirty from an interrupted test cycle"
+            # Force stop the dirty VM
+            sudo virsh destroy "$VM_NAME" 2>/dev/null || true
+        fi
 
-        # Discard overlay and revert to pristine base
-        local OVERLAY="/hddRaid1/VirtualMachines/${VM_NAME}.${PRISTINE_SNAP}"
-        local BASE="/hddRaid1/VirtualMachines/${VM_NAME}.qcow2"
-        if [[ -f "$OVERLAY" ]]; then
-            # DISCARD changes — do NOT commit overlay into base
-            sudo virsh snapshot-delete "$VM_NAME" "$PRISTINE_SNAP" --metadata 2>/dev/null
-            sudo virt-xml "$VM_NAME" --edit target=vda --disk path="$BASE" 2>/dev/null
-            # Fix circular backingStore refs
-            sudo virsh dumpxml "$VM_NAME" > /tmp/vm-fix.xml
-            python3 -c "
+        echo "     Reverting to pristine snapshot: $PRISTINE_SNAP"
+
+        # ─── PRIMARY: virsh snapshot-revert ──────────────────────────
+        if sudo virsh snapshot-revert "$VM_NAME" "$PRISTINE_SNAP" 2>/dev/null; then
+            echo "  ✅ Reverted to pristine via virsh snapshot-revert"
+        else
+            echo "  ⚠️  virsh snapshot-revert failed — internal snapshot may be corrupted"
+
+            # ─── FALLBACK: external qcow2 disaster recovery ─────────
+            if [[ "$PRISTINE_TYPE" == "external_qcow2" && -n "$PRISTINE_PATH" && -n "$ACTIVE_DISK" ]]; then
+                echo "  🔧 Falling back to external qcow2 disaster recovery..."
+                if [[ ! -f "$PRISTINE_PATH" ]]; then
+                    echo "  ⛔ ABORT: External pristine qcow2 not found: $PRISTINE_PATH"
+                    return 1
+                fi
+
+                echo "  Overwriting active disk with pristine image..."
+                sudo cp "$PRISTINE_PATH" "$ACTIVE_DISK"
+                echo "  ✅ Active disk restored from pristine qcow2"
+
+                # Ensure VM XML points to the active disk (not some stale overlay)
+                sudo virt-xml "$VM_NAME" --edit target=vda --disk path="$ACTIVE_DISK" 2>/dev/null
+
+                # Clean up stale overlay files
+                for overlay_candidate in \
+                    "/hddRaid1/VirtualMachines/${VM_NAME}.${PRISTINE_SNAP}" \
+                    "/dasRaid0/VirtualMachines/${VM_NAME}.${PRISTINE_SNAP}"; do
+                    [[ -f "$overlay_candidate" ]] && sudo rm -f "$overlay_candidate"
+                done
+
+                # Delete any stale libvirt snapshot metadata
+                for snap in $(sudo virsh snapshot-list "$VM_NAME" --name 2>/dev/null); do
+                    sudo virsh snapshot-delete "$VM_NAME" "$snap" --metadata 2>/dev/null || true
+                done
+
+                # Fix backingStore refs in VM XML
+                sudo virsh dumpxml "$VM_NAME" > /tmp/vm-fix.xml
+                python3 -c "
 import xml.etree.ElementTree as ET
 tree = ET.parse('/tmp/vm-fix.xml')
 for disk in tree.getroot().iter('disk'):
@@ -168,16 +243,19 @@ for disk in tree.getroot().iter('disk'):
         disk.remove(bs)
 tree.write('/tmp/vm-fix.xml', xml_declaration=True)
 "
-            sudo virsh define /tmp/vm-fix.xml 2>/dev/null
-            rm -f /tmp/vm-fix.xml
-            sudo rm -f "$OVERLAY"
-            echo "  ✅ Dirty overlay discarded — base image is pristine"
-        fi
+                sudo virsh define /tmp/vm-fix.xml 2>/dev/null
+                rm -f /tmp/vm-fix.xml
 
-        # Recreate pristine snapshot and start clean
-        sudo virsh snapshot-create-as "$VM_NAME" "$PRISTINE_SNAP" \
-            "Pristine OS with dependencies. No application installed." --disk-only 2>/dev/null
-        echo "  ✅ Pristine snapshot recreated"
+                # Recreate internal pristine snapshot from this restored state
+                sudo virsh snapshot-create-as "$VM_NAME" "$PRISTINE_SNAP" \
+                    "Pristine OS with dependencies. No application installed." --atomic 2>/dev/null
+                echo "  ✅ Pristine snapshot recreated from external qcow2 backup"
+            else
+                echo "  ⛔ ABORT: No external qcow2 fallback configured (pristine_type != external_qcow2)"
+                echo "     Manual recovery required"
+                return 1
+            fi
+        fi
 
         CURRENT_STATE="shutoff"
     fi
@@ -242,18 +320,26 @@ EOF
         echo "vnc_port=$VNC_ACTUAL" >> "$STATE_FILE"
     fi
 
-    # Create pre-test snapshot (MANDATORY)
-    # This captures the VM state BEFORE tests run, so we can restore afterward
-    local PRE_TEST_SNAPSHOT="pre-test-$(date +%Y%m%d-%H%M%S)"
-    echo ""
-    echo "  📸 Creating pre-test snapshot: $PRE_TEST_SNAPSHOT"
-    if sudo virsh snapshot-create-as "$VM_NAME" "$PRE_TEST_SNAPSHOT" \
-        --description "Pre-test state before /test run" --atomic 2>/dev/null; then
-        echo "  ✅ Pre-test snapshot created"
-        echo "pre_test_snapshot=$PRE_TEST_SNAPSHOT" >> "$STATE_FILE"
+    # Create pre-test snapshot (MANDATORY for legacy snapshot VMs)
+    # For external_qcow2 VMs, the pristine file IS the restore point — no libvirt snapshot needed
+    if [[ "$PRISTINE_TYPE" == "external_qcow2" ]]; then
+        echo ""
+        echo "  📸 Pre-test snapshot: SKIPPED (external qcow2 — pristine file is the restore point)"
+        echo "pristine_type=external_qcow2" >> "$STATE_FILE"
+        echo "pristine_path=$PRISTINE_PATH" >> "$STATE_FILE"
+        echo "active_disk=$ACTIVE_DISK" >> "$STATE_FILE"
     else
-        echo "  ⚠️ Failed to create pre-test snapshot (VM may be running)"
-        echo "     Tests will proceed but VM state won't be auto-restored"
+        local PRE_TEST_SNAPSHOT="pre-test-$(date +%Y%m%d-%H%M%S)"
+        echo ""
+        echo "  📸 Creating pre-test snapshot: $PRE_TEST_SNAPSHOT"
+        if sudo virsh snapshot-create-as "$VM_NAME" "$PRE_TEST_SNAPSHOT" \
+            --description "Pre-test state before /test run" --atomic 2>/dev/null; then
+            echo "  ✅ Pre-test snapshot created"
+            echo "pre_test_snapshot=$PRE_TEST_SNAPSHOT" >> "$STATE_FILE"
+        else
+            echo "  ⚠️ Failed to create pre-test snapshot (VM may be running)"
+            echo "     Tests will proceed but VM state won't be auto-restored"
+        fi
     fi
 
     # ─── PRISTINE VM DETECTION & AUTO-INSTALL ─────────────────────
@@ -387,14 +473,14 @@ install_on_pristine_vm() {
     # is configured in the manifest.
     local HAS_DOCKERFILE=$(python3 -c "import json,os; d=json.load(open('$MANIFEST')); print('true' if os.path.exists(os.path.join('$PROJECT_DIR','Dockerfile')) else 'false')" 2>/dev/null)
     if [[ "$HAS_DOCKERFILE" == "true" ]]; then
-        echo "  Dockerfile detected — Docker container DB will be initialized by Phase D"
+        echo "  Dockerfile detected — Docker container DB will be initialized by Phase 9c"
     fi
 
     echo ""
 }
 ```
 
-## Shutdown VM (Called during Phase C Cleanup)
+## Shutdown VM (Called during Phase 11 Cleanup)
 
 ```bash
 shutdown_test_vm() {
@@ -425,8 +511,7 @@ shutdown_test_vm() {
     echo "  Pre-test Snapshot: ${PRE_TEST_SNAPSHOT:-none}"
     echo ""
 
-    # Restore VM to pristine state (MANDATORY after testing)
-    # Check vm-test-manifest.json for project-specific pristine snapshot
+    # Check vm-test-manifest.json for project-specific config
     local PRISTINE_SNAP=""
     local POST_TEST_RESTORE="false"
     if [[ -f "${PROJECT_DIR}/vm-test-manifest.json" ]]; then
@@ -434,54 +519,39 @@ shutdown_test_vm() {
         POST_TEST_RESTORE=$(python3 -c "import json; d=json.load(open('${PROJECT_DIR}/vm-test-manifest.json')); print(str(d.get('vm_testing',{}).get('post_test_restore', False)).lower())" 2>/dev/null)
     fi
 
-    if [[ "$POST_TEST_RESTORE" == "true" && -n "$PRISTINE_SNAP" ]]; then
-        echo "  📸 Reverting to pristine snapshot: $PRISTINE_SNAP"
-        echo "     (post_test_restore=true — DISCARD all test changes, shut down)"
+    if [[ "$POST_TEST_RESTORE" == "true" ]]; then
+        echo "  post_test_restore=true — shutting down VM only (preserving post-test state)"
+        echo "  Will revert to pristine at start of next test run."
+        echo ""
 
-        # Force stop VM
-        sudo virsh destroy "$VM_NAME" 2>/dev/null || true
+        # Graceful shutdown with force-stop fallback
+        local CURRENT_STATE=$(virsh domstate "$VM_NAME" 2>/dev/null | tr -d '[:space:]')
+        if [[ "$CURRENT_STATE" == "running" ]]; then
+            echo "  Attempting graceful shutdown..."
+            sudo virsh shutdown "$VM_NAME" 2>/dev/null
 
-        # For external snapshots: DISCARD overlay (do NOT commit — that bakes
-        # test changes into the base). Repoint VM to clean base, recreate snapshot.
-        local OVERLAY="/hddRaid1/VirtualMachines/${VM_NAME}.${PRISTINE_SNAP}"
-        local BASE="/hddRaid1/VirtualMachines/${VM_NAME}.qcow2"
+            local WAIT_COUNT=0
+            while [[ $WAIT_COUNT -lt 12 ]]; do
+                sleep 5
+                CURRENT_STATE=$(virsh domstate "$VM_NAME" 2>/dev/null | tr -d '[:space:]')
+                if [[ "$CURRENT_STATE" != "running" ]]; then
+                    echo "  ✅ VM shut down gracefully"
+                    break
+                fi
+                ((WAIT_COUNT++))
+                echo "    Waiting... ($((WAIT_COUNT * 5))s)"
+            done
 
-        if [[ -f "$OVERLAY" ]]; then
-            # Delete snapshot metadata first
-            sudo virsh snapshot-delete "$VM_NAME" "$PRISTINE_SNAP" --metadata 2>/dev/null
-            # Repoint VM directly to base image (discards overlay)
-            sudo virt-xml "$VM_NAME" --edit target=vda --disk path="$BASE" 2>/dev/null
-            # Fix circular backingStore refs that virt-xml sometimes leaves
-            sudo virsh dumpxml "$VM_NAME" > /tmp/vm-fix.xml
-            python3 -c "
-import xml.etree.ElementTree as ET
-tree = ET.parse('/tmp/vm-fix.xml')
-for disk in tree.getroot().iter('disk'):
-    for bs in disk.findall('backingStore'):
-        disk.remove(bs)
-tree.write('/tmp/vm-fix.xml', xml_declaration=True)
-"
-            sudo virsh define /tmp/vm-fix.xml 2>/dev/null
-            rm -f /tmp/vm-fix.xml
-            # Remove overlay file (all test changes discarded)
-            sudo rm -f "$OVERLAY"
-            echo "  ✅ Overlay discarded — base image is pristine"
-            # Recreate pristine snapshot for next test run
-            sudo virsh snapshot-create-as "$VM_NAME" "$PRISTINE_SNAP" \
-                "Pristine OS with dependencies. No application installed." --disk-only 2>/dev/null
-            echo "  ✅ Pristine snapshot recreated"
-        else
-            # Fallback: try internal snapshot revert
-            if sudo virsh snapshot-revert "$VM_NAME" "$PRISTINE_SNAP" 2>/dev/null; then
-                echo "  ✅ Reverted to pristine snapshot"
-            else
-                echo "  ❌ Failed to restore pristine state"
-                echo "     Manual cleanup may be needed"
+            if [[ "$CURRENT_STATE" == "running" ]]; then
+                echo "  ⚠️ Graceful shutdown timeout — forcing stop..."
+                sudo virsh destroy "$VM_NAME" 2>/dev/null || true
+                echo "  ✅ VM force stopped"
             fi
+        else
+            echo "  ✅ VM already stopped"
         fi
 
-        # VM is now shut down and pristine — leave it that way
-        echo "  ✅ VM left shut down and pristine (ready for next test run)"
+        echo "  ✅ VM shut down. Will revert to pristine at start of next test run."
         rm -f "$STATE_FILE"
         echo "  📝 Removed state file: $STATE_FILE"
         echo ""
@@ -576,7 +646,7 @@ tree.write('/tmp/vm-fix.xml', xml_declaration=True)
 
 The dispatcher should call `start_test_vm` when:
 1. Discovery determines `ISOLATION_LEVEL` is `vm-required` or `vm-recommended`
-2. Phase 0 detected `VM_AVAILABLE=true`
+2. Phase 2 detected `VM_AVAILABLE=true`
 
 ```
 # In dispatcher, after Discovery completes:
@@ -587,12 +657,12 @@ if [[ "$ISOLATION_LEVEL" =~ ^vm-(required|recommended)$ ]] && [[ "$VM_AVAILABLE"
 fi
 ```
 
-### During Phase C (Cleanup)
+### During Phase 11 (Cleanup)
 
-Phase C should call `shutdown_test_vm` to clean up:
+Phase 11 should call `shutdown_test_vm` to clean up:
 
 ```
-# In Phase C cleanup:
+# In Phase 11 cleanup:
 source ~/.claude/skills/test-phases/phase-VM-lifecycle.md
 shutdown_test_vm
 ```
@@ -646,7 +716,30 @@ State File: .test-vm-state
 Pre-test Snapshot: pre-test-20260218-153000
 ```
 
-### Cleanup Report
+### Cleanup Report (post_test_restore=true)
+```
+───────────────────────────────────────────────────────────────────
+  VM Lifecycle Cleanup
+───────────────────────────────────────────────────────────────────
+
+  VM: test-audiobook-cachyos
+  Started by /test: true
+  Original State: shutoff
+  Pre-test Snapshot: none
+
+  post_test_restore=true — shutting down VM only (preserving post-test state)
+  Will revert to pristine at start of next test run.
+
+  Attempting graceful shutdown...
+    Waiting... (5s)
+    Waiting... (10s)
+  ✅ VM shut down gracefully
+  ✅ VM shut down. Will revert to pristine at start of next test run.
+
+  📝 Removed state file: .test-vm-state
+```
+
+### Cleanup Report (shared VM)
 ```
 ───────────────────────────────────────────────────────────────────
   VM Lifecycle Cleanup
@@ -671,7 +764,6 @@ Pre-test Snapshot: pre-test-20260218-153000
   📝 Removed state file: .test-vm-state
 
 VM Cleanup Complete:
-  - VM test-vm-cachyos restored to pristine state
   - VM test-vm-cachyos stopped
   - System resources freed (4GB RAM, 4 vCPUs)
 ```

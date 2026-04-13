@@ -1,6 +1,6 @@
-# Phase 0: Pre-Flight Environment Validation
+# Phase 2: Pre-Flight Environment Validation
 
-> **Model**: `sonnet` | **Tier**: 1 (Pre-flight) | **Modifies Files**: Creates sandbox directory only
+> **Model**: `sonnet` | **Phase**: 2 | **Modifies Files**: Creates sandbox directory only
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for environment checks. Use `WebSearch` to verify tool version compatibility if needed.
 
@@ -234,7 +234,7 @@ echo "  Environment status: $([ "$ENV_OK" = true ] && echo "PASS" || echo "FAIL"
 
 ## Step 4: Configuration Validation
 
-Validate project configuration files for syntax and best practices. Produces structured findings for Phase 10 (Fix).
+Validate project configuration files for syntax and best practices. Produces structured findings for Phase 6 (Fix).
 
 ```bash
 echo ""
@@ -406,10 +406,10 @@ if [[ -d "$PROJECT_DIR/.github/workflows" ]]; then
     echo "    Checked $WORKFLOW_COUNT workflow(s), $WORKFLOW_ERRORS error(s)"
 fi
 
-# Print structured issues summary for Phase 10
+# Print structured issues summary for Phase 6
 if [[ ${#CONFIG_ISSUES[@]} -gt 0 ]]; then
     echo ""
-    echo "  Config issues (structured for Phase 10):"
+    echo "  Config issues (structured for Phase 6):"
     for issue in "${CONFIG_ISSUES[@]}"; do
         IFS=':' read -r file category detail <<< "$issue"
         echo "    [$category] $file: $detail"
@@ -612,7 +612,7 @@ echo "  Cleanup: rm -rf $SANDBOX_DIR"
 
 ## Step 9: VM Isolation Availability
 
-Detect if VM-based isolation (Phase V) is available for dangerous operations testing.
+Detect if VM-based isolation (Phase 10a) is available for dangerous operations testing.
 
 ```bash
 echo ""
@@ -807,17 +807,17 @@ spare-desktop=bosco@testbox.local
 -----------------------------------------------------------------------
 
 Sandbox: [Created at path / Failed]
-VM Isolation (Phase V): [Available - X test VMs / Not Available]
+VM Isolation (Phase 10a): [Available - X test VMs / Not Available]
 Physical Hardware: [X hosts online / Not configured]
 ISO Library: [path (count) / None]
 
 -----------------------------------------------------------------------
-  CONFIG ISSUES (for Phase 10)
+  CONFIG ISSUES (for Phase 6)
 -----------------------------------------------------------------------
 
 [category] file: description
 [category] file: description
 
 Note: Isolation requirements are determined by Phase 1 (Discovery).
-Phase 0 only reports WHAT is available, not what is NEEDED.
+Phase 2 only reports WHAT is available, not what is NEEDED.
 ```

@@ -1,12 +1,12 @@
-# Phase P: Production Validation
+# Phase 9b: Production Validation
 
-> **Model**: `opus` | **Tier**: 7 (Conditional) | **Modifies Files**: No (validates live)
+> **Model**: `opus` | **Phase**: 9b | **Modifies Files**: No (validates live)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for system validation (use `timeout` for hung service checks). Use `AskUserQuestion` in `--interactive` mode for production remediation decisions.
 
 Validate that a project's installed production application is running correctly. Compares expected state (from `install-manifest.json` + install script analysis) against actual system state.
 
-**Key Difference from Phase A:** Phase A tests installation *in a sandbox*. Phase P validates *live production*.
+**Key Difference from Phase 9a:** Phase 9a tests installation *in a sandbox*. Phase 9b validates *live production*.
 
 **Prerequisites:** Application must already be installed on the system.
 

@@ -1,6 +1,6 @@
-# Phase 1: Discovery
+# Phase 3: Discovery
 
-> **Model**: `opus` | **Tier**: 1 (Discovery — GATE) | **Modifies Files**: No
+> **Model**: `opus` | **Phase**: 3 | **Modifies Files**: No
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done. All subsequent phases depend on this — use `addBlocks` to express downstream dependencies.
 > **Key Tools**: `Bash`, `Glob`, `Grep`, `Read` for project analysis. Use `WebSearch` to identify framework conventions if an unfamiliar project type is detected.
 
@@ -173,7 +173,7 @@ detect_isolation_level
 
 **Dispatcher Integration:**
 - `vm-required` + no VM available: ABORT
-- `vm-required` or `vm-recommended` + VM available: Phase V
+- `vm-required` or `vm-recommended` + VM available: Phase 10a
 - `sandbox-warn`: Standard test execution (Phase 2) with extra monitoring
 - `sandbox`: Standard test execution (Phase 2)
 
@@ -223,7 +223,7 @@ detect_staged_release() {
 detect_staged_release
 ```
 
-When Discovery reports `Staged Release: valid`, Phase V is triggered and routes to the correct VM via `project-vm-map.json`.
+When Discovery reports `Staged Release: valid`, Phase 10a is triggered and routes to the correct VM via `project-vm-map.json`.
 
 ### 4b. Detect Available MCP Servers
 
@@ -249,7 +249,7 @@ detect_mcp_servers
 
 ### 4b-2. Auto-Enable MCP Servers for Testing
 
-When needed MCP servers are disabled, temporarily enable them (tracked in `.test-mcp-enabled` for Phase C cleanup):
+When needed MCP servers are disabled, temporarily enable them (tracked in `.test-mcp-enabled` for Phase 11 cleanup):
 
 ```bash
 auto_enable_mcp_servers() {

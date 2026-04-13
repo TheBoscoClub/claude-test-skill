@@ -1,6 +1,6 @@
-# Phase D: Docker Validation
+# Phase 9c: Docker Validation
 
-> **Model**: `opus` | **Tier**: 7 (Conditional) | **Modifies Files**: No (validates registry)
+> **Model**: `opus` | **Phase**: 9c | **Modifies Files**: No (validates registry)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for docker/buildx commands (use `timeout` for hung builds). Use `WebSearch` to check for base image vulnerabilities or updated tags.
 
@@ -8,7 +8,7 @@ Validate Docker image builds and registry package synchronization.
 
 ## CRITICAL: Production Data Isolation
 
-**Docker containers created during Phase D must NEVER bind-mount host production paths.**
+**Docker containers created during Phase 9c must NEVER bind-mount host production paths.**
 
 - **NEVER** use `-v` to bind-mount host production database paths, library directories, or config files into a test container
 - Ephemeral in-container databases (e.g., `/tmp/test.db` or schema-initialized) are the standard for smoke tests
@@ -21,7 +21,7 @@ This phase requires:
 - Registry authentication (for push validation)
 - Discovery phase results (Docker Status, Registry Image, Registry Status)
 
-**Post-pristine-revert note:** After reverting a test VM to its pristine snapshot, the Docker container's database does NOT exist. Phase D smoke tests use ephemeral in-container databases (`/tmp/test.db` or schema-initialized), so this is handled automatically. For full integration tests that need a populated DB, initialize from `schema.sql` or copy the native app's database into the Docker data volume.
+**Post-pristine-revert note:** After reverting a test VM to its pristine snapshot, the Docker container's database does NOT exist. Phase 9c smoke tests use ephemeral in-container databases (`/tmp/test.db` or schema-initialized), so this is handled automatically. For full integration tests that need a populated DB, initialize from `schema.sql` or copy the native app's database into the Docker data volume.
 
 ## Execution Steps
 
@@ -540,4 +540,4 @@ The cleanup uses `--time 10` (10 second timeout) to allow containers to:
 
 If graceful shutdown fails, containers are forcefully killed as a fallback.
 
-**This cleanup runs automatically at the end of Phase D, not in Phase C (Restore).** Docker resources should be cleaned immediately after Docker testing, not left until session cleanup.
+**This cleanup runs automatically at the end of Phase 9c, not in Phase 11 (Restore).** Docker resources should be cleaned immediately after Docker testing, not left until session cleanup.

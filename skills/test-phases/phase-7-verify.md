@@ -1,18 +1,18 @@
-# Phase 12: Final Verification
+# Phase 7: Final Verification
 
-> **Model**: `sonnet` | **Tier**: 5 (Verify) | **Modifies Files**: No (re-tests only)
+> **Model**: `sonnet` | **Phase**: 7 | **Modifies Files**: No (re-tests only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for re-running tests (use `timeout` if verification tests hang).
 
-**Purpose**: After Phase 10 (Fix) has applied changes, re-run all checks to CONFIRM the fixes worked and no regressions were introduced. This is the final gate before the audit is declared complete.
+**Purpose**: After Phase 6 (Fix) has applied changes, re-run all checks to CONFIRM the fixes worked and no regressions were introduced. This is the final gate before the audit is declared complete.
 
 ---
 
 ## Prerequisites
 
-Phase 12 depends on data from earlier phases:
+Phase 7 depends on data from earlier phases:
 - **Phase 2 test results**: The baseline pass/fail counts and coverage percentage
-- **Phase 10 fix list**: Which issues were fixed and what files were modified
+- **Phase 6 fix list**: Which issues were fixed and what files were modified
 - If Phase 2 did not run or produced no test results, skip Step 1 and Step 5 (regression/coverage comparison) but still run Steps 2-4.
 
 ## Step 1: Re-Run Test Suite (Regression Check)
@@ -136,39 +136,62 @@ if [ -f /tmp/phase12-test-output.txt ]; then
     PASSED=$(echo "$PYTEST_SUMMARY" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+')
     FAILED=$(echo "$PYTEST_SUMMARY" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+' || echo "0")
     ERRORS=$(echo "$PYTEST_SUMMARY" | grep -oE '[0-9]+ error' | grep -oE '[0-9]+' || echo "0")
-    echo "Phase 12 results: $PASSED passed, ${FAILED:-0} failed, ${ERRORS:-0} errors"
+    echo "Phase 7 results: $PASSED passed, ${FAILED:-0} failed, ${ERRORS:-0} errors"
   fi
 
   # go test format: "ok" or "FAIL"
   GO_PASS=$(grep -c '^ok' /tmp/phase12-test-output.txt 2>/dev/null || echo "0")
   GO_FAIL=$(grep -c '^FAIL' /tmp/phase12-test-output.txt 2>/dev/null || echo "0")
   if [ "$GO_PASS" -gt 0 ] || [ "$GO_FAIL" -gt 0 ]; then
-    echo "Phase 12 results: $GO_PASS packages ok, $GO_FAIL packages failed"
+    echo "Phase 7 results: $GO_PASS packages ok, $GO_FAIL packages failed"
   fi
 
   # cargo test format: "test result: ok. X passed; Y failed"
   CARGO_SUMMARY=$(grep 'test result:' /tmp/phase12-test-output.txt | tail -1)
   if [ -n "$CARGO_SUMMARY" ]; then
-    echo "Phase 12 results: $CARGO_SUMMARY"
+    echo "Phase 7 results: $CARGO_SUMMARY"
   fi
 
   echo ""
   echo "--- Compare against Phase 2 baseline ---"
-  echo "If Phase 2 recorded N tests passing, Phase 12 must show >= N passing."
+  echo "If Phase 2 recorded N tests passing, Phase 7 must show >= N passing."
   echo "Any test that passed in Phase 2 but fails now is a REGRESSION."
 fi
 ```
 
-**Subagent instruction**: Compare the Phase 12 pass count against Phase 2's recorded pass count. If any tests that previously passed now fail, report each as `REGRESSION: test_name`. If Phase 2 data is unavailable, report absolute results only.
+**Subagent instruction**: Compare the Phase 7 pass count against Phase 2's recorded pass count. If any tests that previously passed now fail, report each as `REGRESSION: test_name`. If Phase 2 data is unavailable, report absolute results only.
+
+## Step 1d: FVP Protocol Compliance Check
+
+**Before verifying individual fixes, check that Phase 6 emitted FVP proof blocks for every fix.**
+
+```bash
+echo "=== FVP Protocol Compliance ==="
+echo "Checking Phase 6 output for FVP proof blocks..."
+# Count fixes reported by Phase 6
+# Count FVP PROOF blocks in Phase 6 output
+# If fixes > proof blocks: FAIL — unverified fixes exist
+echo "Fixes reported: N"
+echo "FVP proof blocks found: N"
+echo "Unverified fixes: N"
+```
+
+**Subagent instruction**: Parse the Phase 6 output. Count the total fixes applied and the number of `FVP PROOF` blocks emitted. If any fix lacks a corresponding proof block, report it as `UNVERIFIED_FIX: [description]`. Unverified fixes cause the audit to FAIL — Phase 6 must be re-run for those specific fixes with proper verification.
+
+**If unverified fixes are found:**
+1. Report each as `UNVERIFIED_FIX`
+2. Set overall Phase 7 result to `FAIL — FVP Protocol violation`
+3. The dispatcher loops back to Phase 6 to verify the unverified fixes
+4. Phase 7 re-runs after Phase 6 provides proof blocks
 
 ## Step 2: Verify No Regressions in Specific Fixes
 
-For each fix applied by Phase 10, verify the specific issue is resolved.
+For each fix applied by Phase 6, verify the specific issue is resolved.
 
 ```bash
-echo "=== Verifying Phase 10 fixes ==="
-echo "For each fix Phase 10 applied, run the specific test or check that validates it."
-echo "Phase 10 should have recorded which tests correspond to which fixes."
+echo "=== Verifying Phase 6 fixes ==="
+echo "For each fix Phase 6 applied, run the specific test or check that validates it."
+echo "Phase 7 should have recorded which tests correspond to which fixes."
 echo ""
 echo "If a fix was for:"
 echo "  - A test failure: re-run that specific test"
@@ -177,7 +200,7 @@ echo "  - A security finding: re-run the security scanner"
 echo "  - A type error: re-run the type checker on the fixed file"
 ```
 
-**Subagent instruction**: For each fix Phase 10 reported, run the narrowest possible verification. Examples:
+**Subagent instruction**: For each fix Phase 6 reported, run the narrowest possible verification. Examples:
 
 - Fix was in `src/auth.py` for a test failure -> `pytest tests/test_auth.py -v`
 - Fix was a ruff warning in `app/views.py` -> `ruff check app/views.py`
@@ -188,7 +211,7 @@ Report each fix as VERIFIED or STILL_FAILING with the specific output.
 
 ## Step 3: Build/Compile Check
 
-Verify the project builds cleanly after all Phase 10 changes.
+Verify the project builds cleanly after all Phase 6 changes.
 
 ```bash
 echo "=== Build verification ==="
@@ -351,39 +374,39 @@ If Phase 2 recorded a coverage percentage, verify it has not decreased.
 ```bash
 echo "=== Coverage comparison ==="
 
-# Extract coverage from Phase 12 test output
+# Extract coverage from Phase 7 test output
 if [ -f /tmp/phase12-test-output.txt ]; then
   # pytest-cov format: "TOTAL    XXX    XXX    XX%"
   COV_LINE=$(grep -E '^TOTAL\s' /tmp/phase12-test-output.txt | tail -1)
   if [ -n "$COV_LINE" ]; then
     PHASE12_COV=$(echo "$COV_LINE" | grep -oE '[0-9]+%' | tr -d '%')
-    echo "Phase 12 coverage: ${PHASE12_COV}%"
+    echo "Phase 7 coverage: ${PHASE12_COV}%"
     echo "Compare against Phase 2 baseline. Coverage must not decrease."
   fi
 
   # Jest/istanbul format: "All files  |  XX.XX |"
   JEST_COV=$(grep -E 'All files' /tmp/phase12-test-output.txt | grep -oE '[0-9]+\.[0-9]+' | head -1)
   if [ -n "$JEST_COV" ]; then
-    echo "Phase 12 coverage: ${JEST_COV}%"
+    echo "Phase 7 coverage: ${JEST_COV}%"
   fi
 
   # Go coverage: "coverage: XX.X% of statements"
   GO_COV=$(grep -oE 'coverage: [0-9.]+%' /tmp/phase12-test-output.txt | tail -1 | grep -oE '[0-9.]+')
   if [ -n "$GO_COV" ]; then
-    echo "Phase 12 coverage: ${GO_COV}%"
+    echo "Phase 7 coverage: ${GO_COV}%"
   fi
 fi
 ```
 
-**Subagent instruction**: If Phase 2 recorded a coverage number, compare it to Phase 12's number. If coverage decreased, report `REGRESSION: Coverage dropped from X% to Y%`. Small decreases (<1%) due to new code without tests may be acceptable but should still be flagged.
+**Subagent instruction**: If Phase 2 recorded a coverage number, compare it to Phase 7's number. If coverage decreased, report `REGRESSION: Coverage dropped from X% to Y%`. Small decreases (<1%) due to new code without tests may be acceptable but should still be flagged.
 
 ## Exit Criteria
 
 **ALL of these must be true for PASS:**
 
 1. All tests that passed in Phase 2 still pass (no regressions)
-2. Phase 12 pass count >= Phase 2 pass count
-3. Every Phase 10 fix individually verified as working
+2. Phase 7 pass count >= Phase 2 pass count
+3. Every Phase 6 fix individually verified as working
 4. Build/compile succeeds without errors
 5. Coverage has not decreased from Phase 2 baseline (if measured)
 
@@ -393,17 +416,17 @@ fi
 |--------|----------|
 | **PASS** | All 5 criteria met |
 | **WARN** | Tests pass but coverage decreased slightly, or smoke test unavailable |
-| **FAIL** | Any test regression, build failure, or Phase 10 fix not verified |
+| **FAIL** | Any test regression, build failure, or Phase 6 fix not verified |
 
 ## Failure Handling
 
-If tests still fail after Phase 10:
+If tests still fail after Phase 6:
 
-1. **Do NOT fix within Phase 12** — Phase 12 is verification only, it does not apply fixes itself
+1. **Do NOT fix within Phase 7** — Phase 7 is verification only, it does not apply fixes itself
 2. Report each still-failing test with its output
-3. For each failure, state whether it was a Phase 10 fix target (fix didn't work) or a regression (new failure introduced by Phase 10 changes)
+3. For each failure, state whether it was a Phase 6 fix target (fix didn't work) or a regression (new failure introduced by Phase 6 changes)
 4. Include the specific error messages for diagnostic context
-5. Set overall result to FAIL — the dispatcher loops back to Phase 10 to fix the remaining issues (per the Governing Law: all errors must be fixed, none may be deferred)
+5. Set overall result to FAIL — the dispatcher loops back to Phase 6 to fix the remaining issues (per the Governing Law: all errors must be fixed, none may be deferred)
 
 ## Output Format
 
@@ -413,9 +436,9 @@ FINAL VERIFICATION
 
 Test Suite:
   Phase 2 baseline:  42 passed, 2 failed
-  Phase 12 results:  44 passed, 0 failed
+  Phase 7 results:  44 passed, 0 failed
   Regressions:       0
-  New passes:        2 (from Phase 10 fixes)
+  New passes:        2 (from Phase 6 fixes)
 
 Fix Verification:
   Fix #1 (test_auth_login):     VERIFIED
@@ -431,7 +454,7 @@ Smoke Test:
 
 Coverage:
   Phase 2:  87%
-  Phase 12: 89% (+2%)
+  Phase 7: 89% (+2%)
 
 OVERALL: PASS
 ```

@@ -1,10 +1,12 @@
-# Phase 10: Fix Issues
+# Phase 6: Fix
 
-> **Model**: `opus` | **Tier**: 4 (Fix — BLOCKING) | **Modifies Files**: YES
+> **Model**: `opus` | **Phase**: 6 | **Modifies Files**: YES
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done. This phase blocks ALL subsequent phases.
 > **Key Tools**: `Edit`, `Bash` for fixes. `Read`, `Grep` for analysis. `AskUserQuestion` in `--interactive` mode only.
 
 Fix ALL issues found by prior phases. Three categories, executed in order: auto-fixable tool runs, test failures, and audit findings. Every fix is verified before moving on.
+
+**FVP Protocol applies to this phase.** Every individual fix — not just each category — MUST emit a structured FVP proof block demonstrating the fix works. A fix without a proof block is an incomplete fix. See the FVP Protocol section in test.md for the full specification.
 
 ---
 
@@ -25,10 +27,10 @@ The only valid reasons to prompt the user are: (1) requires credentials/access y
 
 Before fixing anything, gather the structured output from prior phases. The dispatcher passes findings via the `PHASE_RESULTS` context. Extract:
 
-- **Phase 2 output**: Test failures (test file, test name, error type, traceback)
-- **Phase 5 output**: Security findings (file, line, issue type, severity)
-- **Phase 6 output**: Dependency vulnerabilities (package, current version, fixed version, CVE)
-- **Phase 7 output**: Quality issues (file, line, rule code, message)
+- **Phase 4a output**: Test failures (test file, test name, error type, traceback)
+- **Phase 5a output**: Security findings (file, line, issue type, severity)
+- **Phase 5b output**: Dependency vulnerabilities (package, current version, fixed version, CVE)
+- **Phase 5c output**: Quality issues (file, line, rule code, message), AI self-promotion findings
 
 Read each phase's output section and build a mental inventory before starting fixes. This prevents duplicate work and helps prioritize.
 
@@ -63,6 +65,36 @@ These fix simple lint violations (unused imports, trailing whitespace, basic cod
 | Rust | clippy | `cargo clippy --fix --allow-dirty --allow-staged` | Only if `Cargo.toml` exists |
 | Spelling | codespell | `codespell --write-changes --skip=".git,.venv,node_modules,.snapshots,*.lock" .` | Guard with `command -v` |
 
+### Step 1.3a: AI Self-Promotion Purge (Auto-Fixable)
+
+Scan for and remove AI-generated self-promotion, branding, and attribution:
+
+```bash
+echo "=== AI Self-Promotion Scan ==="
+
+# Scan code comments and documentation for AI branding
+grep -rn -i \
+  -e "Co-Authored-By.*\(Claude\|Anthropic\|GPT\|OpenAI\|Copilot\|Gemini\|AI\)" \
+  -e "Generated with.*\(Claude\|Anthropic\|GPT\|OpenAI\|Copilot\)" \
+  -e "Built with Claude\|Powered by Anthropic\|Created by Claude" \
+  -e "claude\.ai/claude-code\|anthropic\.com" \
+  -e "Generated with \[Claude Code\]" \
+  -e "🤖 Generated" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.md" \
+  --include="*.html" --include="*.css" --include="*.sh" --include="*.yml" \
+  --include="*.yaml" --include="*.json" --include="*.toml" --include="*.cfg" \
+  --include="*.txt" --include="*.rst" --include="*.xml" \
+  . 2>/dev/null | grep -v ".venv\|node_modules\|.snapshots\|.git/" | head -50
+
+# Scan git commit messages (cannot rewrite history, but flag for awareness)
+echo ""
+echo "=== Git Commit AI Attribution ==="
+git log --all --format='%H %s' 2>/dev/null | grep -i -e "co-authored.*claude\|co-authored.*anthropic" | head -20
+echo "(Commits with AI attribution cannot be rewritten — flagged for awareness only)"
+```
+
+Remove all AI self-promotion found in files. For each removal, emit an FVP proof block. Do NOT replace with alternative attribution — simply delete the self-promotion line/block entirely.
+
 ### Step 1.4: Verify Auto-Fixes Didn't Break Anything
 
 Run the project's test suite after all auto-fixes:
@@ -96,7 +128,7 @@ If auto-fixes were applied and tests pass, commit them as a batch:
 
 ```bash
 git add -A
-git commit -m "style: auto-format and lint fixes from /test Phase 10"
+git commit -m "style: auto-format and lint fixes from /test Phase 6"
 ```
 
 This creates a clean checkpoint. If later fixes go wrong, you can revert to this point.
@@ -145,7 +177,7 @@ When unclear: check git log for the file to see if recent changes explain the mi
 **D. Apply the fix:**
 Use `Edit` to modify either the test file or the source file. Make the minimal change that fixes the failure.
 
-**E. Verify the fix:**
+**E. Verify the fix and emit FVP proof block:**
 Re-run ONLY the specific test that failed:
 
 ```bash
@@ -170,6 +202,22 @@ pytest --tb=line -q 2>&1 | tail -5
 ```
 
 If a previously passing test now fails, your fix introduced a regression. Revert it and try a different approach.
+
+**G. Emit FVP proof block (MANDATORY after every fix):**
+
+```
+┌─ FVP PROOF ────────────────────────────────────────────┐
+│ Fix:      [file:line — what was changed]               │
+│ Issue:    [test_name — original failure message]       │
+│ Verify:   [exact pytest/jest/go test command executed] │
+│ Before:   [FAILED — original error output excerpt]    │
+│ After:    [PASSED — test output showing pass]         │
+│ Proof:    PASS: test_name now passes                  │
+│ Collateral: N passed, 0 failed (no regressions)      │
+└────────────────────────────────────────────────────────┘
+```
+
+**This block is NOT optional.** A fix without a proof block is treated as an unverified fix by Phase 7. Unverified fixes cause the audit to FAIL.
 
 ### Step 2.3: Handle Cascading Failures
 
@@ -204,7 +252,7 @@ Common security fix patterns:
 | Weak crypto (MD5/SHA1 for security) | Replace with SHA-256+; for non-security use, add `usedforsecurity=False` (Python 3.9+) |
 | Subprocess injection (`shell=True` + user input) | Switch to `shell=False` with argument list |
 
-After each security fix, run the relevant test(s). If no test covers the fixed code, note it in the output — Phase 12 should add coverage.
+After each security fix, run the relevant test(s). If no test covers the fixed code, note it in the output — Phase 7 should add coverage.
 
 ### Step 3.2: Dependency Issues (Phase 6) — Fix Second
 
@@ -259,7 +307,7 @@ ruff check . 2>&1  # (or project-appropriate linter)
 bandit -r src/ -q 2>&1  # (or project-appropriate security scanner)
 ```
 
-If ANY check fails, go back and fix. Do not proceed to Phase 12 with known failures.
+If ANY check fails, go back and fix. Do not proceed to Phase 7 with known failures.
 
 ---
 
@@ -271,7 +319,7 @@ Per the **Governing Law** (see test.md): all errors, warnings, and issues must b
 2. **Verify every fix** — after each fix, run the relevant test(s). A fix without verification is not a fix.
 3. **Don't break passing tests** — if a fix causes a previously passing test to fail, revert the fix and try a different approach. Record it in the output.
 4. **Commit in batches by category** — auto-fixes together, test fixes together, audit fixes together. This makes rollback possible if a batch causes problems.
-5. **Track what was fixed** — produce the structured output below so Phase 12 and the final report know what changed.
+5. **Track what was fixed** — produce the structured output below so Phase 7 and the final report know what changed.
 
 ---
 
@@ -282,17 +330,18 @@ Produce this structured output at the end of the phase:
 ```
 FIXES_APPLIED:
 - file: path/to/file.py
-  category: auto-format|test-fix|security|quality|dependency
+  category: auto-format|test-fix|security|quality|dependency|ai-self-promotion
   description: what was changed and why
   verified: true|false
   test_command: pytest tests/test_foo.py -k test_bar
+  fvp_proof: true|false
 ```
 
 Then produce the summary block:
 
 ```
 ═══════════════════════════════════════════════════════════════════
-  PHASE 10: FIX ALL ISSUES
+  PHASE 6: FIX ALL ISSUES
 ═══════════════════════════════════════════════════════════════════
 
 Issues Received: N    Issues Fixed: N
@@ -300,6 +349,11 @@ Issues Received: N    Issues Fixed: N
 By Category:
   Auto-Format: X files | Lint Auto-Fix: X | Test Failures: X
   Security: X | Dependencies: X updated | Quality: X
+  AI Self-Promotion: X removed
+
+FVP Protocol:
+  Proof Blocks Emitted: N    Fixes Without Proof: 0
+  ⛔ If "Fixes Without Proof" > 0: AUDIT CANNOT PASS
 
 Verification:  Tests: N passed, 0 failed | Lint: 0 errors | Security: 0 new
 
@@ -308,7 +362,9 @@ Commits:
   2. def5678 fix: resolve test failures
   3. ghi9012 fix: resolve audit findings
 
-Status: PASS - All issues resolved
+Status: PASS - All issues resolved, all fixes verified with proof
 ```
+
+**FVP compliance check**: If `Fixes Without Proof > 0`, the phase status MUST be `FAIL — N fixes lack FVP proof blocks`. Phase 7 will reject unverified fixes.
 
 In `--interactive` mode, if a fix requires user input (credentials, architectural decision), append a `BLOCKED` section listing those items with the specific blocker. These are not deferred — they are actively blocked and must be resolved before /test can complete. Status becomes: `BLOCKED - N fixed, M awaiting user input`.

@@ -1,11 +1,11 @@
-# Phase V: VM Testing Configuration
+# Phase 10a: VM Testing Configuration
 
 ## Default Test VM
 
 **test-vm-cachyos**: CachyOS with KDE desktop, 4GB RAM, 4 vCPUs, 40GB disk
 - Location: `/var/lib/libvirt/images/test-vm-cachyos.qcow2`
 - ISO Location: `/hddRaid1/ISOs/`
-- Auto-Detection: Phase V automatically finds VMs with "test" or "dev" in the name
+- Auto-Detection: Phase 10a automatically finds VMs with "test" or "dev" in the name
 
 ## Manifest Template
 
@@ -40,12 +40,12 @@ VM assignments are defined in `~/.claude/config/project-vm-map.json`. The `exclu
 - QA VMs (if configured) receive only promoted releases — `/test` phases never run against them.
 - All other projects use `test-vm-cachyos` (or any non-exclusive VM for cross-distro testing).
 
-## When Phase V Runs
+## When Phase 10a Runs
 
 - Project has `vm-test-manifest.json` with `"enabled": true`
 - Project has dangerous operations (PAM, systemd, kernel)
-- User explicitly requests `--phase=V`
-- Phase 0/1 detects install scripts modifying system-level configs
+- User explicitly requests `--phase=10a`
+- Phase 2/3 detects install scripts modifying system-level configs
 
 ## VM Lifecycle for `post_test_restore=true` VMs
 
@@ -54,13 +54,13 @@ For exclusive VMs with `post_test_restore=true`, the expected lifecycle is:
 | Phase | VM State | Action |
 |-------|----------|--------|
 | **Before /test** | Shut down + pristine | — |
-| **Startup (Phase 0/1)** | Check state | If running → dirty from interrupted test → force revert to pristine, then start. If shut down → start normally. |
+| **Startup (Phase 2/3)** | Check state | If running → dirty from interrupted test → force revert to pristine, then start. If shut down → start normally. |
 | **During testing** | Running | Install, deploy, test |
-| **Cleanup (Phase C)** | Running (dirty) | ALWAYS: revert to pristine, shut down, leave shut down |
+| **Cleanup (Phase 11)** | Running (dirty) | ALWAYS: revert to pristine, shut down, leave shut down |
 
 **Key rules:**
 - Revert ALWAYS discards the overlay (never `qemu-img commit` — that bakes test changes into the base)
-- Phase C shuts down and reverts regardless of who started the VM
+- Phase 11 shuts down and reverts regardless of who started the VM
 - The VM is left shut down and pristine, ready for the next test run
 
 ## VM Snapshot Workflow (Shared VMs)

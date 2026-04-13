@@ -1,8 +1,8 @@
-# Phase 7: Code Quality
+# Phase 5c: Code Quality
 
-> **Model**: `opus` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Model**: `opus` | **Phase**: 5c | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for linters/formatters. Parallelize with other Tier 3 phases. Includes cross-component config sprawl detection, version mismatch identification, and hardcoded path analysis.
+> **Key Tools**: `Bash` for linters/formatters. Parallelize with other phase 5 phases. Includes cross-component config sprawl detection, version mismatch identification, and hardcoded path analysis.
 
 Comprehensive linting, formatting, dead code detection, complexity analysis, and style checks.
 
@@ -12,7 +12,7 @@ Comprehensive linting, formatting, dead code detection, complexity analysis, and
 
 ```bash
 echo "==================================================================="
-echo "  PHASE 7: CODE QUALITY"
+echo "  PHASE 5c: CODE QUALITY"
 echo "==================================================================="
 
 PYTHON_FILES=$(find . -name "*.py" -not -path "./.venv/*" -not -path "./venv/*" -not -path "./.snapshots/*" -not -path "./node_modules/*" 2>/dev/null | head -1)
@@ -445,9 +445,9 @@ fi
 
 **Overall**: PASS requires all categories to pass. Any single FAIL means the phase reports ISSUES FOUND.
 
-## Integration with Phase 10
+## Integration with Phase 6
 
-Issues are collected for Phase 10 (Fix) to process. The collection avoids assuming jq is installed.
+Issues are collected for Phase 6 (Fix) to process. The collection avoids assuming jq is installed.
 
 ```bash
 QUALITY_ISSUES_FILE="${PROJECT_DIR:-$(pwd)}/quality-issues.txt"
@@ -798,6 +798,84 @@ grep -rn "^export \(function\|const\|class\) " --include="*.js" --include="*.ts"
   done 2>/dev/null | head -30
 ```
 
+### AI Self-Promotion & Branding Detection
+
+Scan for AI-generated self-promotion, advertising, attribution, and branding injected by language models. These are code quality issues — the project's code, documentation, and metadata should reflect the project owner's voice, not AI vendor marketing.
+
+```bash
+echo ""
+echo "-------------------------------------------------------------------"
+echo "  AI Self-Promotion & Branding Detection"
+echo "-------------------------------------------------------------------"
+
+PROJECT_ROOT="${PROJECT_ROOT:-.}"
+
+echo ""
+echo "=== Code & Documentation AI Branding ==="
+grep -rn -i \
+  -e "Co-Authored-By.*\(Claude\|Anthropic\|GPT\|OpenAI\|Copilot\|Gemini\)" \
+  -e "Generated with.*\(Claude\|Anthropic\|GPT\|OpenAI\|Copilot\)" \
+  -e "Built with Claude\|Powered by Anthropic\|Created by Claude" \
+  -e "Made with.*\(Claude\|Anthropic\|GPT\|OpenAI\)" \
+  -e "claude\.ai/claude-code" \
+  -e "Generated with \[Claude Code\]" \
+  -e "noreply@anthropic\.com" \
+  -e "🤖 Generated" \
+  --include="*.py" --include="*.js" --include="*.ts" --include="*.md" \
+  --include="*.html" --include="*.css" --include="*.sh" --include="*.yml" \
+  --include="*.yaml" --include="*.json" --include="*.toml" --include="*.cfg" \
+  --include="*.txt" --include="*.rst" --include="*.xml" \
+  "$PROJECT_ROOT" 2>/dev/null \
+  | grep -v ".venv\|node_modules\|.snapshots\|.git/\|__pycache__" \
+  | head -50
+
+echo ""
+echo "=== Package Metadata AI Attribution ==="
+# Check package.json, pyproject.toml, Cargo.toml for AI attribution in descriptions
+for meta in package.json pyproject.toml Cargo.toml setup.cfg setup.py; do
+  if [ -f "$PROJECT_ROOT/$meta" ]; then
+    grep -n -i -e "claude\|anthropic\|generated.*ai\|built.*with.*ai" \
+      "$PROJECT_ROOT/$meta" 2>/dev/null | head -5
+  fi
+done
+
+echo ""
+echo "=== PR/Issue Templates AI Branding ==="
+if [ -d "$PROJECT_ROOT/.github" ]; then
+  grep -rn -i \
+    -e "Claude Code\|Anthropic\|Generated with\|Co-Authored" \
+    "$PROJECT_ROOT/.github/" 2>/dev/null | head -10
+fi
+
+echo ""
+echo "=== Git Commit History AI Attribution ==="
+# Cannot fix (history rewriting is destructive) but report for awareness
+AI_COMMITS=$(git log --all --format='%H %s' 2>/dev/null \
+  | grep -i -c "co-authored.*\(claude\|anthropic\|noreply@anthropic\)" || echo "0")
+echo "Commits with AI Co-Authored-By: $AI_COMMITS"
+if [ "$AI_COMMITS" -gt 0 ]; then
+  echo "  (Cannot rewrite published history — flagged for awareness)"
+  echo "  Ensure no NEW commits include AI attribution"
+  git log --all --format='%h %s' 2>/dev/null \
+    | grep -i "co-authored.*\(claude\|anthropic\|noreply@anthropic\)" | head -10
+fi
+
+echo ""
+echo "=== CI/CD Workflow AI Branding ==="
+if [ -d "$PROJECT_ROOT/.github/workflows" ]; then
+  grep -rn -i \
+    -e "Claude\|Anthropic\|Generated with\|AI-generated" \
+    "$PROJECT_ROOT/.github/workflows/" 2>/dev/null | head -10
+fi
+```
+
+**Report each finding as:**
+```
+FINDING: AI self-promotion in [file]:[line] — [pattern matched]
+```
+
+All findings are quality issues to be fixed by Phase 6 (removal, not replacement).
+
 ## Checklist
 
 - [ ] Config files enumerated and cross-referenced
@@ -806,3 +884,4 @@ grep -rn "^export \(function\|const\|class\) " --include="*.js" --include="*.ts"
 - [ ] Hardcoded paths detected
 - [ ] Version string consistency verified
 - [ ] Cross-component dead code identified
+- [ ] AI self-promotion and branding scanned and reported
