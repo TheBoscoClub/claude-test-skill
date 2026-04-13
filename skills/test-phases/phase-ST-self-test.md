@@ -960,26 +960,26 @@ echo "────────────────────────�
 
 # Validate expected model assignments — 20 phases
 declare -A EXPECTED_MODELS=(
-    ["phase-0-preflight.md"]="sonnet"
-    ["phase-1-discovery.md"]="opus"
-    ["phase-2-execute.md"]="sonnet"
-    ["phase-2a-runtime.md"]="sonnet"
-    ["phase-5-security.md"]="opus"
-    ["phase-6-dependencies.md"]="sonnet"
-    ["phase-7-quality.md"]="opus"
-    ["phase-10-fix.md"]="opus"
-    ["phase-12-verify.md"]="sonnet"
-    ["phase-13-docs.md"]="sonnet"
-    ["phase-A-app-testing.md"]="opus"
-    ["phase-C-restore.md"]="haiku"
-    ["phase-D-docker.md"]="opus"
-    ["phase-G-github.md"]="opus"
-    ["phase-I-infrastructure.md"]="sonnet"
-    ["phase-P-production.md"]="opus"
-    ["phase-S-snapshot.md"]="haiku"
+    ["phase-1-snapshot.md"]="haiku"
+    ["phase-2-preflight.md"]="sonnet"
+    ["phase-3-discovery.md"]="opus"
+    ["phase-4a-execute.md"]="sonnet"
+    ["phase-4b-runtime.md"]="sonnet"
+    ["phase-5a-security.md"]="opus"
+    ["phase-5b-dependencies.md"]="sonnet"
+    ["phase-5c-quality.md"]="opus"
+    ["phase-5d-infrastructure.md"]="sonnet"
+    ["phase-6-fix.md"]="opus"
+    ["phase-7-verify.md"]="sonnet"
+    ["phase-8-docs.md"]="sonnet"
+    ["phase-9a-app-testing.md"]="opus"
+    ["phase-9b-production.md"]="opus"
+    ["phase-9c-docker.md"]="opus"
+    ["phase-9d-github.md"]="opus"
+    ["phase-10a-vm-testing.md"]="sonnet"
+    ["phase-10b-vm-lifecycle.md"]="sonnet"
+    ["phase-11-cleanup.md"]="haiku"
     ["phase-ST-self-test.md"]="opus"
-    ["phase-V-vm-testing.md"]="sonnet"
-    ["phase-VM-lifecycle.md"]="sonnet"
 )
 
 MODEL_MISMATCHES=0
@@ -1018,7 +1018,7 @@ for tool in "${EXPECTED_TOOLS[@]}"; do
     fi
 done
 
-echo "  ✅ Dispatcher declares $TOOLS_FOUND/15 core allowed tools"
+echo "  ✅ Dispatcher declares $TOOLS_FOUND/16 core allowed tools"
 
 echo ""
 echo "───────────────────────────────────────────────────────────────────"
