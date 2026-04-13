@@ -9,9 +9,9 @@
 ## Verification in /test Phases
 
 After ANY fix applied by /test:
-- Phase 10 (Fix): After applying a fix, MUST verify the fix works
-- Phase P (Production): MUST run wrapper scripts, not just check they exist
-- Phase 12 (Verify): MUST execute actual tests, not just check test files exist
+- Phase 6 (Fix): After applying a fix, MUST verify the fix works
+- Phase 9b (Production): MUST run wrapper scripts, not just check they exist
+- Phase 7 (Verify): MUST execute actual tests, not just check test files exist
 
 ## Project-Specific Test Modules
 
@@ -29,7 +29,7 @@ Project Root (any project using /test)
 ```
 
 **Execution Model**:
-- QA shortcuts are **standalone** — bypass the tier/gate system entirely
+- QA shortcuts are **standalone** — bypass the phase dependency system entirely
 - Each module is loaded as a self-contained subagent instruction file (model=opus)
 - Dispatcher discovers modules via glob: `test-*-qa-{app,docker,all}.md`
 - Modules handle their own VM connectivity, version checks, upgrades, DB sync, regression

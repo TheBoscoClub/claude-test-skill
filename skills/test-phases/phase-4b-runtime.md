@@ -1,6 +1,6 @@
-# Phase 2a: Runtime Health Checks
+# Phase 4b: Runtime Checks
 
-> **Model**: `sonnet` | **Tier**: 2 (Execute) | **Modifies Files**: No
+> **Model**: `sonnet` | **Phase**: 4b | **Modifies Files**: No
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for service checks (use `timeout` to prevent hangs). Can parallel with Phase 2.
 
@@ -404,7 +404,7 @@ fi
 
 ## Output Format
 
-Produce a structured summary. Use `FINDING:` prefix for all issues so Phase 10 can parse them.
+Produce a structured summary. Use `FINDING:` prefix for all issues so Phase 6 can parse them.
 
 ```
 RUNTIME HEALTH CHECK

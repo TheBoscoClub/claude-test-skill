@@ -1,6 +1,6 @@
-# Phase V: VM Testing (Heavy Isolation)
+# Phase 10a: VM Testing
 
-> **Model**: `sonnet` | **Tier**: 8 (Conditional) | **Modifies Files**: VM only
+> **Model**: `sonnet` | **Phase**: 10a | **Modifies Files**: VM only
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for virsh/SSH commands (use `timeout` for hung operations). Use `AskUserQuestion` if VM connectivity fails.
 
@@ -8,15 +8,15 @@ Test applications, releases, and system-level changes in fully isolated virtual 
 
 ## When to Use
 
-| Scenario | Phase V? |
+| Scenario | Phase 10a? |
 |----------|----------|
 | PAM/auth modifications | Yes |
 | systemd service changes | Yes |
 | Kernel parameters / boot changes | Yes |
 | Cross-distro testing | Yes |
 | Reboot cycle testing | Yes |
-| App logic testing | No (Phase A) |
-| Production validation | No (Phase P) |
+| App logic testing | No (Phase 9a) |
+| Production validation | No (Phase 9b) |
 
 **Triggers:** `vm-test-manifest.json` with `enabled: true`, dangerous operations detected, staged release, `--phase=V`, isolation level `vm-required`/`vm-recommended`.
 
@@ -402,7 +402,7 @@ capture_vm_screen() {
 }
 ```
 
-## Phase V Execution Order
+## Phase 10a Execution Order
 
 ```bash
 run_phase_V() {
@@ -504,7 +504,7 @@ run_phase_V() {
 
 ## Project-VM Routing
 
-Phase V reads `~/.claude/config/project-vm-map.json`:
+Phase 10a reads `~/.claude/config/project-vm-map.json`:
 
 | Scenario | VM Used |
 |----------|---------|

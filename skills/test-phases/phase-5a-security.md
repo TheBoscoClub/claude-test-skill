@@ -1,8 +1,8 @@
-# Phase 5: Comprehensive Security Testing & Mitigation
+# Phase 5a: Comprehensive Security Testing & Mitigation
 
-> **Model**: `opus` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Model**: `opus` | **Phase**: 5a | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for security scanners, `WebSearch` to look up CVE details and check for known exploits for flagged vulnerabilities. Use `AskUserQuestion` in `--interactive` mode for security remediation decisions (e.g., breaking change vs. patching). Parallelize with other Tier 3 phases. Includes cross-component data flow tracing and unvalidated input detection.
+> **Key Tools**: `Bash` for security scanners, `WebSearch` to look up CVE details and check for known exploits for flagged vulnerabilities. Use `AskUserQuestion` in `--interactive` mode for security remediation decisions (e.g., breaking change vs. patching). Parallelize with other phase 5 phases. Includes cross-component data flow tracing and unvalidated input detection.
 > **Rate Limiting**: GitHub API calls are subject to rate limits. Use `gh api --cache 60s` where possible. Check `gh api rate_limit` before bulk API operations.
 
 **THE security phase** - tests and mitigates all security issues across:
@@ -16,7 +16,7 @@ For targeted deep-dive security audits beyond the automated checks below, the di
 
 ```bash
 # Run as part of full audit
-/test                        # Phase 5 runs in Tier 3
+/test                        # Phase 5a runs in the analysis group
 
 # Run standalone (comprehensive security only)
 /test --phase=5
@@ -626,7 +626,7 @@ echo "════════════════════════�
 ## Integration Notes
 
 ### Invocation:
-- `/test` - Phase 5 runs in Tier 3
+- `/test` - Phase 5a runs in the analysis group
 - `/test --phase=5` or `/test --phase=SEC` - Standalone
 - `/test --phase=5 --audit-only` - No auto-fixes
 

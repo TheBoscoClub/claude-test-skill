@@ -1,6 +1,6 @@
-# Phase 13: Documentation
+# Phase 8: Documentation
 
-> **Model**: `sonnet` | **Tier**: 6 (Docs) | **Modifies Files**: YES (fixes docs)
+> **Model**: `sonnet` | **Phase**: 8 | **Modifies Files**: YES (fixes docs)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Read`, `Edit`, `Write` for doc fixes. Use `NotebookEdit` for Jupyter notebook documentation. Use `WebSearch` to verify external URLs still resolve. In `--interactive` mode, use `AskUserQuestion` for doc style decisions.
 
@@ -191,6 +191,49 @@ Remove references to:
 - Removed dependencies
 - Previous repository names (unless historical context)
 
+### 7a. AI Self-Promotion Purge
+
+**MANDATORY: Scan all documentation for AI-generated self-promotion, advertising, branding, and attribution.** Remove everything found — do not replace with alternative attribution.
+
+```bash
+echo "=== AI Self-Promotion Purge (Documentation) ==="
+
+# Scan all documentation files
+grep -rn -i \
+  -e "Co-Authored-By.*\(Claude\|Anthropic\|GPT\|OpenAI\|Copilot\|Gemini\)" \
+  -e "Generated with.*\(Claude\|Anthropic\|GPT\|OpenAI\|Copilot\)" \
+  -e "Built with Claude\|Powered by Anthropic\|Created by Claude" \
+  -e "Made with.*\(Claude\|Anthropic\|GPT\|OpenAI\)" \
+  -e "claude\.ai/claude-code\|claude\.ai" \
+  -e "noreply@anthropic\.com" \
+  -e "Generated with \[Claude Code\]" \
+  -e "🤖 Generated" \
+  -e "AI-assisted\|AI-generated" \
+  --include="*.md" --include="*.txt" --include="*.rst" \
+  --include="*.html" --include="*.xml" \
+  . 2>/dev/null | grep -v ".venv\|node_modules\|.snapshots\|.git/" | head -30
+
+# Check PR/issue templates
+if [ -d ".github" ]; then
+  grep -rn -i \
+    -e "Claude Code\|Anthropic\|Generated with\|Co-Authored\|🤖" \
+    .github/ 2>/dev/null | head -10
+fi
+```
+
+**For each finding:**
+1. Read the file to understand context
+2. Remove the entire self-promotion line or block
+3. Do NOT add any replacement attribution
+4. Emit an FVP proof block showing the removal
+
+**Common patterns to remove:**
+- Footer lines like `🤖 Generated with [Claude Code](https://claude.ai/claude-code)`
+- PR template blocks that auto-inject AI branding
+- README badges referencing AI tools
+- CHANGELOG entries that mention AI assistance
+- Commit message templates with `Co-Authored-By: Claude` lines
+
 ### 8. Docstring/Comment Updates
 
 For code that changed in this audit:
@@ -215,7 +258,7 @@ For code that changed in this audit:
 
 ```
 ═══════════════════════════════════════════════════════════════════
-  PHASE 13: FIX ALL DOCUMENTATION
+  PHASE 8: FIX ALL DOCUMENTATION
 ═══════════════════════════════════════════════════════════════════
 
 Git Commit Analysis:
@@ -243,6 +286,12 @@ Content Updates:
 Obsolete Removal:
   Removed 2 references to old-project-name (old repo name)
   Removed deprecated --legacy flag documentation
+
+AI Self-Promotion Purge:
+  Files scanned: N
+  AI branding instances found: N
+  Instances removed: N
+  Git commits with AI attribution: N (flagged, not rewritable)
 
 Documentation Files Modified: 8
 Issues Found: 15

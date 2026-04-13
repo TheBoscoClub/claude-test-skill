@@ -1,6 +1,6 @@
-# Phase 2: Test Execution & Analysis
+# Phase 4a: Test Execution & Analysis
 
-> **Model**: `sonnet` | **Tier**: 2 (Execute) | **Modifies Files**: No (runs tests, generates reports)
+> **Model**: `sonnet` | **Phase**: 4a | **Modifies Files**: No (runs tests, generates reports)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for test execution and coverage (use `timeout` for hung processes). `Read`, `Grep` for failure analysis.
 
@@ -401,7 +401,7 @@ fi
 
 ## Phase Output
 
-This phase MUST produce the following structured output. Downstream phases (especially Phase 10 Fix) depend on this exact format.
+This phase MUST produce the following structured output. Downstream phases (especially Phase 6 Fix) depend on this exact format.
 
 ```
 ===============================================================
@@ -466,7 +466,7 @@ Coverage Gap: 5.8% below target
 
 ### Output Fields Reference
 
-These fields are consumed by Phase 10 (Fix) and the final report:
+These fields are consumed by Phase 6 (Fix) and the final report:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -505,7 +505,7 @@ These fields are consumed by Phase 10 (Fix) and the final report:
 Remove temporary test artifacts after output is captured:
 
 ```bash
-# Clean up generated files (keep test-output.log for Phase 10)
+# Clean up generated files (keep test-output.log for Phase 6)
 rm -f coverage.out coverage.json tarpaulin-report.json
-# Do NOT delete test-output.log — Phase 10 needs it for fix verification
+# Do NOT delete test-output.log — Phase 6 needs it for fix verification
 ```

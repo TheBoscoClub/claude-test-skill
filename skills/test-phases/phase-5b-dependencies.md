@@ -1,10 +1,10 @@
-# Phase 6: Dependency Health
+# Phase 5b: Dependency Health
 
-> **Model**: `sonnet` | **Tier**: 3 (Analysis) | **Modifies Files**: No (read-only)
+> **Model**: `sonnet` | **Phase**: 5b | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
-> **Key Tools**: `Bash` for audit commands. Use `WebSearch` to look up CVE details for flagged vulnerabilities. Parallelize with other Tier 3 phases. Includes cross-component import mapping, circular import detection, and unused export analysis.
+> **Key Tools**: `Bash` for audit commands. Use `WebSearch` to look up CVE details for flagged vulnerabilities. Parallelize with other phase 5 phases. Includes cross-component import mapping, circular import detection, and unused export analysis.
 
-Detect all dependency ecosystems present in the project, audit each for outdated packages, known vulnerabilities, dependency conflicts, and license compliance. Produce a structured severity-classified report for Phase 10 consumption.
+Detect all dependency ecosystems present in the project, audit each for outdated packages, known vulnerabilities, dependency conflicts, and license compliance. Produce a structured severity-classified report for Phase 6 consumption.
 
 ---
 
@@ -509,7 +509,7 @@ Report: List all import relationships, flag circular imports and unused exports.
 
 ## Output Format
 
-Produce a structured summary. Use `FINDING [SEVERITY]:` prefix for all issues so Phase 10 can parse them.
+Produce a structured summary. Use `FINDING [SEVERITY]:` prefix for all issues so Phase 6 can parse them.
 
 ```
 DEPENDENCY HEALTH
