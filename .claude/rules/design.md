@@ -8,6 +8,8 @@
 
 ## Verification in /test Phases
 
+These are concrete applications of the global Proof Principle and `[SI-GATE]` in `~/.claude/rules/verification.md` — proof means exercising the user-facing pathway, not just confirming code exists.
+
 After ANY fix applied by /test:
 - Phase 6 (Fix): After applying a fix, MUST verify the fix works
 - Phase 9b (Production): MUST run wrapper scripts, not just check they exist

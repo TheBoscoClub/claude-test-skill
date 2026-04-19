@@ -818,6 +818,6 @@ ISO Library: [path (count) / None]
 [category] file: description
 [category] file: description
 
-Note: Isolation requirements are determined by Phase 1 (Discovery).
+Note: Isolation requirements are determined by Phase 3 (Discovery).
 Phase 2 only reports WHAT is available, not what is NEEDED.
 ```

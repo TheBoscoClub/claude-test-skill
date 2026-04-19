@@ -11,7 +11,7 @@ Complete installation instructions for the Claude Code Test Skill (`/test`).
 
 ### Recommended
 
-These tools are detected automatically by Phase 1 (Discovery) and used when available. The skill works without them, but functionality will be reduced.
+These tools are detected automatically by Phase 3 (Discovery) and used when available. The skill works without them, but functionality will be reduced.
 
 **Code Quality:**
 
@@ -36,7 +36,7 @@ These tools are detected automatically by Phase 1 (Discovery) and used when avai
 
 | Tool | Install | Used By |
 |------|---------|---------|
-| [gh](https://cli.github.com/) | OS package manager | Phase G (GitHub audit) |
+| [gh](https://cli.github.com/) | OS package manager | Phase 9d (GitHub audit) |
 
 > **Note:** You don't need ALL of these. The skill gracefully skips tools that aren't installed and reports what it found. Start with `ruff` and `bandit` for the best coverage-to-effort ratio.
 
@@ -123,7 +123,7 @@ Phase ST checks:
 - Symlinks point to correct targets
 - Dispatcher references all phases
 - Security tools are installed
-- Opus 4.6 configuration headers are present
+- Phase configuration headers are present
 - Model tier assignments are correct
 
 ---
@@ -195,26 +195,26 @@ tools:
 │   └── test.md              → ~/claude-test-skill/commands/test.md (symlink)
 └── skills/
     └── test-phases/          → ~/claude-test-skill/skills/test-phases/ (symlink)
-        ├── phase-0-preflight.md
-        ├── phase-1-discovery.md
-        ├── phase-2-execute.md
-        ├── phase-2a-runtime.md
-        ├── phase-5-security.md
-        ├── phase-6-dependencies.md
-        ├── phase-7-quality.md
-        ├── phase-10-fix.md
-        ├── phase-12-verify.md
-        ├── phase-13-docs.md
-        ├── phase-A-app-testing.md
-        ├── phase-C-restore.md
-        ├── phase-D-docker.md
-        ├── phase-G-github.md
-        ├── phase-I-infrastructure.md
-        ├── phase-P-production.md
-        ├── phase-S-snapshot.md
-        ├── phase-ST-self-test.md
-        ├── phase-V-vm-testing.md
-        └── phase-VM-lifecycle.md
+        ├── phase-1-snapshot.md
+        ├── phase-2-preflight.md
+        ├── phase-3-discovery.md
+        ├── phase-4a-execute.md
+        ├── phase-4b-runtime.md
+        ├── phase-5a-security.md
+        ├── phase-5b-dependencies.md
+        ├── phase-5c-quality.md
+        ├── phase-5d-infrastructure.md
+        ├── phase-6-fix.md
+        ├── phase-7-verify.md
+        ├── phase-8-docs.md
+        ├── phase-9a-app-testing.md
+        ├── phase-9b-production.md
+        ├── phase-9c-docker.md
+        ├── phase-9d-github.md
+        ├── phase-10a-vm-testing.md
+        ├── phase-10b-vm-lifecycle.md
+        ├── phase-11-cleanup.md
+        └── phase-ST-self-test.md
 ```
 
 ---
@@ -244,7 +244,7 @@ tools:
 
 ### "BTRFS snapshot failed"
 
-- Phase S (Snapshot) requires a BTRFS filesystem and sudo access
+- Phase 1 (Snapshot) requires a BTRFS filesystem and sudo access
 - On non-BTRFS systems, Phase S is skipped automatically — this is safe
 
 ### Phase ST reports failures

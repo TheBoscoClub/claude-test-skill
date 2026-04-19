@@ -18,7 +18,7 @@ The test-skill follows a **dispatcher + subagent** architecture that achieves ~9
 │  ┌─────────────┐  spawn (opus)  ┌──────────────────────────────┐   │
 │  │ Dispatcher  │────────────────► Task Subagent (Phase 5)      │   │
 │  │ test.md     │                │ Model: opus                   │   │
-│  │ (~1000 ln)  │◄───────────────│ Reads: phase-5-security.md    │   │
+│  │ (~1000 ln)  │◄───────────────│ Reads: phase-5a-security.md   │   │
 │  │ model: opus │    summary     │ Reports: TaskUpdate            │   │
 │  └─────────────┘                └──────────────────────────────┘   │
 │        │                                                            │
@@ -52,49 +52,49 @@ claude-test-skill/
 │   └── test-phases/            # 20 phase files
 │       │
 │       │  ── TIER 0: Safety Gates ──
-│       ├── phase-S-snapshot.md       # BTRFS safety snapshot          [haiku]
-│       ├── phase-0-preflight.md      # Environment + config validation [sonnet]
+│       ├── phase-1-snapshot.md         # BTRFS safety snapshot          [haiku]
+│       ├── phase-2-preflight.md        # Environment + config validation [sonnet]
 │       │
 │       │  ── TIER 1: Discovery ──
-│       ├── phase-1-discovery.md      # Project detection (GATE)       [opus]
+│       ├── phase-3-discovery.md        # Project detection (GATE)       [opus]
 │       │
 │       │  ── TIER 2: Testing ──
-│       ├── phase-2-execute.md        # Run tests + analysis + coverage [sonnet]
-│       ├── phase-2a-runtime.md       # Service health                 [sonnet]
+│       ├── phase-4a-execute.md         # Run tests + analysis + coverage [sonnet]
+│       ├── phase-4b-runtime.md         # Service health                 [sonnet]
 │       │
 │       │  ── TIER 3: Analysis (Read-Only) ──
-│       ├── phase-5-security.md       # Comprehensive security         [opus]
-│       ├── phase-6-dependencies.md   # Package health                 [sonnet]
-│       ├── phase-7-quality.md        # Linting, complexity, cleanup   [opus]
-│       ├── phase-I-infrastructure.md # Infrastructure issues          [sonnet]
+│       ├── phase-5a-security.md        # Comprehensive security         [opus]
+│       ├── phase-5b-dependencies.md    # Package health                 [sonnet]
+│       ├── phase-5c-quality.md         # Linting, complexity, cleanup   [opus]
+│       ├── phase-5d-infrastructure.md  # Infrastructure issues          [sonnet]
 │       │
 │       │  ── TIER 4: Modifications ──
-│       ├── phase-10-fix.md           # Auto-fixing (BLOCKING)         [opus]
+│       ├── phase-6-fix.md              # Auto-fixing (BLOCKING)         [opus]
 │       │
 │       │  ── TIER 5: Validation (Conditional) ──
-│       ├── phase-A-app-testing.md    # Sandbox app testing            [opus]
-│       ├── phase-P-production.md     # Production validation          [opus]
-│       ├── phase-D-docker.md         # Docker/registry validation     [opus]
-│       ├── phase-G-github.md         # GitHub security audit          [opus]
+│       ├── phase-9a-app-testing.md     # Sandbox app testing            [opus]
+│       ├── phase-9b-production.md      # Production validation          [opus]
+│       ├── phase-9c-docker.md          # Docker/registry validation     [opus]
+│       ├── phase-9d-github.md          # GitHub security audit          [opus]
 │       │
 │       │  ── TIER 6: Verification ──
-│       ├── phase-12-verify.md        # Re-run tests                   [sonnet]
+│       ├── phase-7-verify.md           # Re-run tests                   [sonnet]
 │       │
 │       │  ── TIER 7: Documentation ──
-│       ├── phase-13-docs.md          # Doc synchronization            [sonnet]
+│       ├── phase-8-docs.md             # Doc synchronization            [sonnet]
 │       │
 │       │  ── TIER 8: Cleanup ──
-│       ├── phase-C-restore.md        # Environment restore            [haiku]
+│       ├── phase-11-cleanup.md         # Environment cleanup            [haiku]
 │       │
 │       │  ── SPECIAL: Isolated / Conditional ──
-│       ├── phase-ST-self-test.md     # Framework self-validation      [opus]
-│       ├── phase-V-vm-testing.md     # VM isolation testing           [sonnet]
-│       └── phase-VM-lifecycle.md     # VM startup/shutdown            [sonnet]
+│       ├── phase-ST-self-test.md       # Framework self-validation      [opus]
+│       ├── phase-10a-vm-testing.md     # VM isolation testing           [sonnet]
+│       └── phase-10b-vm-lifecycle.md   # VM startup/shutdown            [sonnet]
 │
 ├── agents/                     # Specialized subagents (integrated into phases)
-│   ├── coverage-reviewer.md    # Test coverage analysis (integrated into Phase 2)
-│   ├── security-scanner.md     # Security pattern matching (integrated into Phase 5)
-│   └── test-analyzer.md        # Test result analysis (integrated into Phase 2)
+│   ├── coverage-reviewer.md    # Test coverage analysis (integrated into Phase 4a)
+│   ├── security-scanner.md     # Security pattern matching (integrated into Phase 5a)
+│   └── test-analyzer.md        # Test result analysis (integrated into Phase 4a)
 │
 ├── examples/
 │   └── test-skill.local.md     # Local configuration example
@@ -146,7 +146,7 @@ Each phase file contains a standardized structure (v2.0.1+):
 ```markdown
 # Phase X: Name
 
-> **Model**: `opus` | **Tier**: 3 (Analysis) | **Modifies Files**: No
+> **Model**: `opus` | **Phase**: 3 | **Modifies Files**: No
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start...
 > **Key Tools**: `Bash`, `WebSearch` for CVE lookups...
 
@@ -168,7 +168,7 @@ Issues: [count]
 | Field | Purpose |
 |-------|---------|
 | **Model** | Which model tier the subagent runs on (opus/sonnet/haiku) |
-| **Tier** | Where in the execution graph this phase sits |
+| **Phase** | Phase identifier (matches the file name — e.g., `3`, `5a`, `10b`, `ST`) |
 | **Modifies Files** | Whether the phase writes to the project |
 | **Task Tracking** | Instructions for reporting progress via TaskUpdate |
 | **Key Tools** | Phase-specific guidance on available tools |
@@ -185,7 +185,7 @@ Specialized subagents that are now integrated into their respective phases. The 
 
 ---
 
-## Model Tiering (Opus 4.6)
+## Model Tiering
 
 Each phase is assigned to an optimal model based on task complexity:
 
@@ -194,36 +194,36 @@ Each phase is assigned to an optimal model based on task complexity:
 │                      MODEL TIER ASSIGNMENTS                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  OPUS (9 phases)          Complex analysis, multi-step reasoning    │
-│  ├── Phase 1  Discovery   Architecture detection, framework ID     │
-│  ├── Phase 5  Security    8-tool security suite, CVE analysis       │
-│  ├── Phase 7  Quality     LSP integration, complexity analysis      │
-│  ├── Phase 10 Fix         Multi-file auto-fixing, refactoring       │
-│  ├── Phase A  App Test    Sandbox deployment testing                │
-│  ├── Phase P  Production  Live system validation                    │
-│  ├── Phase D  Docker      Image/registry validation                 │
-│  ├── Phase G  GitHub      Repository security audit                 │
-│  └── Phase ST Self-Test   Framework meta-validation                 │
+│  OPUS (9 phases)           Complex analysis, multi-step reasoning   │
+│  ├── Phase 3   Discovery    Architecture detection, framework ID    │
+│  ├── Phase 5a  Security     Security suite, CVE analysis            │
+│  ├── Phase 5c  Quality      LSP integration, complexity analysis    │
+│  ├── Phase 6   Fix          Multi-file auto-fixing, refactoring     │
+│  ├── Phase 9a  App Test     Sandbox deployment testing              │
+│  ├── Phase 9b  Production   Live system validation                  │
+│  ├── Phase 9c  Docker       Image/registry validation               │
+│  ├── Phase 9d  GitHub       Repository security audit               │
+│  └── Phase ST  Self-Test    Framework meta-validation               │
 │                                                                     │
-│  SONNET (9 phases)        Standard testing and verification         │
-│  ├── Phase 0  Pre-Flight  Environment + config checks               │
-│  ├── Phase 2  Execute     Test runner + analysis + coverage         │
-│  ├── Phase 2a Runtime     Service health probes                     │
-│  ├── Phase 6  Deps        Dependency auditing                       │
-│  ├── Phase 12 Verify      Re-run verification                      │
-│  ├── Phase 13 Docs        Documentation sync                       │
-│  ├── Phase I  Infra       Infrastructure checks                    │
-│  ├── Phase V  VM Test     VM isolation testing                      │
-│  └── Phase VM Lifecycle   VM startup/shutdown management            │
+│  SONNET (9 phases)         Standard testing and verification        │
+│  ├── Phase 2   Pre-Flight   Environment + config checks             │
+│  ├── Phase 4a  Execute      Test runner + analysis + coverage       │
+│  ├── Phase 4b  Runtime      Service health probes                   │
+│  ├── Phase 5b  Deps         Dependency auditing                     │
+│  ├── Phase 5d  Infra        Infrastructure checks                   │
+│  ├── Phase 7   Verify       Re-run verification                     │
+│  ├── Phase 8   Docs         Documentation sync                      │
+│  ├── Phase 10a VM Test      VM isolation testing                    │
+│  └── Phase 10b VM Lifecycle VM startup/shutdown management          │
 │                                                                     │
-│  HAIKU (2 phases)         Lightweight, fast operations              │
-│  ├── Phase S  Snapshot    BTRFS snapshot creation                   │
-│  └── Phase C  Restore     Environment cleanup                      │
+│  HAIKU (2 phases)          Lightweight, fast operations             │
+│  ├── Phase 1   Snapshot     BTRFS snapshot creation                 │
+│  └── Phase 11  Cleanup      Environment cleanup                     │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Why tier models?** Cost and latency optimization. A BTRFS snapshot (Phase S) doesn't need opus-level reasoning — haiku runs it in a fraction of the time and cost. But security analysis (Phase 5) benefits from opus's deeper reasoning to understand vulnerability context and remediation strategies.
+**Why tier models?** Cost and latency optimization. A BTRFS snapshot (Phase 1) doesn't need opus-level reasoning — haiku runs it in a fraction of the time and cost. But security analysis (Phase 5a) benefits from opus's deeper reasoning to understand vulnerability context and remediation strategies.
 
 ---
 
@@ -328,7 +328,7 @@ The dispatcher declares 15 tools available to all subagents:
 | **Notebooks** | NotebookEdit | Jupyter notebook support |
 | **Research** | WebSearch | CVE lookups, error research |
 
-Phase configuration headers tell each subagent which tools are most relevant for its task. For example, Phase 5 (Security) emphasizes `WebSearch` for CVE lookups, while Phase 2 (Execute) emphasizes `Bash` for running test suites.
+Phase configuration headers tell each subagent which tools are most relevant for its task. For example, Phase 5a (Security) emphasizes `WebSearch` for CVE lookups, while Phase 4a (Execute) emphasizes `Bash` for running test suites.
 
 ---
 
@@ -377,9 +377,9 @@ Phase ST is a **meta-testing** phase that validates the test-skill framework its
 3. Dispatcher contains all phase references and shortcuts
 4. All security and core tools are installed
 5. All phase files have valid bash blocks
-6. **Opus 4.6 integration** — configuration headers present, model tier assignments match dispatcher, all 15 tools declared
+6. **Model tier integration** — configuration headers present, model tier assignments match dispatcher, all dispatcher-declared tools present
 
-### Phase V (VM Testing) — Conditional
+### Phase 10a (VM Testing) — Conditional
 
 Runs applications in fully isolated libvirt/QEMU virtual machines for testing operations that could affect the host system (PAM changes, kernel parameters, systemd units).
 
@@ -387,15 +387,15 @@ Runs applications in fully isolated libvirt/QEMU virtual machines for testing op
 
 Manages automatic VM startup and shutdown for Phase V. Tracks which VMs were started by `/test` to ensure cleanup.
 
-### Conditional Phases (P, D, G)
+### Conditional Phases (9b, 9c, 9d)
 
-These phases skip automatically based on Discovery (Phase 1) results:
+These phases skip automatically based on Discovery (Phase 3) results:
 
 | Phase | Condition to RUN | Condition to SKIP |
 |-------|------------------|-------------------|
-| P | App installed on system | No installable app or not installed |
-| D | Dockerfile + registry package | No Dockerfile or no registry |
-| G | GitHub remote + gh authenticated | No remote or gh not authenticated |
+| 9b | App installed on system | No installable app or not installed |
+| 9c | Dockerfile + registry package | No Dockerfile or no registry |
+| 9d | GitHub remote + gh authenticated | No remote or gh not authenticated |
 
 ---
 
@@ -484,7 +484,7 @@ With tiering:    9 x opus + 9 x sonnet + 2 x haiku = ~45% cost reduction
 
 1. Create `skills/test-phases/phase-X-name.md` with configuration header:
    ```markdown
-   > **Model**: `sonnet` | **Tier**: 3 (Analysis) | **Modifies Files**: No
+   > **Model**: `sonnet` | **Phase**: X | **Modifies Files**: No
    > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start...
    > **Key Tools**: `Bash`, `Read`, `Grep`...
    ```
