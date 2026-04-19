@@ -50,7 +50,7 @@ Search for exposed credentials, API keys, and tokens in source files.
 
 ### 3. Insecure Code Patterns
 
-Reference `phase-5-security.md` for the complete list of patterns to scan for, including:
+Reference `phase-5a-security.md` for the complete list of patterns to scan for, including:
 - Injection vulnerabilities (SQL, command, XSS)
 - Insecure configurations
 - Authentication issues
@@ -77,4 +77,4 @@ A01-A10 (Access Control through SSRF)
 
 - Always rotate secrets after exposure, don't just remove them
 - Check git history for previously committed secrets
-- Use `phase-5-security.md` for detailed scanning instructions
+- Use `phase-5a-security.md` for detailed scanning instructions

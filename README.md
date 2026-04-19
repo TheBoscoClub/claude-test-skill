@@ -154,7 +154,7 @@ rm -rf /tmp/claude-test-skill
 
 ## Tool Detection
 
-Phase 1 (Discovery) automatically detects which tools are installed on your system. The skill uses the tools it finds:
+Phase 3 (Discovery) automatically detects which tools are installed on your system. The skill uses the tools it finds:
 
 ### Code Quality Tools
 
@@ -261,15 +261,15 @@ TIER 8: Cleanup [C] ────────────────────
 
 ### Conditional Phases
 
-**Phase P (Production)** - Skipped if:
+**Phase 9b (Production)** - Skipped if:
 - No installable app detected
 - App not installed on this system
 
-**Phase D (Docker)** - Skipped if:
+**Phase 9c (Docker)** - Skipped if:
 - No Dockerfile in project
 - No registry package found
 
-**Phase G (GitHub)** - Skipped if:
+**Phase 9d (GitHub)** - Skipped if:
 - No GitHub remote configured
 - `gh` CLI not authenticated
 
@@ -304,31 +304,31 @@ claude-test-skill/
 ├── commands/
 │   └── test.md              # Main dispatcher (~1,000 lines)
 ├── skills/
-│   └── test-phases/         # 20 phase files (each with Opus 4.6 config header)
-│       ├── phase-S-snapshot.md       # [haiku]
-│       ├── phase-0-preflight.md      # [sonnet]
-│       ├── phase-1-discovery.md      # [opus]
-│       ├── phase-2-execute.md        # [sonnet]
-│       ├── phase-2a-runtime.md       # [sonnet]
-│       ├── phase-5-security.md       # [opus]
-│       ├── phase-6-dependencies.md   # [sonnet]
-│       ├── phase-7-quality.md        # [opus]
-│       ├── phase-10-fix.md           # [opus]
-│       ├── phase-12-verify.md        # [sonnet]
-│       ├── phase-13-docs.md          # [sonnet]
-│       ├── phase-A-app-testing.md    # [opus]
-│       ├── phase-P-production.md     # [opus]
-│       ├── phase-D-docker.md         # [opus]
-│       ├── phase-G-github.md         # [opus]
-│       ├── phase-I-infrastructure.md # [sonnet]
-│       ├── phase-C-restore.md        # [haiku]
-│       ├── phase-ST-self-test.md     # [opus]
-│       ├── phase-V-vm-testing.md     # [sonnet]
-│       └── phase-VM-lifecycle.md     # [sonnet]
+│   └── test-phases/         # 20 phase files (each with model tier config header)
+│       ├── phase-1-snapshot.md         # [haiku]
+│       ├── phase-2-preflight.md        # [sonnet]
+│       ├── phase-3-discovery.md        # [opus]
+│       ├── phase-4a-execute.md         # [sonnet]
+│       ├── phase-4b-runtime.md         # [sonnet]
+│       ├── phase-5a-security.md        # [opus]
+│       ├── phase-5b-dependencies.md    # [sonnet]
+│       ├── phase-5c-quality.md         # [opus]
+│       ├── phase-5d-infrastructure.md  # [sonnet]
+│       ├── phase-6-fix.md              # [opus]
+│       ├── phase-7-verify.md           # [sonnet]
+│       ├── phase-8-docs.md             # [sonnet]
+│       ├── phase-9a-app-testing.md     # [opus]
+│       ├── phase-9b-production.md      # [opus]
+│       ├── phase-9c-docker.md          # [opus]
+│       ├── phase-9d-github.md          # [opus]
+│       ├── phase-10a-vm-testing.md     # [sonnet]
+│       ├── phase-10b-vm-lifecycle.md   # [sonnet]
+│       ├── phase-11-cleanup.md         # [haiku]
+│       └── phase-ST-self-test.md       # [opus]
 ├── agents/                  # Integrated into phases (reference docs)
-│   ├── coverage-reviewer.md # → Phase 2
-│   ├── security-scanner.md  # → Phase 5
-│   └── test-analyzer.md     # → Phase 2
+│   ├── coverage-reviewer.md # → Phase 4a
+│   ├── security-scanner.md  # → Phase 5a
+│   └── test-analyzer.md     # → Phase 4a
 ├── docs/
 │   └── ARCHITECTURE.md      # System architecture
 ├── .github/

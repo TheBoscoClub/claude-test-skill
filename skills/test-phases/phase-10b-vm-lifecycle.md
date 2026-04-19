@@ -642,17 +642,17 @@ shutdown_test_vm() {
 
 ## Integration Points
 
-### After Phase 1 (Discovery) Completes
+### After Phase 3 (Discovery) Completes
 
 The dispatcher should call `start_test_vm` when:
 1. Discovery determines `ISOLATION_LEVEL` is `vm-required` or `vm-recommended`
-2. Phase 2 detected `VM_AVAILABLE=true`
+2. Phase 2 (Pre-Flight) detected `VM_AVAILABLE=true`
 
 ```
 # In dispatcher, after Discovery completes:
 if [[ "$ISOLATION_LEVEL" =~ ^vm-(required|recommended)$ ]] && [[ "$VM_AVAILABLE" == "true" ]]; then
     # Load and execute VM startup
-    source ~/.claude/skills/test-phases/phase-VM-lifecycle.md
+    source ~/.claude/skills/test-phases/phase-10b-vm-lifecycle.md
     start_test_vm
 fi
 ```
@@ -663,7 +663,7 @@ Phase 11 should call `shutdown_test_vm` to clean up:
 
 ```
 # In Phase 11 cleanup:
-source ~/.claude/skills/test-phases/phase-VM-lifecycle.md
+source ~/.claude/skills/test-phases/phase-10b-vm-lifecycle.md
 shutdown_test_vm
 ```
 

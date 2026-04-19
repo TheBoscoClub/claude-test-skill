@@ -502,17 +502,17 @@ SECURITY_TESTS=$(find "$TEST_DIR" -name 'test_*security*scan*' -o -name 'test_*b
     grep -v '__pycache__' || true)
 
 if [[ -n "$SECURITY_TESTS" ]]; then
-    echo "  ⚠️ Test files that may duplicate Phase 5 (Security):"
+    echo "  ⚠️ Test files that may duplicate Phase 5a (Security):"
     echo "$SECURITY_TESTS" | while IFS= read -r f; do echo "     $(basename "$f")"; done
     PHASE_DUPLICATION=$((PHASE_DUPLICATION + 1))
 fi
 
-# Check for tests that duplicate Phase 7 (linting/formatting)
+# Check for tests that duplicate Phase 5c (linting/formatting)
 LINT_TESTS=$(find "$TEST_DIR" -name 'test_*lint*' -o -name 'test_*format*' \
     -o -name 'test_*style*' 2>/dev/null | grep -v '__pycache__' || true)
 
 if [[ -n "$LINT_TESTS" ]]; then
-    echo "  ⚠️ Test files that may duplicate Phase 7 (Quality):"
+    echo "  ⚠️ Test files that may duplicate Phase 5c (Quality):"
     echo "$LINT_TESTS" | while IFS= read -r f; do echo "     $(basename "$f")"; done
     PHASE_DUPLICATION=$((PHASE_DUPLICATION + 1))
 fi
@@ -921,12 +921,12 @@ echo "  ✅ All phase files contain valid markdown structure"
 
 ---
 
-## Section 6: Opus 4.6 Integration Validation
+## Section 6: Model Tier Integration Validation
 
 ```bash
 echo ""
 echo "╔═══════════════════════════════════════════════════════════════════╗"
-echo "║  SECTION 6: OPUS 4.6 INTEGRATION                                 ║"
+echo "║  SECTION 6: MODEL TIER INTEGRATION                               ║"
 echo "╚═══════════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -943,14 +943,14 @@ for phase_file in "$SKILLS_DIR"/phase-*.md; do
        grep -q '> \*\*Key Tools\*\*:' "$phase_file" 2>/dev/null; then
         PASSED_CHECKS=$((PASSED_CHECKS + 1))
     else
-        echo "  ❌ $PHASE_NAME missing Opus 4.6 configuration header"
+        echo "  ❌ $PHASE_NAME missing phase configuration header"
         FAILED_CHECKS=$((FAILED_CHECKS + 1))
         MISSING_HEADERS=$((MISSING_HEADERS + 1))
     fi
 done
 
 if [[ "$MISSING_HEADERS" -eq 0 ]]; then
-    echo "  ✅ All phase files have Opus 4.6 configuration headers"
+    echo "  ✅ All phase files have phase configuration headers"
 fi
 
 echo ""

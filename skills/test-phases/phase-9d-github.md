@@ -6,7 +6,7 @@
 
 Comprehensive audit of the project's GitHub repository, including security features, alerts, workflows, and compliance.
 
-**Prerequisite**: Phase 1 (Discovery) must have detected a GitHub repository with authenticated access.
+**Prerequisite**: Phase 3 (Discovery) must have detected a GitHub repository with authenticated access.
 
 ## Execution Mode
 
