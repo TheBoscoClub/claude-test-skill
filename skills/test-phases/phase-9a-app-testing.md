@@ -8,6 +8,25 @@
 
 Test the project's **deployable/installable application** separately from the source code. This ensures end users have a smooth experience with installation, updates, and migrations.
 
+## Companion gstack skills for web-facing projects
+
+If Phase 3 (Discovery) detected a web UI, the following gstack skills are optional
+companions — none are blocking, none run inside Phase 9a, all are invoked out-of-phase
+by the user when the specific need arises:
+
+- **`/gstack-qa`** — interactive web-UI QA with fix-verify loop. Complements Phase 9a's
+  "does it run?" with "does it work end-to-end?". Useful during feature development.
+- **`/gstack-qa-only`** — same discovery, report-only (no auto-fix). Useful when you want
+  a bug log without mutation.
+- **`/gstack-benchmark`** — Core Web Vitals + page-load baselines + per-PR regression
+  comparison. Fills a gap Phase 9a does not cover (perf trend tracking).
+- **`/gstack-canary`** — post-deploy drift watch (console errors, perf regressions, page
+  failures over time). Complements Phase 9b's one-shot "did it ship cleanly?" with a
+  continuous "is it STAYING clean?".
+
+These are invoked by the user directly (e.g., `/gstack-qa`), not orchestrated from inside
+Phase 9a. Phase 9a proceeds autonomously regardless of whether they're used.
+
 ## MCP: Playwright Integration
 
 When the **playwright MCP server** is enabled and the app has a web UI, use it for E2E browser testing:

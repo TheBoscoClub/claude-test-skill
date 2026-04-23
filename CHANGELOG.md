@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Phase ST Section 8**: Phase directive compliance (prohibited language scan, cross-component verification, Phase H absence check)
 - **Phase ST Section 9**: Tier dependency validation (Tier 3 composition, gate count, conditional logic)
 - **Phase ST Section 10**: Flag and shortcut validation (all CLI flags, all 7 shortcuts, no stale holistic shortcut)
+- **Companion Tools section in `commands/test.md`**: Points at gstack skills that complement `/test` for narrower or strategic jobs without replacing any phase — `/gstack-health` (fast pulse), `/gstack-cso --skills` (skill supply-chain blind spot), `/gstack-qa`/`/gstack-benchmark`/`/gstack-canary` (web-facing companions), `/gstack-autoplan` (strategic sign-off), `/gstack-investigate` (root-cause debugging). Explicit note that the Governing Law still applies and a companion run does not satisfy `/test`'s completeness requirement
+- **`/gstack-cso --skills` reference in `phase-5a-security.md`**: Optional companion covering skill-supply-chain (curl-pipe-to-shell, unjustified credential access, writes outside skill dir, non-public MCP endpoints) — a blind spot not covered by Phase 5a's own tooling
+- **`/gstack-qa`, `/gstack-qa-only`, `/gstack-benchmark`, `/gstack-canary` references in `phase-9a-app-testing.md`**: Optional web-facing companions for projects where Phase 3 detected a web UI; all invoked out-of-phase by the user, Phase 9a proceeds autonomously regardless
+
+### Fixed
+
+- **`plugin.json` version drift**: Synced from stale `4.0.0` to current `VERSION` file value `4.1.0`. Pre-existing drift — both files should now match per `rules/development-tools.md` single-canonical-source + keep-packaging-in-sync rules
 
 ### Changed
 

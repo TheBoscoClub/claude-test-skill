@@ -1,7 +1,7 @@
 {
   "name": "test-skill",
   "description": "Modular project audit system with 21 phases for testing, security, code quality, vm-testing, GitHub auditing, Docker validation, and production checks. Context-efficient design loads phases on-demand via subagents.",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "author": {
     "name": "TheBoscoClub"
   },
