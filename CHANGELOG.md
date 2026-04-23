@@ -17,10 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`/gstack-cso --skills` reference in `phase-5a-security.md`**: Optional companion covering skill-supply-chain (curl-pipe-to-shell, unjustified credential access, writes outside skill dir, non-public MCP endpoints) — a blind spot not covered by Phase 5a's own tooling
 - **`/gstack-qa`, `/gstack-qa-only`, `/gstack-benchmark`, `/gstack-canary` references in `phase-9a-app-testing.md`**: Optional web-facing companions for projects where Phase 3 detected a web UI; all invoked out-of-phase by the user, Phase 9a proceeds autonomously regardless
 
-### Fixed
-
-- **`plugin.json` version drift**: Synced from stale `4.0.0` to current `VERSION` file value `4.1.0`. Pre-existing drift — both files should now match per `rules/development-tools.md` single-canonical-source + keep-packaging-in-sync rules
-
 ### Changed
 
 - **Phase H dissolved** — Cross-component analysis distributed to every Tier 3 phase:
@@ -32,12 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Holistic analysis as structural property**: All audits now holistic by design — cross-component analysis is a structural property of every analysis phase, not a separate optional phase
 - **Opus phase count reduction**: Opus phase count reduced from 10 to 9
 
-### Fixed
-
 ### Removed
 
 - **`phase-H-holistic.md`**: Dissolved into Phases 5, 6, 7, I (no functionality lost)
 - **`holistic` as separate concept**: All analysis is now inherently holistic — no separate holistic phase needed
+
+### Fixed
+
+- **`plugin.json` version drift**: Synced from stale `4.0.0` to current `VERSION` file value `4.1.0`. Pre-existing drift — both files should now match per `rules/development-tools.md` single-canonical-source + keep-packaging-in-sync rules
 
 ## [4.0.0] - 2026-03-22
 

@@ -13,6 +13,9 @@
 /test-sandbox/
 /mock-env/
 
+# Preflight sandbox probe artifact (created during Phase 2 preflight)
+.sandbox-probe
+
 # Audit output files (generated during /test runs)
 audit-*.log
 security-issues.json
