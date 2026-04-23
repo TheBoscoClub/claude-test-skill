@@ -9,11 +9,19 @@ A comprehensive 20-phase autonomous project audit system for Claude Code with fu
 
 | Version | Status | Release |
 |---------|--------|---------|
-| ![4](https://img.shields.io/badge/4-brightgreen)![0](https://img.shields.io/badge/0-darkgreen)![0](https://img.shields.io/badge/0-green) | Latest major | [v4.0.0](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v4.0.0) |
+| ![4](https://img.shields.io/badge/4-brightgreen)![1](https://img.shields.io/badge/1-darkgreen)![1](https://img.shields.io/badge/1-green) | Latest patch | [v4.1.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v4.1.1) |
+| ![4](https://img.shields.io/badge/4-brightred)![0](https://img.shields.io/badge/0-darkred)![0](https://img.shields.io/badge/0-red) | Prior major (untagged) | [commit aa888d9](https://github.com/TheBoscoClub/claude-test-skill/commit/aa888d9) |
 | ![3](https://img.shields.io/badge/3-brightred)![0](https://img.shields.io/badge/0-darkred)![1](https://img.shields.io/badge/1-red) | Prior patch | [v3.0.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v3.0.1) |
 | ![3](https://img.shields.io/badge/3-brightred)![0](https://img.shields.io/badge/0-darkred)![0](https://img.shields.io/badge/0-red) | Prior major | [v3.0.0](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v3.0.0) |
 | ![2](https://img.shields.io/badge/2-brightred)![0](https://img.shields.io/badge/0-darkred)![1](https://img.shields.io/badge/1-red) | Prior patch | [v2.0.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v2.0.1) |
 | ![2](https://img.shields.io/badge/2-brightred)![0](https://img.shields.io/badge/0-darkred)![0](https://img.shields.io/badge/0-red) | Prior major | [v2.0.0](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v2.0.0) |
+
+> **Note on the v3.0.1 → v4.1.1 tag gap**: The `4.0.0` and `4.1.0` versions were cut
+> internally (VERSION file bumps + CHANGELOG entries) but never tagged on GitHub. `v4.1.1`
+> is therefore the first tagged release in the `4.x` series — its release notes cumulatively
+> cover the phase-consolidation work from `4.0.0` (27 → 21 phases), the Phase H dissolution
+> in `4.1.0` (21 → 20 phases), and the `4.1.1` patch additions. The "Prior major" entry
+> above links to the commit where `4.0.0` was cut, since no tag exists for it.
 
 <details>
 <summary>Badge Color Convention</summary>
