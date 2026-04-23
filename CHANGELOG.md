@@ -5,7 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Note on the v3.0.1 → v4.1.1 tag gap**: The `[4.0.0]` and (implicit) `4.1.0` entries
+> below were cut internally as VERSION-file bumps and CHANGELOG entries but were never
+> individually git-tagged or published as GitHub releases. `v4.1.1` is therefore the
+> first tagged release in the `4.x` series — its release notes cumulatively cover the
+> phase consolidation (`4.0.0`: 27 → 21), Phase H dissolution (`4.1.0`: 21 → 20), and
+> this release's documentation-only additions. The `[4.0.0]` comparison link below
+> points at a tag that does not exist on GitHub; it is preserved for historical
+> continuity.
+
 ## [Unreleased]
+
+### Added
+
+### Changed
+
+### Fixed
+
+## [4.1.1] - 2026-04-23
 
 ### Added
 
@@ -272,7 +289,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Modular plugin architecture**: Converted from monolithic design (93% context reduction)
 - **On-demand phase loading**: All phases load via subagents
 
-[Unreleased]: https://github.com/TheBoscoClub/claude-test-skill/compare/v4.0.0...HEAD
+[Unreleased]: https://github.com/TheBoscoClub/claude-test-skill/compare/v4.1.1...HEAD
+[4.1.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v3.0.1...v4.1.1
 [4.0.0]: https://github.com/TheBoscoClub/claude-test-skill/compare/v3.0.1...v4.0.0
 [3.0.1]: https://github.com/TheBoscoClub/claude-test-skill/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/TheBoscoClub/claude-test-skill/compare/v2.0.1...v3.0.0

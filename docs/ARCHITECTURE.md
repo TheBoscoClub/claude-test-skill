@@ -1,6 +1,6 @@
 # Test-Skill Architecture
 
-> Version: 4.1.0
+> Version: 4.1.1
 
 This document describes the architecture of the claude-test-skill plugin for Claude Code, a modular 20-phase autonomous project audit system.
 

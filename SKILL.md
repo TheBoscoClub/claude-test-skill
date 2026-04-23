@@ -99,4 +99,4 @@ ln -s ~/claude-test-skill/skills/test-phases ~/.claude/skills/test-phases
 
 - **Repository**: https://github.com/TheBoscoClub/claude-test-skill
 - **Full Documentation**: See README.md and INSTALL.md
-- **Version**: 4.1.0
+- **Version**: 4.1.1
