@@ -1366,4 +1366,28 @@ To skip auto-enable behavior, use:
 
 ---
 
+## Companion Tools (out-of-phase, optional)
+
+`/test` is a comprehensive 20-phase audit. For narrower jobs that don't need the full
+sweep, or for strategic/taste decisions that operate above the code level, the following
+gstack skills are complementary — they do not replace `/test`, and `/test` does not
+invoke them:
+
+- **`/gstack-health`** — fast 0-10 quality-score dashboard (seconds, not minutes).
+  Use as a daily pulse; use `/test` weekly and before releases.
+- **`/gstack-cso --skills`** — skill-supply-chain audit (referenced in Phase 5a). Run
+  when the `.claude/skills/` inventory changes.
+- **`/gstack-qa`**, **`/gstack-benchmark`**, **`/gstack-canary`** — web-facing companions
+  for Phase 9a / 9b (referenced in Phase 9a).
+- **`/gstack-autoplan`** — strategic multi-lens sign-off (CEO / eng / design / DX) after
+  a clean `/test`. Use when a release touches product decisions, not just correctness.
+- **`/gstack-investigate`** — root-cause-first debugging when Phase 7 uncovers a failure
+  that `/test`'s auto-fix can't explain.
+
+The `Governing Law` above applies to `/test`'s own phases, not to these companions.
+Running a companion does not satisfy `/test`'s completeness requirement — `/test` must
+still reach a clean pass on its own.
+
+---
+
 *Document Version: 5.0.0 — Unified sequential phase numbering (phase number = execution order), eliminated dual tier/phase system*

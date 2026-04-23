@@ -12,6 +12,8 @@
 
 For targeted deep-dive security audits beyond the automated checks below, the dispatcher may invoke the `security-scanner` agent (see `agents/security-scanner.md`), which provides OWASP Top 10 coverage and detailed remediation guidance.
 
+**Optional companion for skill supply-chain exposure**: when the project contains `.claude/skills/` or uses host-global skills, `/gstack-cso --skills` covers a blind spot of this phase — it scans skill files for curl-pipe-to-shell, unjustified credential access, writes outside the skill's own directory, and MCP server endpoints pointing at non-public domains. Run it out-of-phase when the skill inventory changes or before a release. It does not replace Phase 5a; it adds a layer Phase 5a does not cover.
+
 ## Invocation
 
 ```bash
