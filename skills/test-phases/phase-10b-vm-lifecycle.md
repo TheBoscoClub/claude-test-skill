@@ -463,6 +463,62 @@ install_on_pristine_vm() {
         fi
     fi
 
+    # Verify: every enabled timer matching the manifest's unit_pattern is also
+    # active. Catches the "enable without --now" class of upgrade bug
+    # (Audiobook-Manager-hp2): a new release adds a timer, install/upgrade
+    # creates the .wants/ symlink, but the unit never gets started in the
+    # current boot — so the feature is silently broken until the next reboot.
+    # `is-enabled` alone passes; we need is-active too.
+    #
+    # Manifest opt-in (vm-test-manifest.json):
+    #   "vm_testing": { "install": {
+    #     "assert_enabled_timers_active": {
+    #         "unit_pattern": "audiobook-*"   # systemctl glob; matches install scope
+    #     }
+    #   }}
+    #
+    # Shutdown-only units (WantedBy=halt.target reboot.target shutdown.target
+    # *only*) are exempted — they are designed to activate at shutdown, not at
+    # boot, so 'enabled but inactive' is correct for them.
+    local UNIT_PATTERN=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('vm_testing',{}).get('install',{}).get('assert_enabled_timers_active',{}).get('unit_pattern',''))" 2>/dev/null)
+    if [[ -n "$UNIT_PATTERN" ]]; then
+        echo "  Verifying enabled timers are active (pattern: ${UNIT_PATTERN})..."
+        # Probe per-unit on the VM. We split into two SSH commands for clarity:
+        # (1) list enabled timer files matching the pattern, (2) check is-active
+        # for each. Keeping the inner shell snippet single-quoted avoids host-side
+        # globbing of $UNIT_PATTERN.
+        local TIMER_RESULT
+        TIMER_RESULT=$($SSH_CMD "bash -s" <<REMOTE_PROBE
+set -u
+shopt -s nullglob
+fail=0
+for unit_path in /etc/systemd/system/${UNIT_PATTERN}.timer; do
+    [[ -f "\$unit_path" ]] || continue
+    unit=\$(basename "\$unit_path")
+    state=\$(systemctl is-enabled "\$unit" 2>/dev/null || echo unknown)
+    [[ "\$state" == "enabled" ]] || continue
+    active=\$(systemctl is-active "\$unit" 2>/dev/null || echo unknown)
+    if [[ "\$active" != "active" ]]; then
+        echo "  ⚠️  enabled but \$active: \$unit"
+        fail=1
+    fi
+done
+exit \$fail
+REMOTE_PROBE
+        )
+        local TIMER_EXIT=$?
+        if [[ $TIMER_EXIT -eq 0 ]]; then
+            echo "  ✅ All enabled timers are active"
+        else
+            echo "  ❌ One or more enabled timers are NOT active (see above)"
+            echo "$TIMER_RESULT"
+            echo "     This is the 'enable without --now' bug class."
+            echo "     Fix: install/upgrade scripts must use 'enable --now' for runtime units"
+            echo "     (Audiobook-Manager-hp2 is the canonical example)."
+            return 1
+        fi
+    fi
+
     # Clean up staging area
     $SSH_CMD "rm -rf /tmp/fresh-install" 2>/dev/null
 
