@@ -60,6 +60,8 @@ Shutdown the test VM if it was started by this audit to preserve system resource
 shutdown_test_vm() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
     local STATE_FILE="${PROJECT_DIR}/.test-vm-state"
+    local PROJECT_NAME=$(basename "$PROJECT_DIR")
+    local VM_MAP="$HOME/.claude/config/project-vm-map.json"
 
     echo ""
     echo "───────────────────────────────────────────────────────────────────"
@@ -67,9 +69,52 @@ shutdown_test_vm() {
     echo "───────────────────────────────────────────────────────────────────"
     echo ""
 
-    # Check if state file exists and is readable
+    # No state file? Check project-vm-map.json for an exclusive VM with
+    # post_test_restore: true. Such VMs must be shut down at end-of-/test
+    # even if /test didn't write a state file (e.g. VM was already running
+    # when Phase 10a connected to it). Without this fallback, exclusive
+    # test VMs (e.g. test-audiobook-cachyos) silently survive past
+    # /test cleanup and waste host resources.
     if [[ ! -f "$STATE_FILE" ]]; then
-        echo "  ✓ No VM was managed by /test (no state file)"
+        if [[ -f "$VM_MAP" ]] && command -v python3 >/dev/null 2>&1; then
+            local MAPPED_VM=$(python3 -c "
+import json,sys
+try:
+    d=json.load(open('$VM_MAP'))
+    proj=d.get('projects',{}).get('$PROJECT_NAME',{})
+    vm_name=proj.get('vm','')
+    vm_entry=d.get('vms',{}).get(vm_name,{})
+    if vm_entry.get('post_test_restore') is True:
+        print(vm_name)
+except Exception:
+    pass
+" 2>/dev/null)
+            if [[ -n "$MAPPED_VM" ]]; then
+                local STATE=$(sudo virsh domstate "$MAPPED_VM" 2>/dev/null | tr -d '[:space:]')
+                if [[ "$STATE" == "running" ]]; then
+                    echo "  ℹ️ No state file but project-vm-map declares $MAPPED_VM as project-exclusive (post_test_restore=true)"
+                    echo "    Shutting down — it must not survive past /test cleanup"
+                    sudo virsh shutdown "$MAPPED_VM" 2>/dev/null
+                    local WC=0
+                    while [[ $WC -lt 12 ]]; do
+                        sleep 5
+                        STATE=$(sudo virsh domstate "$MAPPED_VM" 2>/dev/null | tr -d '[:space:]')
+                        [[ "$STATE" == "shutoff" ]] && break
+                        ((WC++))
+                    done
+                    if [[ "$STATE" == "shutoff" ]]; then
+                        echo "  ✓ $MAPPED_VM shut down"
+                    else
+                        echo "  ⚠️ $MAPPED_VM did not shut down within 60s — escalating to destroy"
+                        sudo virsh destroy "$MAPPED_VM" 2>/dev/null
+                    fi
+                    return 0
+                fi
+                echo "  ✓ $MAPPED_VM is already $STATE — no action needed"
+                return 0
+            fi
+        fi
+        echo "  ✓ No VM was managed by /test (no state file, no exclusive mapping)"
         return 0
     fi
 
@@ -101,12 +146,38 @@ shutdown_test_vm() {
         return 0
     fi
 
-    # Only shutdown if we started it
-    if [[ "$STARTED_BY_TEST" != "true" ]]; then
-        echo "  ✓ VM was already running - leaving it running"
-        echo "    (VM was not started by /test)"
+    # Honor project-vm-map.json post_test_restore: true — these VMs are
+    # exclusively for /test runs and have no other workload, so they must
+    # always be shut down regardless of who started them. Without this
+    # override, the "leave VMs we didn't start running" rule below would
+    # incorrectly preserve an exclusive test VM (e.g. test-audiobook-cachyos)
+    # across audit cycles, wasting host resources and risking state drift
+    # before the next pristine revert.
+    local POST_TEST_RESTORE="false"
+    local VM_MAP="$HOME/.claude/config/project-vm-map.json"
+    if [[ -f "$VM_MAP" ]] && command -v python3 >/dev/null 2>&1; then
+        POST_TEST_RESTORE=$(python3 -c "
+import json,sys
+try:
+    d=json.load(open('$VM_MAP'))
+    vm=d.get('vms',{}).get('$VM_NAME',{})
+    print('true' if vm.get('post_test_restore') is True else 'false')
+except Exception:
+    print('false')
+" 2>/dev/null || echo "false")
+    fi
+
+    # Only shutdown if we started it OR the VM is project-exclusive (post_test_restore)
+    if [[ "$STARTED_BY_TEST" != "true" && "$POST_TEST_RESTORE" != "true" ]]; then
+        echo "  ✓ VM was already running and is not project-exclusive — leaving it running"
+        echo "    (VM was not started by /test; post_test_restore=false)"
         rm -f "$STATE_FILE"
         return 0
+    fi
+
+    if [[ "$POST_TEST_RESTORE" == "true" && "$STARTED_BY_TEST" != "true" ]]; then
+        echo "  ℹ️ VM is project-exclusive (post_test_restore=true in project-vm-map.json)"
+        echo "    Shutting down even though /test did not start it"
     fi
 
     # Check if VM is still running
