@@ -1,84 +1,68 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
+This file tells AI coding agents (Claude Code, Codex, etc.) how to operate in this project. The rules in `~/.claude/CLAUDE.md` and this project's own `CLAUDE.md` are the canonical authority. This file is a quick orientation, not a substitute for those.
 
-## Quick Reference
+## Tool Boundaries (Read This First)
 
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work atomically
-bd close <id>         # Complete work
-bd dolt push          # Push beads data to remote
-```
+| Job | Tool |
+|---|---|
+| In-conversation todos for this session | `TaskCreate` / `TaskUpdate` / `TaskList` |
+| Cross-session ephemeral state and recovery | `.claude-checkpoint-notes.md` (written by `/checkpoint`) |
+| Cross-conversation knowledge spanning all projects | `MEMORY.md` and the auto-memory system |
+| Cross-session task graph with explicit dependencies | `bd` (beads) — see below |
+| Session lifecycle | `/checkpoint`, `/close`, `/test`, `/git-release` |
+
+`TaskCreate`, `MEMORY.md`, `/checkpoint`, and `/close` are **not replaced by bd**. Each owns a distinct scope. Use bd only where it earns its keep — long-horizon dependency-graphed work — and leave the others alone.
+
+For the full policy, read `~/.claude/rules/beads.md`.
 
 ## Non-Interactive Shell Commands
 
-**ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
+ALWAYS use non-interactive flags with file operations to avoid hanging on confirmation prompts. Some shells alias `cp`, `mv`, `rm` to include `-i` (interactive) mode.
 
-Shell commands like `cp`, `mv`, and `rm` may be aliased to include `-i` (interactive) mode on some systems, causing the agent to hang indefinitely waiting for y/n input.
-
-**Use these forms instead:**
 ```bash
-# Force overwrite without prompting
 cp -f source dest           # NOT: cp source dest
 mv -f source dest           # NOT: mv source dest
 rm -f file                  # NOT: rm file
-
-# For recursive operations
 rm -rf directory            # NOT: rm -r directory
 cp -rf source dest          # NOT: cp -r source dest
 ```
 
-**Other commands that may prompt:**
-- `scp` - use `-o BatchMode=yes` for non-interactive
-- `ssh` - use `-o BatchMode=yes` to fail instead of prompting
-- `apt-get` - use `-y` flag
-- `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
+Other prompting commands:
+- `scp` / `ssh` — use `-o BatchMode=yes`
+- `apt-get` — use `-y`
+- `brew` — use `HOMEBREW_NO_AUTO_UPDATE=1`
 
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
-## Beads Issue Tracker
+<!-- BEGIN BEADS INTEGRATION v:1 profile:claude-rules-managed hash:managed-by-beads-md -->
+## bd (beads) — Cross-Session Task Graph
 
-This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
+This project is enrolled in bd for **dependency-graphed cross-session task tracking only**. bd does not replace TaskCreate (in-session todos), MEMORY.md (cross-project knowledge), or the `/checkpoint` recovery system. See `~/.claude/rules/beads.md` for the full boundary.
 
 ### Quick Reference
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work
-bd close <id>         # Complete work
+bd ready              # Find issues ready to work (no open blockers)
+bd list --status=in_progress  # Currently claimed work
+bd show <id>          # View issue + dependencies
+bd update <id> --claim        # Claim work atomically
+bd dep add <child> <parent>   # Add dependency edge
+bd close <id>         # Mark complete
+bd preflight          # Pre-PR check (lint, stale, orphans) — the canonical health check
+# bd doctor          # DOES NOT WORK in embedded mode; use preflight instead
 ```
 
 ### Rules
 
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
-- Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+- Use bd for **cross-session task graphs with explicit dependencies**
+- Use `TaskCreate` for in-conversation todos (bd does not replace it)
+- Use `MEMORY.md` for cross-project knowledge (do not use `bd remember` for that)
+- Never run `bd rules compact` — it would damage the modular `.claude/rules/*.md` architecture
+- Never put credentials, PII, or anything that belongs in `~/.config/api-keys.env` into `bd remember`
+- Run `bd prime` for the bd-side command reference
 
-## Session Completion
+### Session Completion
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+For session end, follow the project's `/close` workflow (defined in `~/.claude/rules/session-workflow.md`). It already handles the project's push restrictions, security checks, and CHANGELOG updates. Do NOT follow bd's default "git push or not done" mandate — it does not understand the push-restriction rules in `~/.claude/rules/projects.md`.
 
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+If this project is on the push-restriction list (hardware-pinned, fork-clone, local-only), do NOT run `bd dolt push`. Issues remain on this workstation only.
 <!-- END BEADS INTEGRATION -->
