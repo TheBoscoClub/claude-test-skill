@@ -69,6 +69,69 @@ echo "  Step 2: Security Features Audit"
 echo "───────────────────────────────────────────────────────────────────"
 
 ISSUES_FOUND=0
+
+# ---------------------------------------------------------------------------
+# gh_json / json_count / audit_unknown  (claude-test-skill-dqi)
+#
+# This phase used to read:
+#     ALERTS=$(gh api ... 2>/dev/null)
+#     COUNT=$(echo "$ALERTS" | jq 'length' 2>/dev/null || echo "0")
+# The gh failure is swallowed at capture. It then goes wrong two DIFFERENT
+# ways, both measured 2026-08-24:
+#
+#   empty stdout (network failure, gh crash, timeout, killed process)
+#     jq emits nothing, COUNT becomes "", and [[ "" -eq 0 ]] is TRUE.
+#     Result: "No open alerts" — a FALSE CLEAN.
+#
+#   HTTP error carrying a JSON body (401 Bad credentials, 404 Not Found)
+#     gh writes {"message":...,"documentation_url":...,"status":...} to
+#     STDOUT, so `jq length` counts the error object's KEYS. Result:
+#     "3 open alert(s)" — PHANTOM ALERTS, and the detail render then
+#     silently prints nothing because `.[]` does not apply to an object.
+#
+# Neither is an answer. Both now report UNKNOWN and count an issue — for the
+# three queries that enforce the mandatory baseline in security.md, and for
+# the CI-failure check.
+#
+# gh_json    runs a command and FAILS LOUDLY on error or empty output
+# json_count counts from captured JSON, failing if it is not a number
+# audit_unknown reports "result UNKNOWN, NOT clean" and counts an issue
+gh_json() {
+    local errf out rc
+    errf="$(mktemp)" || { GH_STATUS=failed; GH_ERR="mktemp failed"; GH_OUT=""; return 1; }
+    out="$("$@" 2>"$errf")"
+    rc=$?
+    if [[ $rc -ne 0 || -z $out ]]; then
+        GH_STATUS=failed
+        GH_ERR="exit $rc: $(tr -d '\0' <"$errf" | head -c 200 | tr '\n' ' ')"
+        GH_OUT=""
+        rm -f "$errf"
+        return 1
+    fi
+    GH_STATUS=ok
+    GH_OUT="$out"
+    GH_ERR=""
+    rm -f "$errf"
+    return 0
+}
+
+json_count() {
+    local text="$1" filter="$2" n
+    n="$(printf '%s' "$text" | jq -r "$filter" 2>/dev/null)"
+    if [[ -z $n ]] || ! [[ $n =~ ^[0-9]+$ ]]; then
+        JSON_COUNT=0
+        return 1
+    fi
+    JSON_COUNT="$n"
+    return 0
+}
+
+audit_unknown() {
+    echo "  ⚠️  $1: FAILED — result UNKNOWN, NOT clean"
+    echo "      ${2:-no detail}"
+    ISSUES_FOUND=$((ISSUES_FOUND + 1))
+}
+# ---------------------------------------------------------------------------
 ISSUES_FIXED=0
 
 # Check and enable Dependabot alerts
@@ -217,10 +280,22 @@ echo "────────────────────────�
 # Dependabot alerts
 echo ""
 echo "Dependabot Alerts:"
-DEPENDABOT_ALERTS=$(gh api "repos/$GITHUB_REPO/dependabot/alerts?state=open" 2>/dev/null)
-DEPENDABOT_COUNT=$(echo "$DEPENDABOT_ALERTS" | jq 'length' 2>/dev/null || echo "0")
+if ! gh_json gh api "repos/$GITHUB_REPO/dependabot/alerts?state=open"; then
+    audit_unknown "Dependabot alerts" "$GH_ERR"
+    DEPENDABOT_ALERTS=""
+    DEPENDABOT_COUNT=-1
+elif ! json_count "$GH_OUT" 'length'; then
+    audit_unknown "Dependabot alerts" "response was not a JSON array"
+    DEPENDABOT_ALERTS=""
+    DEPENDABOT_COUNT=-1
+else
+    DEPENDABOT_ALERTS="$GH_OUT"
+    DEPENDABOT_COUNT="$JSON_COUNT"
+fi
 
-if [[ "$DEPENDABOT_COUNT" -eq 0 ]]; then
+if [[ "$DEPENDABOT_COUNT" -lt 0 ]]; then
+    :
+elif [[ "$DEPENDABOT_COUNT" -eq 0 ]]; then
     echo "  ✅ No open Dependabot alerts"
 else
     echo "  ❌ $DEPENDABOT_COUNT open alert(s):"
@@ -230,8 +305,15 @@ else
     # Check for auto-fix PRs
     echo ""
     echo "  Checking for Dependabot PRs..."
-    DEPENDABOT_PRS=$(gh pr list --repo "$GITHUB_REPO" --author "app/dependabot" --state open --json number,title 2>/dev/null)
-    PR_COUNT=$(echo "$DEPENDABOT_PRS" | jq 'length' 2>/dev/null || echo "0")
+    if gh_json gh pr list --repo "$GITHUB_REPO" --author "app/dependabot" --state open --json number,title &&
+        json_count "$GH_OUT" 'length'; then
+        DEPENDABOT_PRS="$GH_OUT"
+        PR_COUNT="$JSON_COUNT"
+    else
+        audit_unknown "Dependabot PR list" "${GH_ERR:-unparseable response}"
+        DEPENDABOT_PRS=""
+        PR_COUNT=0
+    fi
 
     if [[ "$PR_COUNT" -gt 0 ]]; then
         echo "  ℹ️  $PR_COUNT Dependabot PR(s) awaiting merge:"
@@ -242,10 +324,22 @@ fi
 # Code scanning alerts
 echo ""
 echo "Code Scanning Alerts:"
-CODE_ALERTS=$(gh api "repos/$GITHUB_REPO/code-scanning/alerts?state=open" 2>/dev/null)
-CODE_COUNT=$(echo "$CODE_ALERTS" | jq 'length' 2>/dev/null || echo "0")
+if ! gh_json gh api "repos/$GITHUB_REPO/code-scanning/alerts?state=open"; then
+    audit_unknown "Code scanning alerts" "$GH_ERR"
+    CODE_ALERTS=""
+    CODE_COUNT=-1
+elif ! json_count "$GH_OUT" 'length'; then
+    audit_unknown "Code scanning alerts" "response was not a JSON array"
+    CODE_ALERTS=""
+    CODE_COUNT=-1
+else
+    CODE_ALERTS="$GH_OUT"
+    CODE_COUNT="$JSON_COUNT"
+fi
 
-if [[ "$CODE_COUNT" -eq 0 ]]; then
+if [[ "$CODE_COUNT" -lt 0 ]]; then
+    :
+elif [[ "$CODE_COUNT" -eq 0 ]]; then
     echo "  ✅ No open code scanning alerts"
 else
     echo "  ❌ $CODE_COUNT open alert(s):"
@@ -256,10 +350,25 @@ fi
 # Secret scanning alerts
 echo ""
 echo "Secret Scanning Alerts:"
-SECRET_ALERTS=$(gh api "repos/$GITHUB_REPO/secret-scanning/alerts?state=open" 2>/dev/null)
-SECRET_COUNT=$(echo "$SECRET_ALERTS" | jq 'length' 2>/dev/null || echo "0")
+if ! gh_json gh api "repos/$GITHUB_REPO/secret-scanning/alerts?state=open"; then
+    # security.md makes secret scanning mandatory, so a query that did not run
+    # is a finding, not a pass. A 404 here means the feature is off; a 401
+    # means the token is dead. Both are reported, neither is "no alerts".
+    audit_unknown "Secret scanning alerts" "$GH_ERR"
+    SECRET_ALERTS=""
+    SECRET_COUNT=-1
+elif ! json_count "$GH_OUT" 'length'; then
+    audit_unknown "Secret scanning alerts" "response was not a JSON array"
+    SECRET_ALERTS=""
+    SECRET_COUNT=-1
+else
+    SECRET_ALERTS="$GH_OUT"
+    SECRET_COUNT="$JSON_COUNT"
+fi
 
-if [[ "$SECRET_COUNT" -eq 0 ]]; then
+if [[ "$SECRET_COUNT" -lt 0 ]]; then
+    :
+elif [[ "$SECRET_COUNT" -eq 0 ]]; then
     echo "  ✅ No open secret scanning alerts"
 else
     echo "  ❌ $SECRET_COUNT open alert(s):"
@@ -332,10 +441,19 @@ echo "Remote branch: $REMOTE_BRANCH"
 echo ""
 
 # Check sync status
-LOCAL_AHEAD=$(git rev-list --count "$REMOTE_BRANCH..HEAD" 2>/dev/null || echo "0")
-REMOTE_AHEAD=$(git rev-list --count "HEAD..$REMOTE_BRANCH" 2>/dev/null || echo "0")
+# NOT `|| echo "0"`. git rev-list fails when the remote ref is not fetched,
+# and two zeros render as "In sync with remote" — a false clean about push
+# state, which is exactly what this step exists to check.
+if ! LOCAL_AHEAD=$(git rev-list --count "$REMOTE_BRANCH..HEAD" 2>/dev/null) ||
+    ! REMOTE_AHEAD=$(git rev-list --count "HEAD..$REMOTE_BRANCH" 2>/dev/null); then
+    audit_unknown "Branch sync" "git rev-list failed — is $REMOTE_BRANCH fetched?"
+    LOCAL_AHEAD=-1
+    REMOTE_AHEAD=-1
+fi
 
-if [[ "$LOCAL_AHEAD" -eq 0 ]] && [[ "$REMOTE_AHEAD" -eq 0 ]]; then
+if [[ "$LOCAL_AHEAD" -lt 0 ]]; then
+    :
+elif [[ "$LOCAL_AHEAD" -eq 0 ]] && [[ "$REMOTE_AHEAD" -eq 0 ]]; then
     echo "  ✅ In sync with remote"
 else
     if [[ "$LOCAL_AHEAD" -gt 0 ]]; then
@@ -370,7 +488,16 @@ gh run list --repo "$GITHUB_REPO" --limit 5 --json name,status,conclusion,create
     --jq '.[] | "  \(.status) \(.conclusion // "running") - \(.name) (\(.createdAt | split("T")[0]))"' 2>/dev/null || echo "  (none)"
 
 # Check for failed runs
-FAILED_RUNS=$(gh run list --repo "$GITHUB_REPO" --status failure --limit 5 --json name,conclusion 2>/dev/null | jq 'length' || echo "0")
+# FAILED_RUNS is how this audit learns CI is red. A gh failure reporting
+# "0 failed runs" is the 95-red-commits incident class, made invisible by the
+# check meant to catch it.
+if gh_json gh run list --repo "$GITHUB_REPO" --status failure --limit 5 --json name,conclusion &&
+    json_count "$GH_OUT" 'length'; then
+    FAILED_RUNS="$JSON_COUNT"
+else
+    audit_unknown "CI failure check" "${GH_ERR:-unparseable response}"
+    FAILED_RUNS=0
+fi
 
 if [[ "$FAILED_RUNS" -gt 0 ]]; then
     echo ""
