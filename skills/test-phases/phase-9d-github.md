@@ -379,6 +379,60 @@ if [[ "$FAILED_RUNS" -gt 0 ]]; then
 fi
 ```
 
+## Step 8: bd Health Check (enrolled projects only)
+
+Per `~/.claude/rules/beads.md`, projects enrolled in bd should be checked for issue-graph health alongside the GitHub audit. Findings are **informational** — they do NOT block release. (Note: `bd doctor` does not function in embedded mode and is intentionally skipped; `bd preflight` is the canonical health check.)
+
+```bash
+echo ""
+echo "───────────────────────────────────────────────────────────────────"
+echo "  Step 8: bd Health Check (enrolled projects only)"
+echo "───────────────────────────────────────────────────────────────────"
+
+if [ ! -d ".beads" ]; then
+    echo "  ○ Not enrolled in bd — skipping"
+elif ! command -v bd >/dev/null 2>&1; then
+    echo "  ⚠ bd not on PATH — skipping (install: ~/.local/bin/bd)"
+else
+    echo ""
+    echo "Running bd preflight (lint, stale, orphans):"
+    pf_out=$(bd preflight 2>&1 || true)
+    if [ -z "$pf_out" ]; then
+        echo "  ✅ bd preflight: clean"
+    else
+        echo "$pf_out" | head -30 | sed 's/^/  /'
+        # Increment ISSUES_FOUND only for hard problems (orphans), not stale warnings.
+        #
+        # NOT `$(... || echo 0)`. `grep -c` PRINTS "0" and EXITS 1 when there
+        # are no matches, so the `||` fires too and the variable becomes the
+        # two-line string "0\n0" — after which `[ "$bd_orphans" -gt 0 ]` dies
+        # with "integer expression expected". Measured, not theorised.
+        bd_orphans=$(printf '%s\n' "$pf_out" | grep -ciE 'orphan') || bd_orphans=0
+        if [ "$bd_orphans" -gt 0 ]; then
+            ISSUES_FOUND=$((ISSUES_FOUND + bd_orphans))
+        fi
+    fi
+
+    echo ""
+    echo "Open issue counts:"
+    # From `bd stats`, NOT `bd list | wc -l`. Two reasons, both in
+    # ~/.claude/rules/beads.md: `bd list` TRUNCATES past a row cap, and its
+    # output carries a total line and a status legend that `wc -l` counts as
+    # issues. Measured on a 48-open graph: the wc method reported 52.
+    bd_stats_out=$(bd stats 2>/dev/null)
+    bd_field() { printf '%s\n' "$bd_stats_out" | awk -F: -v k="$1" '$0 ~ "^[[:space:]]*"k":" {gsub(/[^0-9]/,"",$2); print $2; exit}'; }
+    bd_open=$(bd_field "Open")
+    bd_in_prog=$(bd_field "In Progress")
+    bd_blocked=$(bd_field "Blocked")
+    if [ -z "$bd_open$bd_in_prog$bd_blocked" ]; then
+        echo "  ⚠ bd stats produced no counts — issue-graph health UNKNOWN, not clean"
+        ISSUES_FOUND=$((ISSUES_FOUND + 1))
+    else
+        echo "  open=${bd_open:-?}  in_progress=${bd_in_prog:-?}  blocked=${bd_blocked:-?}"
+    fi
+fi
+```
+
 ## Summary Report
 
 ```bash
