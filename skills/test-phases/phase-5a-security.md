@@ -86,6 +86,67 @@ TOTAL_ISSUES=0
 FIXED_ISSUES=0
 CRITICAL_ISSUES=0
 
+# ---------------------------------------------------------------------------
+# scan_count — run a scanner and DISTINGUISH THREE OUTCOMES the old code
+# collapsed into one: ran-and-found-nothing, ran-and-found-N, and DID NOT RUN.
+#
+# Every scanner in this phase used to read:
+#     COUNT=$(tool ... 2>/dev/null | jq '...' || echo "0")
+# which reports a failing scanner as CLEAN three different ways: 2>/dev/null
+# throws away the reason, `|| echo "0"` invents a clean answer, and even
+# without that the `||` binds to the PIPELINE — a dead tool leaves jq with
+# empty input, COUNT becomes "", and bash evaluates [[ "" -gt 0 ]] as false.
+# Demonstrated 2026-08-24: grype against a bad path printed
+# "OK Grype: No vulnerabilities".
+#
+# Usage:  scan_count <jq-filter> <command...>
+# Sets:   SCAN_STATUS  'ok' | 'failed'
+#         SCAN_COUNT   the count, valid ONLY when SCAN_STATUS is 'ok'
+#         SCAN_ERR     the real stderr, when it failed
+# Returns 0 on success, 1 on failure. NEVER substitutes a number for a failure.
+scan_count() {
+    local filter="$1"
+    shift
+    local out rc errf n
+    errf="$(mktemp)" || { SCAN_STATUS=failed; SCAN_ERR="mktemp failed"; SCAN_COUNT=0; return 1; }
+
+    out="$("$@" 2>"$errf")"
+    rc=$?
+
+    # The exit code is deliberately NOT the test. bandit, semgrep, checkov and
+    # npm audit all exit NON-ZERO when they FIND something, so gating on rc
+    # would report every real finding as a scanner failure. The honest question
+    # is whether the tool produced a parseable answer: a tool that exits 1 with
+    # valid findings JSON ran fine, and a tool that exits 0 with no output (the
+    # timeout case that started this) did not.
+    n="$(printf '%s' "$out" | jq -r "$filter" 2>>"$errf")"
+    if [[ -z $n ]] || ! [[ $n =~ ^[0-9]+$ ]]; then
+        SCAN_STATUS=failed
+        SCAN_ERR="exit $rc, no parseable count: $(tr -d '\0' <"$errf" | head -c 300 | tr '\n' ' ')"
+        SCAN_COUNT=0
+        rm -f "$errf"
+        return 1
+    fi
+
+    SCAN_STATUS=ok
+    SCAN_COUNT="$n"
+    SCAN_ERR=""
+    rm -f "$errf"
+    return 0
+}
+
+# scan_failed — the uniform failure branch. A scanner that did not run is a
+# FINDING, not a pass: it counts toward TOTAL_ISSUES so the audit total
+# reflects that something is unverified, and it prints the real error so the
+# operator can see why rather than reading a checkmark.
+scan_failed() {
+    local label="$1"
+    echo "  ⚠️  ${label}: FAILED — result UNKNOWN, NOT clean"
+    echo "      ${SCAN_ERR}"
+    TOTAL_ISSUES=$((TOTAL_ISSUES + 1))
+}
+# ---------------------------------------------------------------------------
+
 # Detect primary language
 PRIMARY_LANG="Unknown"
 if [[ -n "$(find "$PROJECT_ROOT" -maxdepth 3 -name '*.py' -not -path '*/.venv/*' -not -path '*/.snapshots/*' 2>/dev/null | head -1)" ]]; then
@@ -156,31 +217,39 @@ else
         echo "───────────────────────────────────────────────────────────────"
 
         # Dependabot alerts
-        DEPENDABOT_COUNT=$(gh api "repos/$GITHUB_REPO/dependabot/alerts?state=open" 2>/dev/null | jq 'length' || echo "0")
-        if [[ "$DEPENDABOT_COUNT" -eq 0 ]]; then
+        if ! scan_count 'length' gh api "repos/$GITHUB_REPO/dependabot/alerts?state=open"; then
+            scan_failed "Dependabot"
+        elif [[ "$SCAN_COUNT" -eq 0 ]]; then
             echo "  ✅ Dependabot: No open alerts"
         else
-            echo "  ❌ Dependabot: $DEPENDABOT_COUNT open alert(s)"
-            TOTAL_ISSUES=$((TOTAL_ISSUES + DEPENDABOT_COUNT))
+            echo "  ❌ Dependabot: $SCAN_COUNT open alert(s)"
+            TOTAL_ISSUES=$((TOTAL_ISSUES + SCAN_COUNT))
         fi
 
         # Code scanning alerts
-        CODE_COUNT=$(gh api "repos/$GITHUB_REPO/code-scanning/alerts?state=open" 2>/dev/null | jq 'length' || echo "0")
-        if [[ "$CODE_COUNT" -eq 0 ]]; then
+        if ! scan_count 'length' gh api "repos/$GITHUB_REPO/code-scanning/alerts?state=open"; then
+            scan_failed "Code scanning"
+        elif [[ "$SCAN_COUNT" -eq 0 ]]; then
             echo "  ✅ Code scanning: No open alerts"
         else
-            echo "  ❌ Code scanning: $CODE_COUNT open alert(s)"
-            TOTAL_ISSUES=$((TOTAL_ISSUES + CODE_COUNT))
+            echo "  ❌ Code scanning: $SCAN_COUNT open alert(s)"
+            TOTAL_ISSUES=$((TOTAL_ISSUES + SCAN_COUNT))
         fi
 
         # Secret scanning alerts
-        SECRET_COUNT=$(gh api "repos/$GITHUB_REPO/secret-scanning/alerts?state=open" 2>/dev/null | jq 'length' || echo "0")
-        if [[ "$SECRET_COUNT" -eq 0 ]]; then
+        if ! scan_count 'length' gh api "repos/$GITHUB_REPO/secret-scanning/alerts?state=open"; then
+            # A secret-scanning query that did not run is CRITICAL-unknown, not
+            # clean: this is the check enforcing the mandatory baseline in
+            # security.md, and an expired token returns the same silence as a
+            # clean repo.
+            scan_failed "Secret scanning"
+            CRITICAL_ISSUES=$((CRITICAL_ISSUES + 1))
+        elif [[ "$SCAN_COUNT" -eq 0 ]]; then
             echo "  ✅ Secret scanning: No open alerts"
         else
-            echo "  🚨 SECRET SCANNING: $SECRET_COUNT ALERT(S) - CRITICAL!"
-            TOTAL_ISSUES=$((TOTAL_ISSUES + SECRET_COUNT))
-            CRITICAL_ISSUES=$((CRITICAL_ISSUES + SECRET_COUNT))
+            echo "  🚨 SECRET SCANNING: $SCAN_COUNT ALERT(S) - CRITICAL!"
+            TOTAL_ISSUES=$((TOTAL_ISSUES + SCAN_COUNT))
+            CRITICAL_ISSUES=$((CRITICAL_ISSUES + SCAN_COUNT))
         fi
     fi
 fi
@@ -243,11 +312,13 @@ echo "────────────────────────�
 # Bandit (Python)
 if command -v bandit &>/dev/null && [[ "$PRIMARY_LANG" == "Python" ]]; then
     echo "Running Bandit..."
-    BANDIT_HIGH=$(bandit -r "$PROJECT_ROOT" -x ./.venv,./.snapshots,./venv --format json 2>/dev/null | jq '[.results[] | select(.severity == "HIGH")] | length' || echo "0")
-    if [[ "$BANDIT_HIGH" -gt 0 ]]; then
-        echo "  ❌ Bandit HIGH severity: $BANDIT_HIGH"
-        TOTAL_ISSUES=$((TOTAL_ISSUES + BANDIT_HIGH))
-        CRITICAL_ISSUES=$((CRITICAL_ISSUES + BANDIT_HIGH))
+    if ! scan_count '[.results[] | select(.severity == "HIGH")] | length' \
+        bandit -r "$PROJECT_ROOT" -x ./.venv,./.snapshots,./venv --format json; then
+        scan_failed "Bandit"
+    elif [[ "$SCAN_COUNT" -gt 0 ]]; then
+        echo "  ❌ Bandit HIGH severity: $SCAN_COUNT"
+        TOTAL_ISSUES=$((TOTAL_ISSUES + SCAN_COUNT))
+        CRITICAL_ISSUES=$((CRITICAL_ISSUES + SCAN_COUNT))
     else
         echo "  ✅ Bandit: No high severity issues"
     fi
@@ -256,10 +327,12 @@ fi
 # Semgrep
 if command -v semgrep &>/dev/null; then
     echo "Running Semgrep (timeout: 300s)..."
-    SEMGREP_COUNT=$(timeout 300 semgrep scan --config auto --json "$PROJECT_ROOT" 2>/dev/null | jq '.results | length' || echo "0")
-    if [[ "$SEMGREP_COUNT" -gt 0 ]]; then
-        echo "  ❌ Semgrep found $SEMGREP_COUNT issue(s)"
-        TOTAL_ISSUES=$((TOTAL_ISSUES + SEMGREP_COUNT))
+    if ! scan_count '.results | length' \
+        timeout 300 semgrep scan --config auto --json "$PROJECT_ROOT"; then
+        scan_failed "Semgrep"
+    elif [[ "$SCAN_COUNT" -gt 0 ]]; then
+        echo "  ❌ Semgrep found $SCAN_COUNT issue(s)"
+        TOTAL_ISSUES=$((TOTAL_ISSUES + SCAN_COUNT))
     else
         echo "  ✅ Semgrep: No issues"
     fi
@@ -275,10 +348,11 @@ if command -v codeql &>/dev/null && [[ "$PRIMARY_LANG" == "Python" ]]; then
         if [[ $? -eq 124 ]]; then
             echo "  ⚠️ CodeQL analysis timed out (600s) — skipping results"
         else
-            CODEQL_ISSUES=$(jq '.runs[0].results | length' "/tmp/codeql-$$.sarif" 2>/dev/null || echo "0")
-            if [[ "$CODEQL_ISSUES" -gt 0 ]]; then
-                echo "  ❌ CodeQL found $CODEQL_ISSUES issues"
-                TOTAL_ISSUES=$((TOTAL_ISSUES + CODEQL_ISSUES))
+            if ! scan_count '.runs[0].results | length' cat "/tmp/codeql-$$.sarif"; then
+                scan_failed "CodeQL"
+            elif [[ "$SCAN_COUNT" -gt 0 ]]; then
+                echo "  ❌ CodeQL found $SCAN_COUNT issues"
+                TOTAL_ISSUES=$((TOTAL_ISSUES + SCAN_COUNT))
             else
                 echo "  ✅ CodeQL: No issues"
             fi
@@ -313,10 +387,12 @@ fi
 # Trivy
 if command -v trivy &>/dev/null; then
     echo "Running Trivy filesystem scan..."
-    TRIVY_VULNS=$(trivy fs --security-checks vuln,secret --format json "$PROJECT_ROOT" 2>/dev/null | jq '[.Results[]?.Vulnerabilities // [] | .[]] | length' || echo "0")
-    if [[ "$TRIVY_VULNS" -gt 0 ]]; then
-        echo "  ❌ Trivy found $TRIVY_VULNS vulnerabilities"
-        TOTAL_ISSUES=$((TOTAL_ISSUES + TRIVY_VULNS))
+    if ! scan_count '[.Results[]?.Vulnerabilities // [] | .[]] | length' \
+        trivy fs --security-checks vuln,secret --format json "$PROJECT_ROOT"; then
+        scan_failed "Trivy"
+    elif [[ "$SCAN_COUNT" -gt 0 ]]; then
+        echo "  ❌ Trivy found $SCAN_COUNT vulnerabilities"
+        TOTAL_ISSUES=$((TOTAL_ISSUES + SCAN_COUNT))
     else
         echo "  ✅ Trivy: No vulnerabilities"
     fi
@@ -325,10 +401,11 @@ fi
 # Grype
 if command -v grype &>/dev/null; then
     echo "Running Grype vulnerability scan..."
-    GRYPE_COUNT=$(grype dir:"$PROJECT_ROOT" --output json 2>/dev/null | jq '.matches | length' || echo "0")
-    if [[ "$GRYPE_COUNT" -gt 0 ]]; then
-        echo "  ❌ Grype found $GRYPE_COUNT issues"
-        TOTAL_ISSUES=$((TOTAL_ISSUES + GRYPE_COUNT))
+    if ! scan_count '.matches | length' grype dir:"$PROJECT_ROOT" --output json; then
+        scan_failed "Grype"
+    elif [[ "$SCAN_COUNT" -gt 0 ]]; then
+        echo "  ❌ Grype found $SCAN_COUNT issues"
+        TOTAL_ISSUES=$((TOTAL_ISSUES + SCAN_COUNT))
     else
         echo "  ✅ Grype: No vulnerabilities"
     fi
@@ -365,10 +442,12 @@ fi
 # npm audit
 if [[ -f "$PROJECT_ROOT/package.json" ]]; then
     echo "Running npm audit..."
-    VULN_TOTAL=$(npm audit --json 2>/dev/null | jq '.metadata.vulnerabilities.total // 0' || echo "0")
-    if [[ "$VULN_TOTAL" -eq 0 ]]; then
+    if ! scan_count '.metadata.vulnerabilities.total' npm audit --json; then
+        scan_failed "npm audit"
+    elif [[ "$SCAN_COUNT" -eq 0 ]]; then
         echo "  ✅ npm audit: No vulnerabilities"
     else
+        VULN_TOTAL=$SCAN_COUNT
         echo "  ❌ npm audit: $VULN_TOTAL vulnerabilities"
         TOTAL_ISSUES=$((TOTAL_ISSUES + 1))
         [[ "$AUDIT_ONLY" != "true" ]] && npm audit fix 2>&1 | tail -3 && FIXED_ISSUES=$((FIXED_ISSUES + 1))
@@ -412,10 +491,12 @@ if command -v checkov &>/dev/null; then
         echo "───────────────────────────────────────────────────────────────────"
         echo "  2.5 Infrastructure as Code Security (Checkov)"
         echo "───────────────────────────────────────────────────────────────────"
-        CHECKOV_FAILED=$(checkov -d "$PROJECT_ROOT" --quiet --compact --output json 2>/dev/null | jq '[.results.failed_checks // []] | length' || echo "0")
-        if [[ "$CHECKOV_FAILED" -gt 0 ]]; then
-            echo "  ❌ Checkov found $CHECKOV_FAILED IaC issues"
-            TOTAL_ISSUES=$((TOTAL_ISSUES + CHECKOV_FAILED))
+        if ! scan_count '[.results.failed_checks // []] | length' \
+            checkov -d "$PROJECT_ROOT" --quiet --compact --output json; then
+            scan_failed "Checkov"
+        elif [[ "$SCAN_COUNT" -gt 0 ]]; then
+            echo "  ❌ Checkov found $SCAN_COUNT IaC issues"
+            TOTAL_ISSUES=$((TOTAL_ISSUES + SCAN_COUNT))
         else
             echo "  ✅ Checkov: No IaC security issues"
         fi
