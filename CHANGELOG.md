@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Semgrep CI workflow** (`.github/workflows/semgrep.yml`): runs `semgrep ci` — Code (SAST), Secrets and Supply Chain — diff-aware on pull requests, full on pushes to `main`, weekly on schedule and on manual dispatch, reporting to the Semgrep AppSec Platform (deployment `gjbr-pm-me`). Engine image pinned `tag@digest`; the sole credential is the Agent (CI) scoped `SEMGREP_APP_TOKEN` org secret — no GitHub App is installed and Semgrep is granted no code access
+
 ### Changed
 
 ### Fixed
