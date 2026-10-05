@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Self-test Section 11 runs the regression tests** — `tests/test-*.sh` (the `dqi` and `pqy` guards) were run by nothing, so a regression would have gone unseen. Phase ST now runs every one and fails on a non-zero exit or an empty `tests/` directory
 - **`--budget` flag** — drops the Opus floor so judgement-tier phases run on the session model; a cheaper audit becomes an explicit choice rather than a side effect of the session
 - **Semgrep CI workflow** (`.github/workflows/semgrep.yml`): runs `semgrep ci` — Code (SAST), Secrets and Supply Chain — diff-aware on pull requests, full on pushes to `main`, weekly on schedule and on manual dispatch, reporting to the Semgrep AppSec Platform (deployment `gjbr-pm-me`). Engine image pinned `tag@digest`; the sole credential is the Agent (CI) scoped `SEMGREP_APP_TOKEN` org secret — no GitHub App is installed and Semgrep is granted no code access
 
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Phase 9d Step 8 can count orphaned bd issues again** — it grepped `bd preflight` output for "orphan", but on bd 1.0.3 that command prints a PR checklist for bd's own Go repository and exits 0, so the count was always zero. It now runs `bd orphans --json` through the parse-checked `json_count` (`null` is a real zero; a `bd` failure or non-JSON output is reported UNKNOWN, not clean), with `bd stale` and `bd lint` shown as information. Regression test `tests/test-bd-health.sh` extracts Step 8 from the skill and runs it in a throwaway bd repository: 9/9 against the fix, 8 of 9 failing against the old step
 - **Self-test 6.3 no longer reports success on failure** — its summary line printed `✅ Dispatcher declares 14/15 core allowed tools` even with a tool missing; it is now conditional, and the expected total is derived from `EXPECTED_TOOLS` instead of a hardcoded count
 
 ## [4.1.1] - 2026-04-23

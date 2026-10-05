@@ -508,7 +508,7 @@ fi
 
 ## Step 8: bd Health Check (enrolled projects only)
 
-Per `~/.claude/rules/beads.md`, projects enrolled in bd should be checked for issue-graph health alongside the GitHub audit. Findings are **informational** — they do NOT block release. (Note: `bd doctor` does not function in embedded mode and is intentionally skipped; `bd preflight` is the canonical health check.)
+Per `~/.claude/rules/beads.md`, projects enrolled in bd should be checked for issue-graph health alongside the GitHub audit. Findings are **informational** — they do NOT block release. (Note: `bd doctor` does not function in embedded mode and is intentionally skipped. `bd preflight` is NOT a health check on bd 1.0.3 — it prints a checklist for bd's own repository — so this step uses `bd orphans`, `bd stale` and `bd lint` directly.)
 
 ```bash
 echo ""
@@ -522,23 +522,38 @@ elif ! command -v bd >/dev/null 2>&1; then
     echo "  ⚠ bd not on PATH — skipping (install: ~/.local/bin/bd)"
 else
     echo ""
-    echo "Running bd preflight (lint, stale, orphans):"
-    pf_out=$(bd preflight 2>&1 || true)
-    if [ -z "$pf_out" ]; then
-        echo "  ✅ bd preflight: clean"
-    else
-        echo "$pf_out" | head -30 | sed 's/^/  /'
-        # Increment ISSUES_FOUND only for hard problems (orphans), not stale warnings.
-        #
-        # NOT `$(... || echo 0)`. `grep -c` PRINTS "0" and EXITS 1 when there
-        # are no matches, so the `||` fires too and the variable becomes the
-        # two-line string "0\n0" — after which `[ "$bd_orphans" -gt 0 ]` dies
-        # with "integer expression expected". Measured, not theorised.
-        bd_orphans=$(printf '%s\n' "$pf_out" | grep -ciE 'orphan') || bd_orphans=0
+    # NOT `bd preflight`: on bd 1.0.3 it prints a PR checklist for bd's OWN Go
+    # repository (go test, golangci-lint, Nix hash) and exits 0, so grepping it
+    # for "orphan" counted zero whatever the graph held (claude-test-skill-pqy).
+    #
+    # `bd orphans` = issues referenced by FULL id in a commit message but still
+    # open — work that landed and was never closed. `--json` prints `null` when
+    # there are none (a real zero); anything unparseable is UNKNOWN, not clean.
+    echo "Orphans (referenced by full id in a commit, still open):"
+    bd_err=$(mktemp)
+    if orph_json=$(bd orphans --json 2>"$bd_err") &&
+        json_count "$orph_json" 'if . == null then 0 else length end'; then
+        bd_orphans="$JSON_COUNT"
         if [ "$bd_orphans" -gt 0 ]; then
+            echo "  ⚠️ $bd_orphans orphaned issue(s) — implemented but not closed:"
+            printf '%s' "$orph_json" | jq -r '.[] | "    \(.issue_id)  \(.title)  (\(.latest_commit))"'
             ISSUES_FOUND=$((ISSUES_FOUND + bd_orphans))
+        else
+            echo "  ✅ No orphaned issues"
         fi
+    else
+        audit_unknown "bd orphans" "$(head -1 "$bd_err")"
     fi
+    rm -f "$bd_err"
+
+    # Informational only — never counted.
+    if json_count "$(bd stale --json 2>/dev/null)" 'if . == null then 0 else length end'; then
+        echo "  ○ Stale issues (no recent activity): $JSON_COUNT"
+    else
+        echo "  ○ Stale issues: could not be determined"
+    fi
+    bd_lint_out=$(bd lint 2>&1) && echo "  ○ bd lint: clean" ||
+        printf '%s\n' "$bd_lint_out" | head -10 | sed 's/^/  ○ /'
 
     echo ""
     echo "Open issue counts:"

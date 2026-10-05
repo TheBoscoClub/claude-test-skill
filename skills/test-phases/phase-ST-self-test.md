@@ -1483,6 +1483,50 @@ fi
 
 ---
 
+## Section 11: Regression Tests
+
+Every `tests/test-*.sh` guards a defect that once made a check report clean
+when it was not (dqi, pqy). A test nobody runs guards nothing, so the
+self-test runs all of them. Each must exit 0; its last line is shown either way.
+
+```bash
+echo ""
+echo "╔═══════════════════════════════════════════════════════════════════╗"
+echo "║  SECTION 11: REGRESSION TESTS                                     ║"
+echo "╚═══════════════════════════════════════════════════════════════════╝"
+echo ""
+
+shopt -s nullglob
+REGRESSION_TESTS=("$TEST_SKILL_PROJECT"/tests/test-*.sh)
+shopt -u nullglob
+
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+if [[ ${#REGRESSION_TESTS[@]} -eq 0 ]]; then
+    echo "  ❌ No regression tests found in $TEST_SKILL_PROJECT/tests/ — they guard known false-clean defects"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+else
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    echo "  ✅ ${#REGRESSION_TESTS[@]} regression test(s) found"
+fi
+
+for rt in "${REGRESSION_TESTS[@]}"; do
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    rt_out=$(bash "$rt" 2>&1)
+    rt_rc=$?
+    rt_last=$(printf '%s\n' "$rt_out" | tail -1)
+    if [[ $rt_rc -eq 0 ]]; then
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+        echo "  ✅ $(basename "$rt"): $rt_last"
+    else
+        FAILED_CHECKS=$((FAILED_CHECKS + 1))
+        echo "  ❌ $(basename "$rt") exit $rt_rc: $rt_last"
+        printf '%s\n' "$rt_out" | grep -E '^  FAIL|^FAIL' | head -5 | sed 's/^/      /'
+    fi
+done
+```
+
+---
+
 ## Summary Report
 
 ```bash
