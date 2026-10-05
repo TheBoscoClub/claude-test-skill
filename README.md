@@ -124,6 +124,22 @@ The `/test` skill performs a complete autonomous audit of any software project -
 - Loops until all tests pass and all issues resolved
 - Useful when architectural decisions require human judgment
 
+### Model Tiers
+
+Each phase runs in a subagent on one of three tiers (shown as `[tier]` in the tree
+under [Architecture](#architecture)):
+
+| Tier | Phases | Model |
+| ---- | ------ | ----- |
+| **judgement** | 3, 5a, 5c, 6, 9a–9d, ST | The more capable of the session model and Opus (`fable` > `opus` > `sonnet` > `haiku`) |
+| **sonnet** | 2, 4a, 4b, 5b, 5d, 7, 8, 10a, 10b | Sonnet |
+| **haiku** | 1, 11 | Haiku |
+
+A Fable session audits its judgement phases on Fable. A Sonnet or Haiku session
+still audits them on Opus, because an auditor weaker than the builder shares the
+builder's blind spots. `--budget` removes that floor, so the judgement tier runs
+on the session model.
+
 ---
 
 ## Installation
@@ -315,24 +331,24 @@ claude-test-skill/
 │   └── test-phases/         # 20 phase files (each with model tier config header)
 │       ├── phase-1-snapshot.md         # [haiku]
 │       ├── phase-2-preflight.md        # [sonnet]
-│       ├── phase-3-discovery.md        # [opus]
+│       ├── phase-3-discovery.md        # [judgement]
 │       ├── phase-4a-execute.md         # [sonnet]
 │       ├── phase-4b-runtime.md         # [sonnet]
-│       ├── phase-5a-security.md        # [opus]
+│       ├── phase-5a-security.md        # [judgement]
 │       ├── phase-5b-dependencies.md    # [sonnet]
-│       ├── phase-5c-quality.md         # [opus]
+│       ├── phase-5c-quality.md         # [judgement]
 │       ├── phase-5d-infrastructure.md  # [sonnet]
-│       ├── phase-6-fix.md              # [opus]
+│       ├── phase-6-fix.md              # [judgement]
 │       ├── phase-7-verify.md           # [sonnet]
 │       ├── phase-8-docs.md             # [sonnet]
-│       ├── phase-9a-app-testing.md     # [opus]
-│       ├── phase-9b-production.md      # [opus]
-│       ├── phase-9c-docker.md          # [opus]
-│       ├── phase-9d-github.md          # [opus]
+│       ├── phase-9a-app-testing.md     # [judgement]
+│       ├── phase-9b-production.md      # [judgement]
+│       ├── phase-9c-docker.md          # [judgement]
+│       ├── phase-9d-github.md          # [judgement]
 │       ├── phase-10a-vm-testing.md     # [sonnet]
 │       ├── phase-10b-vm-lifecycle.md   # [sonnet]
 │       ├── phase-11-cleanup.md         # [haiku]
-│       └── phase-ST-self-test.md       # [opus]
+│       └── phase-ST-self-test.md       # [judgement]
 ├── agents/                  # Integrated into phases (reference docs)
 │   ├── coverage-reviewer.md # → Phase 4a
 │   ├── security-scanner.md  # → Phase 5a

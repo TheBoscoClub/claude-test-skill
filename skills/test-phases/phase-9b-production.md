@@ -1,6 +1,6 @@
 # Phase 9b: Production Validation
 
-> **Model**: `opus` | **Phase**: 9b | **Modifies Files**: No (validates live)
+> **Model**: `judgement` | **Phase**: 9b | **Modifies Files**: No (validates live)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for system validation (use `timeout` for hung service checks). Use `AskUserQuestion` in `--interactive` mode for production remediation decisions.
 

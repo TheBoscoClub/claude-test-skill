@@ -1,6 +1,6 @@
 # Phase 5a: Comprehensive Security Testing & Mitigation
 
-> **Model**: `opus` | **Phase**: 5a | **Modifies Files**: No (read-only)
+> **Model**: `judgement` | **Phase**: 5a | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for security scanners, `WebSearch` to look up CVE details and check for known exploits for flagged vulnerabilities. Use `AskUserQuestion` in `--interactive` mode for security remediation decisions (e.g., breaking change vs. patching). Parallelize with other phase 5 phases. Includes cross-component data flow tracing and unvalidated input detection.
 > **Rate Limiting**: GitHub API calls are subject to rate limits. Use `gh api --cache 60s` where possible. Check `gh api rate_limit` before bulk API operations.

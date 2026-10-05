@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--budget` flag** — drops the Opus floor so judgement-tier phases run on the session model; a cheaper audit becomes an explicit choice rather than a side effect of the session
 - **Semgrep CI workflow** (`.github/workflows/semgrep.yml`): runs `semgrep ci` — Code (SAST), Secrets and Supply Chain — diff-aware on pull requests, full on pushes to `main`, weekly on schedule and on manual dispatch, reporting to the Semgrep AppSec Platform (deployment `gjbr-pm-me`). Engine image pinned `tag@digest`; the sole credential is the Agent (CI) scoped `SEMGREP_APP_TOKEN` org secret — no GitHub App is installed and Semgrep is granted no code access
 
 ### Removed
@@ -25,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`TaskOutput` dropped from the dispatcher's `allowed-tools`** (`commands/test.md`) — the tool no longer exists in Claude Code, so the entry granted nothing. Self-test 6.3 now expects 15 tools, and the `docs/ARCHITECTURE.md` tool table is corrected to the declared set (it listed `Task` and omitted `TaskGet` and `WebFetch`)
 
 ### Changed
+
+- **Judgement-tier phases follow the session model, with an Opus floor** — phases 3, 5a, 5c, 6, 9a–9d and ST were pinned to `opus`, so a Fable session audited below its builder. They now run on `JUDGEMENT_MODEL`, resolved once per run to the more capable of the session model and `opus` (`fable` > `opus` > `sonnet` > `haiku`) and stated in the final report; QA modules use it too. The Opus floor is deliberate — a Sonnet or Haiku session still audits judgement phases on Opus unless `--budget` is passed. The `sonnet` and `haiku` tiers are unchanged. The dispatcher's frontmatter `model: opus` is removed, so the dispatcher itself runs on the session model
+- **Self-test 6.2 and 6.4 enforce the judgement tier** — 6.2 expects `judgement` in the nine phase headers; 6.4 fails on a frontmatter model pin, a missing `JUDGEMENT_MODEL` resolution or `--budget` flag, or a subagent spawn hard-coded to `opus`
 
 ### Fixed
 

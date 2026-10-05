@@ -15,18 +15,18 @@ The test-skill follows a **dispatcher + subagent** architecture that achieves ~9
 │                      TEST-SKILL ARCHITECTURE                        │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  ┌─────────────┐  spawn (opus)  ┌──────────────────────────────┐   │
+│  ┌─────────────┐  spawn (tier)  ┌──────────────────────────────┐   │
 │  │ Dispatcher  │────────────────► Task Subagent (Phase 5)      │   │
-│  │ test.md     │                │ Model: opus                   │   │
+│  │ test.md     │                │ Model: JUDGEMENT_MODEL        │   │
 │  │ (~1000 ln)  │◄───────────────│ Reads: phase-5a-security.md   │   │
-│  │ model: opus │    summary     │ Reports: TaskUpdate            │   │
+│  │ (session)   │    summary     │ Reports: TaskUpdate            │   │
 │  └─────────────┘                └──────────────────────────────┘   │
 │        │                                                            │
 │        │ spawn (parallel, model varies per phase)                   │
 │        ▼                                                            │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │  [Phase 5]   [Phase 6]   [Phase 7]   [Phase I]              │  │
-│  │   opus       sonnet      opus        sonnet                  │  │
+│  │   judgement  sonnet      judgement   sonnet                  │  │
 │  │  Running in parallel — each in its own subagent context      │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │        │                                                            │
@@ -56,26 +56,26 @@ claude-test-skill/
 │       ├── phase-2-preflight.md        # Environment + config validation [sonnet]
 │       │
 │       │  ── TIER 1: Discovery ──
-│       ├── phase-3-discovery.md        # Project detection (GATE)       [opus]
+│       ├── phase-3-discovery.md        # Project detection (GATE)       [judgement]
 │       │
 │       │  ── TIER 2: Testing ──
 │       ├── phase-4a-execute.md         # Run tests + analysis + coverage [sonnet]
 │       ├── phase-4b-runtime.md         # Service health                 [sonnet]
 │       │
 │       │  ── TIER 3: Analysis (Read-Only) ──
-│       ├── phase-5a-security.md        # Comprehensive security         [opus]
+│       ├── phase-5a-security.md        # Comprehensive security         [judgement]
 │       ├── phase-5b-dependencies.md    # Package health                 [sonnet]
-│       ├── phase-5c-quality.md         # Linting, complexity, cleanup   [opus]
+│       ├── phase-5c-quality.md         # Linting, complexity, cleanup   [judgement]
 │       ├── phase-5d-infrastructure.md  # Infrastructure issues          [sonnet]
 │       │
 │       │  ── TIER 4: Modifications ──
-│       ├── phase-6-fix.md              # Auto-fixing (BLOCKING)         [opus]
+│       ├── phase-6-fix.md              # Auto-fixing (BLOCKING)         [judgement]
 │       │
 │       │  ── TIER 5: Validation (Conditional) ──
-│       ├── phase-9a-app-testing.md     # Sandbox app testing            [opus]
-│       ├── phase-9b-production.md      # Production validation          [opus]
-│       ├── phase-9c-docker.md          # Docker/registry validation     [opus]
-│       ├── phase-9d-github.md          # GitHub security audit          [opus]
+│       ├── phase-9a-app-testing.md     # Sandbox app testing            [judgement]
+│       ├── phase-9b-production.md      # Production validation          [judgement]
+│       ├── phase-9c-docker.md          # Docker/registry validation     [judgement]
+│       ├── phase-9d-github.md          # GitHub security audit          [judgement]
 │       │
 │       │  ── TIER 6: Verification ──
 │       ├── phase-7-verify.md           # Re-run tests                   [sonnet]
@@ -87,7 +87,7 @@ claude-test-skill/
 │       ├── phase-11-cleanup.md         # Environment cleanup            [haiku]
 │       │
 │       │  ── SPECIAL: Isolated / Conditional ──
-│       ├── phase-ST-self-test.md       # Framework self-validation      [opus]
+│       ├── phase-ST-self-test.md       # Framework self-validation      [judgement]
 │       ├── phase-10a-vm-testing.md     # VM isolation testing           [sonnet]
 │       └── phase-10b-vm-lifecycle.md   # VM startup/shutdown            [sonnet]
 │
@@ -125,7 +125,7 @@ The dispatcher is the entry point for `/test` commands. It:
 
 1. **Parses arguments** — Handles `--phase=X`, `--interactive`, shortcuts
 2. **Builds execution plan** — Respects tier dependencies
-3. **Selects models** — Assigns opus/sonnet/haiku per phase complexity
+3. **Selects models** — Resolves `JUDGEMENT_MODEL` from the session model (`--budget` aware), then assigns judgement/sonnet/haiku per phase complexity
 4. **Spawns subagents** — Uses Task tool for parallel/sequential execution
 5. **Tracks progress** — Creates TaskCreate/TaskUpdate entries for each phase
 6. **Enforces gates** — Blocks at tier boundaries until all phases complete
@@ -134,7 +134,7 @@ The dispatcher is the entry point for `/test` commands. It:
 **Key sections:**
 - Quick Reference and argument parsing
 - Available Phases table
-- Subagent Model Selection table (opus/sonnet/haiku)
+- Subagent Model Selection table (judgement/sonnet/haiku) and the `JUDGEMENT_MODEL` resolution table
 - Task Progress Tracking instructions
 - Dependency graph and tier execution algorithm
 - Inline fallback instructions for missing phase files
@@ -146,7 +146,7 @@ Each phase file contains a standardized structure (v2.0.1+):
 ```markdown
 # Phase X: Name
 
-> **Model**: `opus` | **Phase**: 3 | **Modifies Files**: No
+> **Model**: `judgement` | **Phase**: 3 | **Modifies Files**: No
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start...
 > **Key Tools**: `Bash`, `WebSearch` for CVE lookups...
 
@@ -167,7 +167,7 @@ Issues: [count]
 
 | Field | Purpose |
 |-------|---------|
-| **Model** | Which model tier the subagent runs on (opus/sonnet/haiku) |
+| **Model** | Which model tier the subagent runs on (judgement/sonnet/haiku) |
 | **Phase** | Phase identifier (matches the file name — e.g., `3`, `5a`, `10b`, `ST`) |
 | **Modifies Files** | Whether the phase writes to the project |
 | **Task Tracking** | Instructions for reporting progress via TaskUpdate |
@@ -194,7 +194,7 @@ Each phase is assigned to an optimal model based on task complexity:
 │                      MODEL TIER ASSIGNMENTS                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  OPUS (9 phases)           Complex analysis, multi-step reasoning   │
+│  JUDGEMENT (9 phases)      max(session model, opus); see below      │
 │  ├── Phase 3   Discovery    Architecture detection, framework ID    │
 │  ├── Phase 5a  Security     Security suite, CVE analysis            │
 │  ├── Phase 5c  Quality      LSP integration, complexity analysis    │
@@ -223,7 +223,18 @@ Each phase is assigned to an optimal model based on task complexity:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Why tier models?** Cost and latency optimization. A BTRFS snapshot (Phase 1) doesn't need opus-level reasoning — haiku runs it in a fraction of the time and cost. But security analysis (Phase 5a) benefits from opus's deeper reasoning to understand vulnerability context and remediation strategies.
+**Why tier models?** Cost and latency optimization. A BTRFS snapshot (Phase 1) doesn't need judgement-tier reasoning — haiku runs it in a fraction of the time and cost. But security analysis (Phase 5a) benefits from the deepest reasoning available to understand vulnerability context and remediation strategies.
+
+**Why the judgement tier is relative, not a fixed name.** The nine judgement phases
+find defects and fix them, so reasoning depth decides the result. A fixed `opus` pin
+audited a Fable-built project below the model that built it. The tier now resolves once per run to the more capable
+of the session model and `opus` (`fable` > `opus` > `sonnet` > `haiku`). The Opus
+floor is deliberate: an auditor weaker than the builder shares the builder's blind
+spots, so a Sonnet or Haiku session still audits these phases on Opus by default;
+`--budget` removes the floor so a cheaper audit is an explicit choice. The
+sonnet and haiku tiers stay fixed — a snapshot or a test run gains nothing from a
+larger model. The dispatcher's own frontmatter pins no model; it runs on the session
+model, and self-test 6.4 fails if a pin or a hard-coded `opus` spawn returns.
 
 ---
 
@@ -274,11 +285,11 @@ Phases execute in **9 tiers** with strict dependencies:
 | Tier | Phases | Mode | Model(s) | Rationale |
 |------|--------|------|----------|-----------|
 | 0 | S, 0 | Parallel | haiku, sonnet | Independent safety setup |
-| 1 | 1 | Sequential | opus | Everything depends on discovery |
+| 1 | 1 | Sequential | judgement | Everything depends on discovery |
 | 2 | 2, 2a | Parallel | sonnet, sonnet | Independent test execution |
 | 3 | 5,6,7,I | Parallel | mixed | All read-only analysis |
-| 4 | 10 | Sequential | opus | Modifies files — must be isolated |
-| 5 | A, P, D, G | Conditional | opus | Based on discovery results |
+| 4 | 10 | Sequential | judgement | Modifies files — must be isolated |
+| 5 | A, P, D, G | Conditional | judgement | Based on discovery results |
 | 6 | 12 | Sequential | sonnet | Final verification |
 | 7 | 13 | Sequential | sonnet | Documentation sync |
 | 8 | C | Sequential | haiku | Cleanup must be last |
@@ -424,8 +435,10 @@ Context consumed: ~93% reduction for single-phase runs
 By assigning cheaper models to simpler phases:
 
 ```
-Without tiering: 20 phases x opus cost = $$$
-With tiering:    9 x opus + 9 x sonnet + 2 x haiku = ~45% cost reduction
+Without tiering: 20 phases x judgement model
+With tiering:    9 x judgement + 9 x sonnet + 2 x haiku
+                 (saving depends on the session model; with --budget on a
+                  sonnet/haiku session, the judgement tier drops with it)
 ```
 
 ---
@@ -454,7 +467,7 @@ With tiering:    9 x opus + 9 x sonnet + 2 x haiku = ~45% cost reduction
 │           ┌───────────────────────┼───────────────────────┐         │
 │           ▼                       ▼                       ▼         │
 │  ┌─────────────────┐     ┌─────────────────┐     ┌────────────────┐│
-│  │ Task (haiku)    │     │ Task (opus)     │     │ Task (sonnet)  ││
+│  │ Task (haiku)    │     │ Task (judgement)│     │ Task (sonnet)  ││
 │  │ Phase S Snapshot│     │ Phase 5 Security│     │ Phase 6 Deps   ││
 │  │ TaskUpdate ──►  │     │ TaskUpdate ──►  │     │ TaskUpdate ──► ││
 │  └────────┬────────┘     └────────┬────────┘     └────────┬───────┘│

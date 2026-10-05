@@ -1,6 +1,6 @@
 # Phase 9d: GitHub Audit
 
-> **Model**: `opus` | **Phase**: 9d | **Modifies Files**: No (audits GitHub)
+> **Model**: `judgement` | **Phase**: 9d | **Modifies Files**: No (audits GitHub)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for `gh` CLI commands. Use `WebSearch` to look up GitHub API changes or new security features. Use `AskUserQuestion` in `--interactive` mode for security remediation decisions (e.g., enabling features that may affect CI).
 
