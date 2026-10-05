@@ -965,29 +965,29 @@ When `/test` is invoked:
 │    2    Pre-Flight       Config validation, sandbox setup, env checks       │
 │    3    Discovery        Detect project type, tests, isolation level (GATE) │
 │   4a    Execute&Analyze  Run tests, coverage, reporting, failure analysis   │
-│   4b    Runtime          Service health checks & connectivity       ║parallel│
-│   5a    Security         8-tool security suite (SAST + deps + secrets)     │
+│   4b    Runtime          Service health checks & connectivity        ║par.  │
+│   5a    Security         8-tool security suite (SAST + deps + secrets)      │
 │   5b    Dependencies     Package health & outdated checks            ║      │
 │   5c    Quality          Linting, complexity, formatting, dead code  ║par.  │
 │   5d    Infrastructure   Infrastructure & runtime issue detection    ║      │
-│    6    Fix              Auto-fix ALL issues from phases 4-5 (BLOCKING)    │
-│    7    Verify           Re-run tests; loop to 6 if failures               │
-│    8    Docs             Sync docs with codebase (ALWAYS runs)             │
+│    6    Fix              Auto-fix ALL issues from phases 4-5 (BLOCKING)     │
+│    7    Verify           Re-run tests; loop to 6 if failures                │
+│    8    Docs             Sync docs with codebase (ALWAYS runs)              │
 │   9a    App Test         Sandbox installation & deployment testing   ║      │
 │   9b    Production       Validate installed production app           ║cond. │
 │   9c    Docker           Validate Docker image & registry package    ║      │
 │   9d    GitHub           Audit repo: Dependabot, CodeQL, etc.        ║      │
 │  10a    VM Testing       Heavy isolation in libvirt/QEMU VM          ║cond. │
-│  10b    VM Lifecycle     VM snapshot create/revert/delete management  ║      │
+│  10b    VM Lifecycle     VM snapshot create/revert/delete management ║      │
 │   11    Cleanup          Restore environment (ALWAYS last)                  │
-│   ST    Self-Test        Validate test-skill framework (--phase=ST only)   │
+│   ST    Self-Test        Validate test-skill framework (--phase=ST only)    │
 │                                                                             │
 │  NOTES                                                                      │
 │  ─────                                                                      │
 │  • Autonomous mode (default): fixes ALL issues, no prompts, loops           │
 │  • Interactive mode (--interactive): may prompt, still fixes ALL issues     │
-│  • All audits are holistic — every analysis phase includes cross-component │
-│  • All audits iterate until clean — re-run after fixes until zero issues   │
+│  • All audits are holistic — every analysis phase includes cross-component  │
+│  • All audits iterate until clean — re-run after fixes until zero issues    │
 │  • Phase 9b/9c/9d: auto-skipped when not applicable (no prompts)            │
 │  • Phase 10a: auto-triggered when isolation level is vm-required            │
 │  • Phase ST: NEVER runs in normal /test — explicit --phase=ST only          │
