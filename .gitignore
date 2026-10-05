@@ -323,3 +323,6 @@ test-*-[0-9][0-9].md
 # Beads / Dolt files (added by bd init)
 .dolt/
 .beads-credential-key
+
+# Self-interrogation gate log (machine-local audit trail) — never commit
+.claude-si-gate-log.md
