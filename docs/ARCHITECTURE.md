@@ -322,11 +322,11 @@ The dispatcher declares 15 tools available to all subagents:
 | Category | Tools | Purpose |
 |----------|-------|---------|
 | **File I/O** | Bash, Read, Write, Edit, Glob, Grep | Core file operations |
-| **Subagents** | Task, TaskOutput, TaskStop | Spawning and managing subagents |
+| **Subagents** | TaskGet, TaskStop | Inspecting and stopping subagents |
 | **Progress** | TaskCreate, TaskUpdate, TaskList | Real-time phase tracking |
 | **Interaction** | AskUserQuestion | Interactive mode decisions |
 | **Notebooks** | NotebookEdit | Jupyter notebook support |
-| **Research** | WebSearch | CVE lookups, error research |
+| **Research** | WebSearch, WebFetch | CVE lookups, error research, advisory pages |
 
 Phase configuration headers tell each subagent which tools are most relevant for its task. For example, Phase 5a (Security) emphasizes `WebSearch` for CVE lookups, while Phase 4a (Execute) emphasizes `Bash` for running test suites.
 

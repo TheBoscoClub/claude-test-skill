@@ -1002,10 +1002,10 @@ fi
 
 echo ""
 echo "───────────────────────────────────────────────────────────────────"
-echo "  6.3 Dispatcher Allowed Tools (16 expected)"
+echo "  6.3 Dispatcher Allowed Tools (15 expected)"
 echo "───────────────────────────────────────────────────────────────────"
 
-EXPECTED_TOOLS=("Bash" "Read" "Write" "Edit" "Glob" "Grep" "TaskGet" "TaskOutput" "TaskStop" "TaskCreate" "TaskUpdate" "TaskList" "AskUserQuestion" "NotebookEdit" "WebSearch" "WebFetch")
+EXPECTED_TOOLS=("Bash" "Read" "Write" "Edit" "Glob" "Grep" "TaskGet" "TaskStop" "TaskCreate" "TaskUpdate" "TaskList" "AskUserQuestion" "NotebookEdit" "WebSearch" "WebFetch")
 TOOLS_FOUND=0
 for tool in "${EXPECTED_TOOLS[@]}"; do
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
@@ -1018,7 +1018,11 @@ for tool in "${EXPECTED_TOOLS[@]}"; do
     fi
 done
 
-echo "  ✅ Dispatcher declares $TOOLS_FOUND/16 core allowed tools"
+if [[ "$TOOLS_FOUND" -eq "${#EXPECTED_TOOLS[@]}" ]]; then
+    echo "  ✅ Dispatcher declares $TOOLS_FOUND/${#EXPECTED_TOOLS[@]} core allowed tools"
+else
+    echo "  ❌ Dispatcher declares only $TOOLS_FOUND/${#EXPECTED_TOOLS[@]} core allowed tools"
+fi
 
 echo ""
 echo "───────────────────────────────────────────────────────────────────"

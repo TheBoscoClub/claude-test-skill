@@ -9,7 +9,6 @@ allowed-tools:
   - Glob
   - Grep
   - TaskGet
-  - TaskOutput
   - TaskStop
   - TaskCreate
   - TaskUpdate
