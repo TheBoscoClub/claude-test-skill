@@ -20,9 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Semgrep CI workflow** (`.github/workflows/semgrep.yml`): runs `semgrep ci` — Code (SAST), Secrets and Supply Chain — diff-aware on pull requests, full on pushes to `main`, weekly on schedule and on manual dispatch, reporting to the Semgrep AppSec Platform (deployment `gjbr-pm-me`). Engine image pinned `tag@digest`; the sole credential is the Agent (CI) scoped `SEMGREP_APP_TOKEN` org secret — no GitHub App is installed and Semgrep is granted no code access
 
+### Removed
+
+- **`TaskOutput` dropped from the dispatcher's `allowed-tools`** (`commands/test.md`) — the tool no longer exists in Claude Code, so the entry granted nothing. Self-test 6.3 now expects 15 tools, and the `docs/ARCHITECTURE.md` tool table is corrected to the declared set (it listed `Task` and omitted `TaskGet` and `WebFetch`)
+
 ### Changed
 
 ### Fixed
+
+- **Self-test 6.3 no longer reports success on failure** — its summary line printed `✅ Dispatcher declares 14/15 core allowed tools` even with a tool missing; it is now conditional, and the expected total is derived from `EXPECTED_TOOLS` instead of a hardcoded count
 
 ## [4.1.1] - 2026-04-23
 
