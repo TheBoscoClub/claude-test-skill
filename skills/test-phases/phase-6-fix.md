@@ -1,6 +1,6 @@
 # Phase 6: Fix
 
-> **Model**: `opus` | **Phase**: 6 | **Modifies Files**: YES
+> **Model**: `judgement` | **Phase**: 6 | **Modifies Files**: YES
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done. This phase blocks ALL subsequent phases.
 > **Key Tools**: `Edit`, `Bash` for fixes. `Read`, `Grep` for analysis. `AskUserQuestion` in `--interactive` mode only.
 

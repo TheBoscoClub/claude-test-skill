@@ -1,6 +1,6 @@
 # Phase ST: Test-Skill Self-Test
 
-> **Model**: `opus` | **Phase**: ST (isolated) | **Modifies Files**: No (read-only)
+> **Model**: `judgement` | **Phase**: ST (isolated) | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash`, `Read`, `Glob`, `Grep` for framework validation. Verify all 15 allowed tools are accessible. Validate model tiering configuration matches dispatcher.
 
@@ -962,24 +962,24 @@ echo "────────────────────────�
 declare -A EXPECTED_MODELS=(
     ["phase-1-snapshot.md"]="haiku"
     ["phase-2-preflight.md"]="sonnet"
-    ["phase-3-discovery.md"]="opus"
+    ["phase-3-discovery.md"]="judgement"
     ["phase-4a-execute.md"]="sonnet"
     ["phase-4b-runtime.md"]="sonnet"
-    ["phase-5a-security.md"]="opus"
+    ["phase-5a-security.md"]="judgement"
     ["phase-5b-dependencies.md"]="sonnet"
-    ["phase-5c-quality.md"]="opus"
+    ["phase-5c-quality.md"]="judgement"
     ["phase-5d-infrastructure.md"]="sonnet"
-    ["phase-6-fix.md"]="opus"
+    ["phase-6-fix.md"]="judgement"
     ["phase-7-verify.md"]="sonnet"
     ["phase-8-docs.md"]="sonnet"
-    ["phase-9a-app-testing.md"]="opus"
-    ["phase-9b-production.md"]="opus"
-    ["phase-9c-docker.md"]="opus"
-    ["phase-9d-github.md"]="opus"
+    ["phase-9a-app-testing.md"]="judgement"
+    ["phase-9b-production.md"]="judgement"
+    ["phase-9c-docker.md"]="judgement"
+    ["phase-9d-github.md"]="judgement"
     ["phase-10a-vm-testing.md"]="sonnet"
     ["phase-10b-vm-lifecycle.md"]="sonnet"
     ["phase-11-cleanup.md"]="haiku"
-    ["phase-ST-self-test.md"]="opus"
+    ["phase-ST-self-test.md"]="judgement"
 )
 
 MODEL_MISMATCHES=0
@@ -1036,6 +1036,43 @@ if grep -q 'Subagent Model Selection' "$DISPATCHER" 2>/dev/null; then
 else
     echo "  ❌ Model selection table missing from dispatcher"
     FAILED_CHECKS=$((FAILED_CHECKS + 1))
+fi
+
+# Judgement tier: resolved from the session model, never pinned in frontmatter
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+if [[ ! -f "$DISPATCHER" ]] || sed -n '2,/^---$/p' "$DISPATCHER" | grep -q '^model:'; then
+    echo "  ❌ Dispatcher frontmatter pins a model — the judgement tier must follow the session"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+else
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    echo "  ✅ Dispatcher frontmatter pins no model"
+fi
+
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+if grep -q 'Resolving `JUDGEMENT_MODEL`' "$DISPATCHER" 2>/dev/null && \
+   grep -q '^argument-hint:.*\[--budget\]' "$DISPATCHER" 2>/dev/null && \
+   grep -q 'set `BUDGET_MODE=true`' "$DISPATCHER" 2>/dev/null; then
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    echo "  ✅ Judgement-tier resolution and --budget flag defined in dispatcher"
+else
+    echo "  ❌ Judgement-tier resolution or --budget flag missing from dispatcher"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+fi
+
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+if [[ ! -f "$DISPATCHER" ]]; then
+    echo "  ❌ Dispatcher not found: $DISPATCHER"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+elif grep -qE "model[[:space:]]*[:=][[:space:]]*[\"'\`]?opus\b|^[[:space:]]*- \`opus\`: Phases|^\| \*\*opus\*\* \|" "$DISPATCHER"; then
+    echo "  ❌ Dispatcher hard-codes opus for a subagent spawn — use JUDGEMENT_MODEL"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+elif ! grep -qE '^[[:space:]]+- `JUDGEMENT_MODEL`: Phases 3, 5a, 5c, 6, 9a, 9b, 9c, 9d, ST$' "$DISPATCHER" || \
+     ! grep -qE '^\| \*\*judgement\*\* \| 3, 5a, 5c, 6, 9a, 9b, 9c, 9d, ST \| `JUDGEMENT_MODEL`' "$DISPATCHER"; then
+    echo "  ❌ Judgement phases not assigned JUDGEMENT_MODEL in the tier table and the execute-by-tier step"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+else
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    echo "  ✅ Judgement phases spawn on JUDGEMENT_MODEL; no spawn hard-codes opus"
 fi
 
 TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
@@ -1390,7 +1427,7 @@ echo "────────────────────────�
 echo "  10.1 All CLI Flags Present"
 echo "───────────────────────────────────────────────────────────────────"
 
-FLAGS=("--interactive" "--skip-snapshot" "--force-sandbox" "--no-mcp-enable" "--phase=" "--list-phases")
+FLAGS=("--interactive" "--skip-snapshot" "--force-sandbox" "--no-mcp-enable" "--phase=" "--list-phases" "--budget")
 MISSING_FLAGS=0
 for flag in "${FLAGS[@]}"; do
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))

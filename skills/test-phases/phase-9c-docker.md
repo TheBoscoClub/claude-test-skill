@@ -1,6 +1,6 @@
 # Phase 9c: Docker Validation
 
-> **Model**: `opus` | **Phase**: 9c | **Modifies Files**: No (validates registry)
+> **Model**: `judgement` | **Phase**: 9c | **Modifies Files**: No (validates registry)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for docker/buildx commands (use `timeout` for hung builds). Use `WebSearch` to check for base image vulnerabilities or updated tags.
 

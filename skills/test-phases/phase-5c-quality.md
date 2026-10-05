@@ -1,6 +1,6 @@
 # Phase 5c: Code Quality
 
-> **Model**: `opus` | **Phase**: 5c | **Modifies Files**: No (read-only)
+> **Model**: `judgement` | **Phase**: 5c | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for linters/formatters. Parallelize with other phase 5 phases. Includes cross-component config sprawl detection, version mismatch identification, and hardcoded path analysis.
 

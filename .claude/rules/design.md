@@ -32,7 +32,7 @@ Project Root (any project using /test)
 
 **Execution Model**:
 - QA shortcuts are **standalone** — bypass the phase dependency system entirely
-- Each module is loaded as a self-contained subagent instruction file (model=opus)
+- Each module is loaded as a self-contained subagent instruction file (judgement tier: `JUDGEMENT_MODEL`)
 - Dispatcher discovers modules via glob: `test-*-qa-{app,docker,all}.md`
 - Modules handle their own VM connectivity, version checks, upgrades, DB sync, regression
 

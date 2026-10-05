@@ -1,6 +1,5 @@
 ---
 description: Modular project audit - testing, security, debugging, fixing (phase-based loading for context efficiency, holistic by design) (user)
-model: opus
 allowed-tools:
   - Bash
   - Read
@@ -17,7 +16,7 @@ allowed-tools:
   - NotebookEdit
   - WebSearch
   - WebFetch
-argument-hint: "[help] [prodapp] [docker] [qaapp] [qadocker] [qaall] [security] [github] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive]"
+argument-hint: "[help] [prodapp] [docker] [qaapp] [qadocker] [qaall] [security] [github] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive] [--budget]"
 ---
 
 # Modular Project Audit (/test)
@@ -212,6 +211,7 @@ This skill operates **entirely non-interactively** except in extremely rare case
 /test --list-phases      # Show available phases
 /test --interactive      # Enable interactive mode (prompts, manual items allowed)
 /test --force-sandbox    # DANGEROUS: Skip VM requirement for vm-required projects
+/test --budget           # Judgement-tier phases run on the session model (no Opus floor)
 /test --phase=5 --interactive  # Combine with other options
 /test help               # Show help
 ```
@@ -714,17 +714,44 @@ Each phase runs in its own subagent context, then returns a summary.
 
 ### Subagent Model Selection
 
-When spawning Task subagents for phases, specify the `model` parameter based on phase complexity:
+Phases run on three tiers. Two are fixed names; the **judgement** tier is resolved
+from the session model once per run, before any phase is spawned.
 
-| Model | Phases | Rationale |
-|-------|--------|-----------|
-| **opus** | 3, 5a, 5c, 6, 9a, 9b, 9c, 9d, ST | Complex analysis, multi-step fixes, security audit, cross-component reasoning |
-| **sonnet** | 2, 4a, 4b, 5b, 7, 8, 5d, 10a, 10b | Moderate complexity: test execution, dependency checks, verification |
-| **haiku** | 1, 11 | Lightweight: snapshots, cleanup |
+| Tier | Phases | Model passed to Task | Rationale |
+|------|--------|----------------------|-----------|
+| **judgement** | 3, 5a, 5c, 6, 9a, 9b, 9c, 9d, ST | `JUDGEMENT_MODEL` (resolved below) | Finding defects and fixing them — where reasoning depth decides the result |
+| **sonnet** | 2, 4a, 4b, 5b, 7, 8, 5d, 10a, 10b | `sonnet` | Moderate complexity: test execution, dependency checks, verification |
+| **haiku** | 1, 11 | `haiku` | Lightweight: snapshots, cleanup |
 
-**Example Task call with model:**
+#### Resolving `JUDGEMENT_MODEL`
+
+Capability order: `fable` > `opus` > `sonnet` > `haiku`. Identify the model the
+dispatcher itself is running on from its own system context, then:
+
+| Session model | Default | With `--budget` |
+|---------------|---------|-----------------|
+| `fable` | `fable` | `fable` |
+| `opus` | `opus` | `opus` |
+| `sonnet` | `opus` | `sonnet` |
+| `haiku` | `opus` | `haiku` |
+
+- **Default = the more capable of the session model and `opus`.** A fixed `opus`
+  pin would audit a Fable-built project below its builder; the floor stops a
+  cheap session from producing a cheap audit by accident — an auditor weaker
+  than the builder shares the builder's blind spots.
+- **`--budget` removes the floor**: the judgement tier runs on the session model.
+  Spending less is then a visible choice, not a side effect of the session.
+- If the session model is none of the four names, use `opus` (with or without
+  `--budget`) and say so in the report header.
+- **Always pass the resolved name explicitly** as `model=`. Never omit it — an
+  omitted model can resolve to an agent definition's own model rather than the
+  session's.
+- The fixed tiers do not move with the session: snapshots and test runs gain
+  nothing from a larger model.
+
+**Example Task calls:**
 ```
-Task(subagent_type="general-purpose", model="opus", prompt="Read phase file and execute...")
+Task(subagent_type="general-purpose", model=JUDGEMENT_MODEL, prompt="Read phase file and execute...")
 Task(subagent_type="general-purpose", model="haiku", prompt="Read phase file and execute...")
 ```
 
@@ -748,7 +775,9 @@ When running phases, spawn a Task subagent for each phase:
 For each requested phase:
   1. Read the phase file from ~/.claude/skills/test-phases/phase-{X}.md
   2. If file exists, execute the phase instructions via Task tool with appropriate model
-  3. If no file, use inline fallback instructions below
+  3. If no file, use inline fallback instructions below — still through a Task
+     subagent with the phase's tier model (judgement phases: model=JUDGEMENT_MODEL),
+     never inline in the dispatcher, which runs on the session model with no floor
   4. Collect results and continue to next phase
 ```
 
@@ -855,6 +884,7 @@ After all phases complete:
 Total Issues Found: X
 Total Issues Fixed: X  # MUST equal Found
 Verification: ✅ All tests passing
+Judgement tier: <JUDGEMENT_MODEL> (session: <model>; --budget: yes/no)
 
 Output Log: audit-YYYYMMDD-HHMMSS.log
 ```
@@ -892,6 +922,10 @@ When `/test` is invoked:
 
 1. **Parse arguments**
    - Check for `--interactive` flag → set `INTERACTIVE_MODE=true` (default: false)
+   - Check for `--budget` flag → set `BUDGET_MODE=true` (default: false)
+   - Resolve `JUDGEMENT_MODEL` from the session model and `BUDGET_MODE` (see
+     "Resolving `JUDGEMENT_MODEL`") and state it in the first line of audit
+     output (not for `help` / `--list-phases`, which print their block verbatim)
    - All other flags work the same in both modes
 2. If `help` or `--list-phases`: display the canonical help block below **verbatim** and exit. Do not summarize or rephrase — output the block exactly as written:
 
@@ -909,6 +943,7 @@ When `/test` is invoked:
 │  /test --phase=X,Y,Z             Run multiple phases                        │
 │  /test --interactive             Enable prompts and manual items            │
 │  /test --skip-snapshot           Skip BTRFS snapshot (Phase 1)              │
+│  /test --budget                  Judgement tier on session model, no floor  │
 │  /test --force-sandbox           DANGEROUS: bypass VM requirement           │
 │  /test --no-mcp-enable           Skip auto-enabling MCP servers             │
 │  /test help                      This help                                  │
@@ -1005,7 +1040,7 @@ When the argument is `qaapp`, `qadocker`, or `qaall`:
 
 5. **Execute as standalone subagent:**
    - Read the module file contents
-   - Spawn a single Task subagent with `model: opus`
+   - Spawn a single Task subagent with `model=JUDGEMENT_MODEL` (judgement tier)
    - Pass the module contents as the subagent's instructions
    - Include context: `PROJECT_DIR`, QA VM config from manifest, SSH config
    - **QA modules are STANDALONE** — no phase prerequisites
@@ -1149,7 +1184,7 @@ ELSE (Autonomous - DEFAULT):
    - Each subagent reads `~/.claude/skills/test-phases/phase-{X}-{name}.md`
    - Each returns summary with Status, Issue count, Key findings
    - **Model selection per phase** (use `model` parameter on Task tool):
-     - `opus`: Phases 3, 5a, 5c, 6, 9a, 9b, 9c, 9d, ST
+     - `JUDGEMENT_MODEL`: Phases 3, 5a, 5c, 6, 9a, 9b, 9c, 9d, ST
      - `sonnet`: Phases 2, 4a, 4b, 5b, 7, 8, 5d, 10a, 10b
      - `haiku`: Phases 1, 11
    - Use `run_in_background: true` for long-running phases where appropriate

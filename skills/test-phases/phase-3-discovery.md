@@ -1,6 +1,6 @@
 # Phase 3: Discovery
 
-> **Model**: `opus` | **Phase**: 3 | **Modifies Files**: No
+> **Model**: `judgement` | **Phase**: 3 | **Modifies Files**: No
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done. All subsequent phases depend on this — use `addBlocks` to express downstream dependencies.
 > **Key Tools**: `Bash`, `Glob`, `Grep`, `Read` for project analysis. Use `WebSearch` to identify framework conventions if an unfamiliar project type is detected.
 

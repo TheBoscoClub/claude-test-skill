@@ -1,6 +1,6 @@
 # Phase 9a: Deployable Application Testing
 
-> **Model**: `opus` | **Phase**: 9a | **Modifies Files**: Sandbox only
+> **Model**: `judgement` | **Phase**: 9a | **Modifies Files**: Sandbox only
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for install/test commands (use `Bash` with `kill` to terminate hung install processes). Use `AskUserQuestion` in `--interactive` mode if install paths or config choices are needed. Can parallel with phase 5 phases.
 
