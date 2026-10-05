@@ -47,7 +47,9 @@ bd show <id>          # View issue + dependencies
 bd update <id> --claim        # Claim work atomically
 bd dep add <child> <parent>   # Add dependency edge
 bd close <id>         # Mark complete
-bd preflight          # Pre-PR check (lint, stale, orphans) — the canonical health check
+bd orphans            # Open issues referenced by a commit (done, never closed)
+bd lint               # Issues missing template sections
+bd stale              # Issues with no recent activity
 # bd doctor          # DOES NOT WORK in embedded mode; use preflight instead
 ```
 
