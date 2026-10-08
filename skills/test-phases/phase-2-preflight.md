@@ -4,8 +4,7 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for environment checks. Use `WebSearch` to verify tool version compatibility if needed.
 
-Validate the environment is ready before running any tests. Fail fast on environment issues.
-This phase consolidates all pre-flight work: environment checks, config validation, and sandbox setup.
+Validate environment before any tests; fail fast. Covers env checks, config validation, sandbox setup.
 
 ---
 
@@ -234,7 +233,7 @@ echo "  Environment status: $([ "$ENV_OK" = true ] && echo "PASS" || echo "FAIL"
 
 ## Step 4: Configuration Validation
 
-Validate project configuration files for syntax and best practices. Produces structured findings for Phase 6 (Fix).
+Check config files for syntax/best practices; emits structured findings for Phase 6 (Fix).
 
 ```bash
 echo ""
@@ -499,7 +498,7 @@ echo "  Permissions status: $([ "$PERMS_OK" = true ] && echo "PASS" || echo "FAI
 
 ## Step 7: Service User Permissions
 
-If systemd services exist, verify service user can write to required directories.
+If systemd services exist, verify service user can write to required dirs.
 
 ```bash
 echo ""
@@ -523,7 +522,7 @@ fi
 
 ## Step 8: Sandbox Setup
 
-Create an isolated sandbox environment for test artifacts and set test-mode environment variables.
+Create isolated sandbox for test artifacts; set test-mode env vars.
 
 ```bash
 echo ""
@@ -612,7 +611,7 @@ echo "  Cleanup: rm -rf $SANDBOX_DIR"
 
 ## Step 9: VM Isolation Availability
 
-Detect if VM-based isolation (Phase 10a) is available for dangerous operations testing.
+Detect VM isolation (Phase 10a) for dangerous-operations testing.
 
 ```bash
 echo ""
@@ -726,7 +725,7 @@ detect_vm_availability
 
 ## Step 10: Physical Test Hardware (Optional)
 
-Detect SSH-accessible physical test machines (Raspberry Pi, spare systems, etc.)
+Detect SSH-accessible physical test machines (Pi, spare systems).
 
 ```bash
 echo ""
@@ -818,6 +817,5 @@ ISO Library: [path (count) / None]
 [category] file: description
 [category] file: description
 
-Note: Isolation requirements are determined by Phase 3 (Discovery).
-Phase 2 only reports WHAT is available, not what is NEEDED.
+Note: Phase 3 (Discovery) determines isolation needs; Phase 2 reports only what is available.
 ```

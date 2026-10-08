@@ -4,11 +4,11 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for cleanup. Use `Bash` with `kill` to terminate any lingering test processes.
 
-Clean up test artifacts and optionally restore from snapshot.
+Clean up test artifacts; optionally restore from snapshot.
 
 ## Purpose
 
-- Remove temporary files created during audit
+- Remove temp files from the audit
 - Optionally restore from BTRFS snapshot
 - Reset environment to pre-audit state
 
@@ -54,7 +54,7 @@ unset NODE_ENV FLASK_ENV DJANGO_SETTINGS_MODULE GO_ENV RUST_TEST
 
 ### 3a. Shutdown Test VM (if started by /test)
 
-Shutdown the test VM if it was started by this audit to preserve system resources.
+Shut down the test VM if this audit started it.
 
 ```bash
 shutdown_test_vm() {
@@ -237,7 +237,7 @@ shutdown_test_vm
 
 ### 3b. Disable Auto-Enabled MCP Servers
 
-Restore MCP servers to their pre-test state:
+Restore MCP servers to pre-test state:
 
 ```bash
 restore_mcp_servers() {
@@ -314,13 +314,7 @@ with open('$SETTINGS_FILE', 'w') as f:
 restore_mcp_servers
 ```
 
-**What This Does:**
-1. Reads `.test-mcp-enabled` to find which servers were auto-enabled
-2. Disables each server in `settings.json`
-3. Removes the tracking file
-4. Reports what was restored
-
-**Note:** If the user manually enabled a server during testing that was in the list, it will still be disabled. This ensures clean restoration to pre-test state.
+Reads `.test-mcp-enabled`, disables each listed server in `settings.json`, removes the tracking file, reports. A listed server the user enabled manually is still disabled.
 
 ### 4. BTRFS Snapshot Restore (Optional)
 
@@ -348,8 +342,7 @@ fi
 
 ### 5. Snapshot Cleanup
 
-Audit/pre-test snapshot cleanup is handled by Phase 1 (before creating new snapshots).
-Phase 11 does not manage snapshots.
+Phase 1 cleans audit/pre-test snapshots (before creating new ones); Phase 11 does not manage snapshots.
 
 ## Output Format
 
@@ -384,12 +377,6 @@ Project restored to clean state.
 
 ## When to Restore
 
-Use snapshot restore when:
-- Auto-fix broke something
-- Want to undo all audit changes
-- Need clean state for fresh audit
+Restore when: auto-fix broke something; undoing all audit changes; clean state needed for a fresh audit.
 
-Do NOT restore when:
-- Fixes were intentional
-- Changes should be committed
-- Audit was successful
+Do NOT restore when: fixes were intentional; changes should be committed; audit succeeded.

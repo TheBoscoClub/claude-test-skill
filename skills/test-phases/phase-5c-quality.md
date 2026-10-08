@@ -4,7 +4,7 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for linters/formatters. Parallelize with other phase 5 phases. Includes cross-component config sprawl detection, version mismatch identification, and hardcoded path analysis.
 
-Comprehensive linting, formatting, dead code detection, complexity analysis, and style checks.
+Lint, format, dead code, complexity, style.
 
 ## Execution Steps
 
@@ -435,19 +435,19 @@ fi
 
 | Category | PASS | FAIL |
 |----------|------|------|
-| Linting (ruff/pylint/eslint/clippy) | 0 errors (warnings OK) | Any errors |
-| Type checking (mypy/tsc) | 0 type errors | Any type errors |
-| Formatting (black/prettier/gofmt/shfmt/rustfmt) | 0 files need formatting | Any files need formatting |
-| Dead code (vulture/autoflake/deadcode) | 0 high-confidence findings | Any findings at 80%+ confidence |
-| Complexity (radon) | No function grade D or worse | Any function grade D+ (CC > 20) |
-| Docker (hadolint) | 0 errors (DL info OK) | Any DL errors |
-| Spelling (codespell) | 0 issues | Any issues |
+| Linting (ruff/pylint/eslint/clippy) | 0 errors (warnings OK) | Any error |
+| Type checking (mypy/tsc) | 0 errors | Any error |
+| Formatting (black/prettier/gofmt/shfmt/rustfmt) | 0 files | Any file |
+| Dead code (vulture/autoflake/deadcode) | 0 high-confidence | Any at 80%+ confidence |
+| Complexity (radon) | No grade D or worse | Any grade D+ (CC > 20) |
+| Docker (hadolint) | 0 errors (DL info OK) | Any DL error |
+| Spelling (codespell) | 0 | Any |
 
-**Overall**: PASS requires all categories to pass. Any single FAIL means the phase reports ISSUES FOUND.
+PASS requires all categories to pass; any FAIL reports ISSUES FOUND.
 
 ## Integration with Phase 6
 
-Issues are collected for Phase 6 (Fix) to process. The collection avoids assuming jq is installed.
+Collect issues for Phase 6 (Fix); do not assume jq is installed.
 
 ```bash
 QUALITY_ISSUES_FILE="${PROJECT_DIR:-$(pwd)}/quality-issues.txt"
@@ -504,7 +504,7 @@ collect_quality_issues
 
 ## Schema Consistency Validation
 
-Detect divergence between a canonical database schema and all DDL/query statements across the codebase. This catches the class of bug where multiple components define their own `CREATE TABLE` with different column names, types, or constraints than the single source of truth.
+Detect `CREATE TABLE`/query divergence from the canonical schema (columns, types, constraints).
 
 ```bash
 echo ""
@@ -611,7 +611,7 @@ fi
 
 ## Python Version Syntax Validation
 
-Detect Python 2 syntax that is invalid in Python 3 but may not be caught by all linters with default configs. This catches bugs that cause `SyntaxError` at import time in production.
+Detect Python 2 syntax (`SyntaxError` at import) that default linter configs may miss.
 
 ```bash
 PYTHON_SOURCE=$(find "$PROJECT_ROOT" -name "*.py" \
@@ -685,11 +685,11 @@ fi
 
 ## Cross-Component Quality Analysis
 
-Every phase must analyze quality holistically — not just within individual files but across the entire project. This section is mandatory for all /test audits.
+Mandatory for all /test audits; analyze across the whole project, not per file.
 
 ### Shared Config Detection
 
-Find configuration files and detect sprawl (same setting defined in multiple places).
+Find config files; detect sprawl (same setting in multiple places).
 
 ```bash
 # Find config files
@@ -741,7 +741,7 @@ grep -rn "\.db\b\|\.sqlite\|database.*=\|DB_PATH\|DB_FILE\|DATABASE_URL" \
   | grep -v ".venv\|node_modules\|.snapshots\|test\|__pycache__" | sort
 ```
 
-Report: List each setting, all locations where it appears, and flag mismatches.
+Report each setting, all its locations, and mismatches.
 
 ### Cross-Component Issues
 
@@ -800,7 +800,7 @@ grep -rn "^export \(function\|const\|class\) " --include="*.js" --include="*.ts"
 
 ### AI Self-Promotion & Branding Detection
 
-Scan for AI-generated self-promotion, advertising, attribution, and branding injected by language models. These are code quality issues — the project's code, documentation, and metadata should reflect the project owner's voice, not AI vendor marketing.
+Scan for AI-injected self-promotion, advertising, attribution, and branding; code, docs, and metadata must carry only the owner's voice.
 
 ```bash
 echo ""
@@ -869,12 +869,12 @@ if [ -d "$PROJECT_ROOT/.github/workflows" ]; then
 fi
 ```
 
-**Report each finding as:**
+Report each finding as:
 ```
 FINDING: AI self-promotion in [file]:[line] — [pattern matched]
 ```
 
-All findings are quality issues to be fixed by Phase 6 (removal, not replacement).
+All findings go to Phase 6 for removal (not replacement).
 
 ## Checklist
 

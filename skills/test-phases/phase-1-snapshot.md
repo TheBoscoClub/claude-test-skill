@@ -8,14 +8,14 @@ Create read-only safety snapshots before making changes.
 
 ## Prerequisites
 
-- Project must be on a BTRFS filesystem
-- User must have sudo access for btrfs and virsh commands
+- Project on a BTRFS filesystem
+- sudo for btrfs and virsh
 
 ## Execution
 
 ### Step 1: Clean Up Prior Audit Snapshots (MANDATORY)
 
-Before creating a new snapshot, scan for existing audit/pre-test snapshots and delete any whose purpose has been fulfilled. This is the **primary and authoritative** snapshot cleanup mechanism (see `~/.claude/rules/projects.md`).
+Before creating a new snapshot, delete prior audit/pre-test snapshots whose purpose is fulfilled. This is the **primary and authoritative** cleanup (`~/.claude/rules/projects.md`).
 
 ```bash
 PROJECT_DIR="$(pwd)"
@@ -64,9 +64,7 @@ fi
 
 ### Step 2: Create BTRFS Project Snapshot
 
-Snapshots are stored inside the project directory at `.snapshots/` to avoid polluting the top-level projects directory.
-
-**Naming convention**: `snap-pre-test-YYYYMMDD-HHMMSS` (enforced below).
+Store snapshots in `.snapshots/` inside the project, never the top-level projects directory. Name: `snap-pre-test-YYYYMMDD-HHMMSS`.
 
 ```bash
 SNAPSHOT_PATH="$SNAPSHOT_DIR/snap-pre-test-$TIMESTAMP"
@@ -104,7 +102,7 @@ fi
 
 ### VM Snapshot
 
-Detects the project's test VM from `vm-test-manifest.json` or `project-vm-map.json`.
+VM comes from `vm-test-manifest.json` or `project-vm-map.json`.
 
 ```bash
 # Determine the project's test VM
@@ -157,16 +155,16 @@ sudo virsh snapshot-delete $VM_NAME "pre-test-YYYYMMDD-HHMMSS"
 
 ## Snapshot Naming Convention
 
-All BTRFS snapshots created by Phase 1 follow this pattern:
+BTRFS snapshots from Phase 1:
 - **Location**: `$PROJECT_DIR/.snapshots/`
 - **Name**: `snap-pre-test-YYYYMMDD-HHMMSS`
 - **Type**: Read-only (`-r` flag)
 
-Phase 1 (this phase) handles snapshot cleanup before creating new ones. Using a different location or naming pattern will cause the cleanup scan to miss old snapshots.
+Any other location or name makes the cleanup scan miss old snapshots.
 
 ## Output
 
 Report:
-- BTRFS snapshot path created
-- VM snapshot name and VM state at time of snapshot
-- Commands to restore if needed
+- BTRFS snapshot path
+- VM snapshot name and VM state at snapshot time
+- Restore commands

@@ -8,7 +8,7 @@ Identify project type, test framework, and testable components.
 
 ## Output Schema
 
-Phase 1 MUST output all of the following key-value pairs (downstream phases parse them):
+Phase 1 MUST output all these key-value pairs (parsed downstream):
 
 ```
 Project Type: [type]
@@ -121,7 +121,7 @@ echo "Rust:";         for t in cargo-clippy cargo-audit; do check_tool "$t" "$t"
 
 ### 6. Isolation Level Detection
 
-Scan project for dangerous system-modifying patterns and assign a danger score.
+Scan for dangerous system-modifying patterns; assign danger score.
 
 ```bash
 detect_isolation_level() {
@@ -183,7 +183,7 @@ detect_isolation_level
 
 ### 1b. Detect Staged Release
 
-Check for `.staged-release` breadcrumb written by `/git-release --local`:
+Check `.staged-release` breadcrumb (from `/git-release --local`):
 
 ```bash
 detect_staged_release() {
@@ -223,7 +223,7 @@ detect_staged_release() {
 detect_staged_release
 ```
 
-When Discovery reports `Staged Release: valid`, Phase 10a is triggered and routes to the correct VM via `project-vm-map.json`.
+`Staged Release: valid` triggers Phase 10a, routed to the VM via `project-vm-map.json`.
 
 ### 4b. Detect Available MCP Servers
 
@@ -245,11 +245,11 @@ detect_mcp_servers() {
 detect_mcp_servers
 ```
 
-**MCP usage by phase:** playwright (A, 2a for E2E), LSP servers (7 for type checking), context7/greptile (1, 5 for codebase analysis). Prefer MCP over CLI when available.
+**MCP use:** playwright (A, 2a E2E), LSP (7 type checking), context7/greptile (1, 5 codebase analysis). Prefer MCP over CLI.
 
 ### 4b-2. Auto-Enable MCP Servers for Testing
 
-When needed MCP servers are disabled, temporarily enable them (tracked in `.test-mcp-enabled` for Phase 11 cleanup):
+Temporarily enable needed disabled MCP servers (tracked in `.test-mcp-enabled` for Phase 11 cleanup):
 
 ```bash
 auto_enable_mcp_servers() {
@@ -378,7 +378,7 @@ PYEOF
 detect_pytest_options
 ```
 
-**Resource flags (`vm`, `hardware`) ALWAYS prompt** (even in autonomous mode) since they require physical resources. Other flags follow normal mode rules. The dispatcher records the final selection as `Pytest Extra Flags: --vm --hardware` (or `(none)`).
+**Resource flags (`vm`, `hardware`) ALWAYS prompt** (even autonomous mode); others follow normal mode rules. Dispatcher records selection as `Pytest Extra Flags: --vm --hardware` (or `(none)`).
 
 ### 5. Detect Installable Application
 

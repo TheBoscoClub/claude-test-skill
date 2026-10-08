@@ -4,9 +4,9 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for `gh` CLI commands. Use `WebSearch` to look up GitHub API changes or new security features. Use `AskUserQuestion` in `--interactive` mode for security remediation decisions (e.g., enabling features that may affect CI).
 
-Comprehensive audit of the project's GitHub repository, including security features, alerts, workflows, and compliance.
+Audit the GitHub repo: security features, alerts, workflows, compliance.
 
-**Prerequisite**: Phase 3 (Discovery) must have detected a GitHub repository with authenticated access.
+**Prerequisite**: Phase 3 (Discovery) must have detected a GitHub repo with authenticated access.
 
 ## Execution Mode
 
@@ -508,7 +508,7 @@ fi
 
 ## Step 8: bd Health Check (enrolled projects only)
 
-Per `~/.claude/rules/beads.md`, projects enrolled in bd should be checked for issue-graph health alongside the GitHub audit. Findings are **informational** — they do NOT block release. (Note: `bd doctor` does not function in embedded mode and is intentionally skipped. `bd preflight` is NOT a health check on bd 1.0.3 — it prints a checklist for bd's own repository — so this step uses `bd orphans`, `bd stale` and `bd lint` directly.)
+Per `~/.claude/rules/beads.md`, check issue-graph health of bd-enrolled projects. Findings are **informational** — they do NOT block release. Skip `bd doctor` (non-functional in embedded mode) and `bd preflight` (bd 1.0.3: checklist for bd's own repo, not a health check); use `bd orphans`, `bd stale`, `bd lint` directly.
 
 ```bash
 echo ""
@@ -607,7 +607,7 @@ fi
 
 ## Remediation Instructions (for Phase 6)
 
-When Phase 6 (Auto-Fixing) runs, it should process GitHub issues:
+Phase 6 (Auto-Fixing) processes GitHub issues:
 
 ### Enable Missing Security Features
 

@@ -4,24 +4,22 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for docker/buildx commands (use `timeout` for hung builds). Use `WebSearch` to check for base image vulnerabilities or updated tags.
 
-Validate Docker image builds and registry package synchronization.
+Validate Docker image builds and registry package sync.
 
 ## CRITICAL: Production Data Isolation
 
-**Docker containers created during Phase 9c must NEVER bind-mount host production paths.**
-
-- **NEVER** use `-v` to bind-mount host production database paths, library directories, or config files into a test container
-- Ephemeral in-container databases (e.g., `/tmp/test.db` or schema-initialized) are the standard for smoke tests
-- Copying data into a container image at build time is allowed — it's isolated inside the container
+- Phase 9c containers must NEVER bind-mount host production paths.
+- NEVER use `-v` to mount host production database paths, library directories, or config files into a test container.
+- Smoke tests use ephemeral in-container databases (`/tmp/test.db` or schema-initialized).
+- Copying data into the image at build time is allowed (isolated in the container).
 
 ## Prerequisites
 
-This phase requires:
 - Docker daemon running
-- Registry authentication (for push validation)
-- Discovery phase results (Docker Status, Registry Image, Registry Status)
+- Registry auth (for push validation)
+- Discovery results (Docker Status, Registry Image, Registry Status)
 
-**Post-pristine-revert note:** After reverting a test VM to its pristine snapshot, the Docker container's database does NOT exist. Phase 9c smoke tests use ephemeral in-container databases (`/tmp/test.db` or schema-initialized), so this is handled automatically. For full integration tests that need a populated DB, initialize from `schema.sql` or copy the native app's database into the Docker data volume.
+After a pristine revert the container DB does not exist; ephemeral DBs cover smoke tests. For integration tests needing a populated DB, initialize from `schema.sql` or copy the native app's DB into the Docker data volume.
 
 ## Execution Steps
 
@@ -235,9 +233,7 @@ check_version_sync
 
 ### 5. Verify Image Contains Current Application Version and Code
 
-**CRITICAL**: After a successful build, verify the Docker image has the correct
-version and current code installed. This catches stale COPY instructions, missing
-files, and version mismatches.
+**CRITICAL**: After a successful build, verify the image has the correct version and current code (catches stale COPY, missing files, version mismatches).
 
 ```bash
 verify_image_contents() {
@@ -426,20 +422,18 @@ Issues: [count]
 
 | Category | Severity | Description |
 |----------|----------|-------------|
-| Buildx unavailable | ❌ FAIL | Docker buildx not installed |
-| Build failure | ❌ FAIL | Docker image won't build |
-| Missing registry tag | ⚠️ ISSUE | Version tag missing from registry |
+| Buildx unavailable | ❌ FAIL | buildx not installed |
+| Build failure | ❌ FAIL | image won't build |
+| Missing registry tag | ⚠️ ISSUE | version tag missing |
 | Version mismatch | ⚠️ ISSUE | VERSION file != registry tag |
-| Default builder | ⚠️ WARN | Using default builder (no multi-platform) |
-| Unpinned base | ⚠️ WARN | Base image not pinned (reproducibility) |
-| Missing platforms | ⚠️ WARN | Registry image not multi-platform (amd64 only) |
-| Hardcoded secrets | ⚠️ ISSUE | Secrets in Dockerfile/compose |
+| Default builder | ⚠️ WARN | no multi-platform |
+| Unpinned base | ⚠️ WARN | base image not pinned |
+| Missing platforms | ⚠️ WARN | amd64 only |
+| Hardcoded secrets | ⚠️ ISSUE | secrets in Dockerfile/compose |
 
 ## Cleanup (MANDATORY — Release Leak Prevention)
 
-After all Docker tests complete, **always** clean up resources. This is not just hygiene — test containers may contain production data (copied in for testing) that must NEVER survive into a release artifact. Orphaned test containers with production content could be accidentally committed to an image or captured by `docker save`.
-
-**Cleanup MUST complete BEFORE `/test` formally ends.**
+ALWAYS clean up after Docker tests: test containers may hold production data that must NEVER survive into a release artifact (orphans could be committed to an image or captured by `docker save`). Cleanup MUST complete BEFORE `/test` ends.
 
 ```bash
 cleanup_docker_phase() {
@@ -523,21 +517,16 @@ cleanup_docker_phase
 
 ### Why Cleanup Matters
 
-| Resource | Problem if Left | Cleanup Action |
-|----------|-----------------|----------------|
-| Test containers | Consume memory/CPU, hold ports | `docker stop --time 10` (graceful) |
-| Compose services | Multiple containers left running | `docker compose down --timeout 10` |
-| Buildx containers | Consume memory, stay running indefinitely | `docker stop buildx_buildkit*` |
-| Test images | Consume disk space | `docker rmi *:test-*` |
-| Build cache | Can grow to 10s of GB | `docker builder prune` |
+| Resource | Cleanup Action |
+|----------|----------------|
+| Test containers | `docker stop --time 10` |
+| Compose services | `docker compose down --timeout 10` |
+| Buildx containers | `docker stop buildx_buildkit*` |
+| Test images | `docker rmi *:test-*` |
+| Build cache | `docker builder prune` |
 
 ### Graceful Shutdown
 
-The cleanup uses `--time 10` (10 second timeout) to allow containers to:
-1. Receive SIGTERM and shutdown gracefully
-2. Flush logs and close connections
-3. Save state if applicable
+`--time 10` gives SIGTERM time to flush and close; containers are force-killed as fallback.
 
-If graceful shutdown fails, containers are forcefully killed as a fallback.
-
-**This cleanup runs automatically at the end of Phase 9c, not in Phase 11 (Restore).** Docker resources should be cleaned immediately after Docker testing, not left until session cleanup.
+Cleanup runs at the end of Phase 9c, not in Phase 11 (Restore).

@@ -4,11 +4,7 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash`, `Read`, `Glob`, `Grep` for framework validation. Verify all 15 allowed tools are accessible. Validate model tiering configuration matches dispatcher.
 
-**Meta-testing phase** - validates the test-skill framework itself.
-
-This phase only runs when explicitly called: `/test --phase=ST`
-
-It is NOT included in normal `/test` runs to avoid circular testing.
+Meta-testing: validates the test-skill framework. Runs ONLY via `/test --phase=ST`; NOT in normal `/test` runs (avoids circular testing).
 
 ## Invocation
 
@@ -58,8 +54,7 @@ echo ""
 
 ## Project Test Validation (Project Mode Only)
 
-When `IS_PROJECT_MODE=true`, run these project-level checks INSTEAD OF the framework sections (1-10).
-When `IS_PROJECT_MODE=false`, skip this entire block and run the framework sections as before.
+`IS_PROJECT_MODE=true`: run these checks INSTEAD OF framework sections (1-10). `false`: skip this block, run the framework sections.
 
 ### P1: Test Discoverability
 
@@ -350,9 +345,7 @@ fi  # IS_PROJECT_MODE P3
 
 Run all tests individually then as full suite to detect order-dependent failures.
 
-**NOTE**: This section is INFORMATIONAL only. It runs `pytest --collect-only` to count tests
-and reports a recommendation. Actually running all tests in isolation would take too long
-for a self-test. Instead, it checks for known isolation-risk patterns.
+**NOTE**: INFORMATIONAL only: runs `pytest --collect-only` to count tests, reports a recommendation, and checks known isolation-risk patterns (full isolated runs take too long).
 
 ```bash
 if [[ "$IS_PROJECT_MODE" == "true" ]] && [[ -n "$TEST_DIR" ]]; then
@@ -1485,9 +1478,7 @@ fi
 
 ## Section 11: Regression Tests
 
-Every `tests/test-*.sh` guards a defect that once made a check report clean
-when it was not (dqi, pqy). A test nobody runs guards nothing, so the
-self-test runs all of them. Each must exit 0; its last line is shown either way.
+Run every `tests/test-*.sh` (each guards a past false-clean defect: dqi, pqy). Each must exit 0; its last line is shown either way.
 
 ```bash
 echo ""
@@ -1565,35 +1556,30 @@ echo "════════════════════════�
 
 ### Dual Mode Operation
 
-Phase ST operates in two modes based on where it's run:
-
 | Context | Mode | What It Validates |
 |---------|------|-------------------|
 | `claude-test-skill` project | Framework Self-Test | Phase files, symlinks, dispatcher, tools, model tiers, governing law |
-| Any other project | Project Test Validation | Test discoverability, redundancy, fixture conflicts, isolation risks, version-gating, phase duplication |
+| Any other project | Project Test Validation | Discoverability, redundancy, fixture conflicts, isolation risks, version-gating, phase duplication |
 
 ### When to Use:
 
-**Framework mode** (in claude-test-skill):
-- After modifying test-skill phase files
-- After updating symlinks
-- After installing new tools
+**Framework mode** (in claude-test-skill): after modifying phase files, updating symlinks, installing tools.
 
-**Project mode** (in any project):
-- After adding new test modules
-- To verify all tests are discoverable by pytest
-- To check for fixture conflicts or order-dependent failures
-- To validate version-gated markers (v8, v9, etc.)
-- To ensure project tests don't duplicate /test phase functionality
+**Project mode** (any project):
+- After adding test modules
+- Verify pytest discoverability
+- Check fixture conflicts / order-dependent failures
+- Validate version-gated markers (v8, v9, etc.)
+- Ensure tests don't duplicate /test phase functionality
 
 ### What This Phase Does NOT Do:
-- Modify any files (reports only)
-- Run the actual test suite (uses `--collect-only` for discovery)
-- Auto-fix issues
+- Modify files (reports only)
+- Run the test suite (`--collect-only` only)
+- Auto-fix
 
 ### This Phase is EXCLUDED From:
 - Normal `/test` runs
 - Full audit cycles
 - Any tier-based execution
 
-It ONLY runs when explicitly called with `/test --phase=ST`.
+ONLY runs via `/test --phase=ST`.
