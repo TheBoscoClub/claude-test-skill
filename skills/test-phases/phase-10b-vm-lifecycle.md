@@ -16,7 +16,7 @@ Automatic VM startup/shutdown for isolated testing.
 ### Expected VM States
 
 | When | post_test_restore=true VM | Shared VM |
-|------|--------------------------|-----------|
+| --- | --- | --- |
 | Before `/test` | **Shut down + pristine** | Running or shut down |
 | During `/test` | Running (started by /test) | Running |
 | After Phase 11 | **Shut down (dirty)** | Restored to original state |
@@ -363,6 +363,7 @@ No test VM may have LIVE ACCESS to production storage.
 ## Install on Pristine VM (Called after VM boots)
 
 A VM started from a pristine snapshot (OS + deps, no app) must be bootstrapped before tests. The function:
+
 1. Detects app presence via `detects_pristine_by` in `vm-test-manifest.json`
 2. If pristine AND `install.required_on_pristine: true`: copies the project to the VM and runs the install command non-interactively (e.g., `install.sh --system`)
 3. Any service user/group is a no-login account created by the install script
@@ -610,11 +611,11 @@ shutdown_test_vm() {
             if sudo virsh snapshot-delete "$VM_NAME" "$PRE_TEST_SNAPSHOT" 2>/dev/null; then
                 echo "  ✅ Pre-test snapshot deleted"
             else
-                echo "  ⚠️ Failed to delete snapshot (cleanup manually)"
+                echo "  ⚠️ Failed to delete snapshot (the next /test Phase 1 sweep removes it)"
             fi
         else
-            echo "  ❌ Failed to revert to pre-test snapshot"
-            echo "     VM may have accumulated test artifacts"
+            echo "  ❌ Failed to revert to pre-test snapshot — kept as the only way back"
+            echo "     VM may have accumulated test artifacts; the next /test Phase 1 sweep deletes the snapshot"
         fi
     fi
     echo ""
@@ -686,7 +687,7 @@ shutdown_test_vm() {
 
 Dispatcher calls `start_test_vm` when `ISOLATION_LEVEL` is `vm-required` or `vm-recommended` AND Phase 2 detected `VM_AVAILABLE=true`:
 
-```
+```text
 # In dispatcher, after Discovery completes:
 if [[ "$ISOLATION_LEVEL" =~ ^vm-(required|recommended)$ ]] && [[ "$VM_AVAILABLE" == "true" ]]; then
     # Load and execute VM startup
@@ -699,7 +700,7 @@ fi
 
 Phase 11 calls `shutdown_test_vm`:
 
-```
+```text
 # In Phase 11 cleanup:
 source ~/.claude/skills/test-phases/phase-10b-vm-lifecycle.md
 shutdown_test_vm
@@ -728,6 +729,7 @@ VM info, revert to pre-test snapshot, snapshot deleted, shutdown, state file rem
 ## Manual Override
 
 Keep the VM running after /test:
+
 ```bash
 # Before running /test:
 export TEST_KEEP_VM_RUNNING=true
