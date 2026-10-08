@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **gstack companion references removed** (`commands/test.md` Companion Tools section, `phase-5a-security.md` `/gstack-cso` paragraph, `phase-9a-app-testing.md` companion list): the gstack skills were uninstalled from the host on 2026-10-08; `/test` never invoked them.
 - **`TaskOutput` dropped from the dispatcher's `allowed-tools`** (`commands/test.md`) — the tool no longer exists in Claude Code, so the entry granted nothing. Self-test 6.3 now expects 15 tools, and the `docs/ARCHITECTURE.md` tool table is corrected to the declared set (it listed `Task` and omitted `TaskGet` and `WebFetch`)
 
 ### Changed

@@ -698,18 +698,4 @@ ELSE (Autonomous - DEFAULT):
 
 ---
 
-## Companion Tools (out-of-phase, optional)
-
-Complementary gstack skills; they do not replace `/test`, and `/test` does not invoke them:
-
-- **`/gstack-health`** — fast 0-10 quality dashboard; daily pulse (`/test` weekly and before releases)
-- **`/gstack-cso --skills`** — skill-supply-chain audit (referenced in Phase 5a); run when `.claude/skills/` changes
-- **`/gstack-qa`**, **`/gstack-benchmark`**, **`/gstack-canary`** — web-facing companions for Phase 9a / 9b
-- **`/gstack-autoplan`** — strategic CEO/eng/design/DX sign-off after a clean `/test` when a release touches product decisions
-- **`/gstack-investigate`** — root-cause debugging when Phase 7 uncovers a failure auto-fix can't explain
-
-The `Governing Law` governs `/test`'s own phases, not companions. Running a companion never satisfies `/test`'s completeness requirement.
-
----
-
 *Document Version: 5.0.0 — unified sequential phase numbering (phase number = execution order)*
