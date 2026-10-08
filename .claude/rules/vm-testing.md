@@ -14,7 +14,7 @@
 sudo virsh list --all
 sudo virsh start test-vm-cachyos
 virt-viewer test-vm-cachyos
-sudo virsh snapshot-create-as test-vm-cachyos clean-install --description "Fresh install"
+sudo virsh snapshot-create-as test-vm-cachyos clean-install --description "Fresh install"   # VM shut off (see below)
 sudo virsh snapshot-revert test-vm-cachyos clean-install
 # Project pristine snapshots: each project's vm-test-manifest.json ("snapshot", "post_test_restore")
 ```
@@ -24,7 +24,7 @@ sudo virsh snapshot-revert test-vm-cachyos clean-install
 Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a **bidirectional lock**: only the named project may use that VM, and that project must not test on other VMs.
 
 | VM (generic pattern) | Exclusive To | Purpose | Snapshot |
-|----|-------------|---------|----------|
+| ---- | ------------- | --------- | ---------- |
 | `test-<project>-cachyos` | `<your-project>` | Integration/API/UI testing | `pristine-*` |
 | `qa-<project>-cachyos` | `<your-project>` | QA only — released versions, no test runs | `return-to-base-*` |
 | `test-vm-cachyos` | *(none)* | Default for all other projects | — |
@@ -42,7 +42,7 @@ Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a 
 ## VM Lifecycle for `post_test_restore=true` VMs
 
 | Phase | VM State | Action |
-|-------|----------|--------|
+| ------- | ---------- | -------- |
 | **Before /test** | Shut down + pristine | — |
 | **Startup (Phase 2/3)** | Check state | Running → dirty from interrupted test → force revert to pristine, then start. Shut down → start normally. |
 | **During testing** | Running | Install, deploy, test |
@@ -55,10 +55,16 @@ Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a 
 
 Shared VMs (no `post_test_restore`) use pre-test snapshots:
 
+**Internal snapshots need the VM SHUT OFF** (pflash firmware + raw NVRAM: a live
+`snapshot-create-as` fails with `require QCOW2 nvram format`; verified libvirt
+12.8.0, 2026-10-08, claude-test-skill-ijg). Snapshot first, then start.
+
 ```bash
-# 1. BEFORE tests
+# 1. BEFORE tests — VM must be shut off
+sudo virsh domstate test-vm-cachyos | grep -q 'shut off' || sudo virsh shutdown test-vm-cachyos
 sudo virsh snapshot-create-as test-vm-cachyos pre-test-$(date +%Y%m%d-%H%M%S) \
     --description "Pre-test state before /test run"
+sudo virsh start test-vm-cachyos
 # 2. RUN tests
 # 3. AFTER tests
 sudo virsh snapshot-revert test-vm-cachyos <snapshot-name>
@@ -69,7 +75,7 @@ sudo virsh snapshot-delete test-vm-cachyos <snapshot-name>
 ### Snapshot Types
 
 | Snapshot | Purpose | Lifetime |
-|----------|---------|----------|
+| ---------- | --------- | ---------- |
 | `pristine-*-YYYY-MM-DD` | Pristine OS + deps, no app (project-specific) | Permanent, authoritative |
 | `return-to-base-YYYY-MM-DD` | QA baseline: app installed + data populated | Permanent (QA VMs only) |
 | `clean-install` | Legacy baseline (fresh OS + SSH) | Permanent (fallback) |
