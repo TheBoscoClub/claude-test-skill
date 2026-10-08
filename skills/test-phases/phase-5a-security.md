@@ -12,8 +12,6 @@ Tests and mitigates all security issues across:
 
 Deep-dive audits: dispatcher may invoke the `security-scanner` agent (`agents/security-scanner.md`; OWASP Top 10, remediation guidance).
 
-**Optional companion**: if the project has `.claude/skills/` or uses host-global skills, `/gstack-cso --skills` scans skill files for curl-pipe-to-shell, unjustified credential access, writes outside the skill's directory, and MCP endpoints on non-public domains. Run out-of-phase when the skill inventory changes or before a release. Adds a layer; does not replace Phase 5a.
-
 ## Invocation
 
 ```bash
