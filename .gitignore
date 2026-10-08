@@ -162,7 +162,6 @@ nohup.out
 exit.*
 
 # Project-specific Claude instructions (local)
-CLAUDE.md
 
 # CLAUDE.md version history (zstd-compressed snapshots, managed by session-start hook)
 .claude-md-history/
@@ -330,3 +329,6 @@ test-*-[0-9][0-9].md
 
 # Claude workflow files — never commit (enforced by ~/.claude/scripts/lib-local-only.sh)
 SESSION_RECORD*.md.zst
+
+# CLAUDE.md and .claude/rules/ are tracked project content (2026-10-08); local-only values go here
+.claude/rules/local-*.md
