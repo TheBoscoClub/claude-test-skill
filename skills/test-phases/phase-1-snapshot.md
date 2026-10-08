@@ -1,10 +1,10 @@
-# Phase 1: Safety Snapshots (BTRFS + VM)
+# Phase 1: Safety Snapshot (BTRFS) + VM Pre-Test Sweep
 
-> **Model**: `haiku` | **Phase**: 1 | **Modifies Files**: No (creates snapshot)
+> **Model**: `haiku` | **Phase**: 1 | **Modifies Files**: No (creates a BTRFS snapshot; deletes leftover VM pre-test snapshots)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for btrfs/virsh commands. Use `Bash` with `timeout` if a snapshot command hangs.
 
-Create read-only safety snapshots before making changes.
+Create a read-only BTRFS safety snapshot before making changes, and sweep the project VM of `pre-test-*` internal snapshots left by earlier runs. Phase 1 does NOT create a VM snapshot: Phase 10b creates, records and deletes the one for this run (claude-test-skill-hyx, 2026-10-08 — Phase 1 used to create a second one that nothing ever deleted).
 
 ## Prerequisites
 
@@ -100,35 +100,19 @@ if [[ -n "$SNAPSHOT_PATH" ]]; then
 fi
 ```
 
-### VM Snapshot
+### Step 3: Sweep Leftover VM Pre-Test Snapshots (MANDATORY)
 
-VM comes from `vm-test-manifest.json` or `project-vm-map.json`.
+`~/.claude/scripts/vm-pretest-sweep.sh` is the single sweep (also run by `/close` in `--list` mode). It resolves the VM exactly as Phase 10b does (`vm-test-manifest.json` `vm_testing.default_vm`, overridden by `~/.claude/config/project-vm-map.json` `projects.<name>.vm`, default `test-vm-cachyos`), deletes every snapshot named `pre-test-YYYYMMDD-HHMMSS`, and touches no other name. A pre-test snapshot protects nothing once its run has ended, so none is ever kept. Internal snapshots of a pflash VM delete only while it is shut off; a running VM is reported and left for the next sweep.
 
 ```bash
-# Determine the project's test VM
-VM_NAME="test-vm-cachyos"  # default
-if [[ -f "vm-test-manifest.json" ]]; then
-  VM_NAME=$(python3 -c "import json; d=json.load(open('vm-test-manifest.json')); print(d.get('vm_testing',{}).get('default_vm','test-vm-cachyos'))" 2>/dev/null)
-fi
-
-if command -v virsh &>/dev/null && sudo virsh dominfo "$VM_NAME" &>/dev/null 2>&1; then
-  VM_STATE=$(sudo virsh domstate "$VM_NAME" 2>/dev/null | tr -d '[:space:]')
-  SNAP_NAME="pre-test-$TIMESTAMP"
-  SNAP_DESC="Pre-test snapshot for ${PROJECT_NAME} v$(cat VERSION 2>/dev/null || echo 'unknown')"
-
-  if sudo virsh snapshot-create-as "$VM_NAME" "$SNAP_NAME" "$SNAP_DESC"; then
-    echo "VM snapshot created: $SNAP_NAME on $VM_NAME (state: $VM_STATE)"
-  else
-    echo "VM snapshot failed (non-fatal) - continuing"
-  fi
-else
-  echo "virsh not available or $VM_NAME not found - skipping VM snapshot"
-fi
+~/.claude/scripts/vm-pretest-sweep.sh --project "$PROJECT_DIR"
+# exit 0: nothing left; 1: leftovers remain (VM running) — report them, do not fail the phase
 ```
 
 ## Recovery
 
 ### Restore BTRFS Snapshot
+
 ```bash
 # Delete current (if needed)
 sudo btrfs subvolume delete "$PROJECT_DIR"
@@ -138,15 +122,12 @@ sudo btrfs subvolume snapshot "$SNAPSHOT_PATH" "$PROJECT_DIR"
 ```
 
 ### Restore VM Snapshot
+
+The pre-test snapshot for the current run is created by Phase 10b and named in `.test-vm-state` (`pre_test_snapshot=`); Phase 10b cleanup reverts to it and deletes it.
+
 ```bash
-# List available snapshots
-sudo virsh snapshot-list $VM_NAME
-
-# Revert to pre-test snapshot
-sudo virsh snapshot-revert $VM_NAME "pre-test-YYYYMMDD-HHMMSS"
-
-# Delete a snapshot (optional cleanup)
-sudo virsh snapshot-delete $VM_NAME "pre-test-YYYYMMDD-HHMMSS"
+# VM must be shut off (pflash + raw NVRAM)
+sudo virsh snapshot-revert $VM_NAME "$(grep ^pre_test_snapshot= .test-vm-state | cut -d= -f2)"
 
 # For projects with post_test_restore=true in vm-test-manifest.json,
 # the Phase 11 cleanup automatically restores the VM to its pristine
@@ -156,6 +137,7 @@ sudo virsh snapshot-delete $VM_NAME "pre-test-YYYYMMDD-HHMMSS"
 ## Snapshot Naming Convention
 
 BTRFS snapshots from Phase 1:
+
 - **Location**: `$PROJECT_DIR/.snapshots/`
 - **Name**: `snap-pre-test-YYYYMMDD-HHMMSS`
 - **Type**: Read-only (`-r` flag)
@@ -165,6 +147,7 @@ Any other location or name makes the cleanup scan miss old snapshots.
 ## Output
 
 Report:
+
 - BTRFS snapshot path
-- VM snapshot name and VM state at snapshot time
+- VM pre-test sweep result (deleted names, or leftovers on a running VM)
 - Restore commands

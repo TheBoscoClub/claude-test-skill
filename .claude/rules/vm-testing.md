@@ -79,4 +79,4 @@ sudo virsh snapshot-delete test-vm-cachyos <snapshot-name>
 | `pristine-*-YYYY-MM-DD` | Pristine OS + deps, no app (project-specific) | Permanent, authoritative |
 | `return-to-base-YYYY-MM-DD` | QA baseline: app installed + data populated | Permanent (QA VMs only) |
 | `clean-install` | Legacy baseline (fresh OS + SSH) | Permanent (fallback) |
-| `pre-test-YYYYMMDD-HHMMSS` | State before a specific test run | Deleted after test |
+| `pre-test-YYYYMMDD-HHMMSS` | State before a specific test run | Deleted after test by Phase 10b; leftovers swept by `/test` Phase 1 (`~/.claude/scripts/vm-pretest-sweep.sh`) |
