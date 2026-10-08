@@ -2,10 +2,7 @@
 
 ## Default Test VM
 
-**example-test-vm**: CachyOS with KDE desktop, the VM's RAM, vCPUs and disk size
-- Location: `/var/lib/libvirt/images/example-test-vm.qcow2`
-- ISO Location: `/path/to/isos/`
-- Auto-Detection: Phase 10a automatically finds VMs with "test" or "dev" in the name
+**example-test-vm**: an existing libvirt VM. Image `/var/lib/libvirt/images/example-test-vm.qcow2`; ISOs `/path/to/isos/`. Phase 10a auto-detects VMs with "test" or "dev" in the name.
 
 ## Manifest Template
 
@@ -19,65 +16,53 @@ sudo virsh start example-test-vm
 virt-viewer example-test-vm
 sudo virsh snapshot-create-as example-test-vm clean-install --description "Fresh install"
 sudo virsh snapshot-revert example-test-vm clean-install
-# Project-specific pristine snapshots are defined in each project's vm-test-manifest.json
-# (see "snapshot" and "post_test_restore" fields)
+# Project pristine snapshots: each project's vm-test-manifest.json ("snapshot", "post_test_restore")
 ```
 
 ## VM Exclusivity Rules
 
-VM assignments are defined in `~/.claude/config/project-vm-map.json`. The `exclusive_to` field is a **bidirectional lock**: only the named project may use that VM, and no other project may.
+Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a **bidirectional lock**: only the named project may use that VM, and that project must not test on other VMs.
 
-**Example** (generic — actual assignments live in the JSON config):
-
-| VM | Exclusive To | Purpose | Snapshot |
+| VM (generic pattern) | Exclusive To | Purpose | Snapshot |
 |----|-------------|---------|----------|
 | `test-<project>-cachyos` | `<your-project>` | Integration/API/UI testing | `pristine-*` |
 | `qa-<project>-cachyos` | `<your-project>` | QA only — released versions, no test runs | `qa-baseline-*` |
 | `example-test-vm` | *(none)* | Default for all other projects | — |
 
-**Rules:**
-- VMs with `exclusive_to` set are reserved for the named project only. No other project may use them, and the named project must not use other VMs for testing.
-- QA VMs (if configured) receive only promoted releases — `/test` phases never run against them.
+- QA VMs receive only promoted releases — `/test` phases never run against them.
 - All other projects use `example-test-vm` (or any non-exclusive VM for cross-distro testing).
 
 ## When Phase 10a Runs
 
-- Project has `vm-test-manifest.json` with `"enabled": true`
+- `vm-test-manifest.json` has `"enabled": true`
 - Project has dangerous operations (PAM, systemd, kernel)
-- User explicitly requests `--phase=10a`
+- User requests `--phase=10a`
 - Phase 2/3 detects install scripts modifying system-level configs
 
 ## VM Lifecycle for `post_test_restore=true` VMs
 
-For exclusive VMs with `post_test_restore=true`, the expected lifecycle is:
-
 | Phase | VM State | Action |
 |-------|----------|--------|
 | **Before /test** | Shut down + pristine | — |
-| **Startup (Phase 2/3)** | Check state | If running → dirty from interrupted test → force revert to pristine, then start. If shut down → start normally. |
+| **Startup (Phase 2/3)** | Check state | Running → dirty from interrupted test → force revert to pristine, then start. Shut down → start normally. |
 | **During testing** | Running | Install, deploy, test |
 | **Cleanup (Phase 11)** | Running (dirty) | ALWAYS: revert to pristine, shut down, leave shut down |
 
-**Key rules:**
-- Revert ALWAYS discards the overlay (never `qemu-img commit` — that bakes test changes into the base)
-- Phase 11 shuts down and reverts regardless of who started the VM
-- The VM is left shut down and pristine, ready for the next test run
+- Revert ALWAYS discards the overlay (never `qemu-img commit` — bakes test changes into the base)
+- Phase 11 reverts and shuts down regardless of who started the VM
 
 ## VM Snapshot Workflow (Shared VMs)
 
-For shared VMs (no `post_test_restore`), use pre-test snapshots:
+Shared VMs (no `post_test_restore`) use pre-test snapshots:
 
 ```bash
-# 1. BEFORE tests: Create pre-test snapshot
+# 1. BEFORE tests
 sudo virsh snapshot-create-as example-test-vm pre-test-$(date +%Y%m%d-%H%M%S) \
     --description "Pre-test state before /test run"
-
 # 2. RUN tests
-
-# 3. AFTER tests: Revert to pre-test snapshot
+# 3. AFTER tests
 sudo virsh snapshot-revert example-test-vm <snapshot-name>
-
-# 4. CLEANUP: Delete the temporary pre-test snapshot
+# 4. CLEANUP
 sudo virsh snapshot-delete example-test-vm <snapshot-name>
 ```
 
@@ -85,7 +70,7 @@ sudo virsh snapshot-delete example-test-vm <snapshot-name>
 
 | Snapshot | Purpose | Lifetime |
 |----------|---------|----------|
-| `pristine-*-YYYY-MM-DD` | Pristine OS + deps, no app installed (project-specific) | Permanent, authoritative |
-| `qa-baseline-YYYY-MM-DD` | QA baseline with app installed + data populated | Permanent (QA VMs only) |
+| `pristine-*-YYYY-MM-DD` | Pristine OS + deps, no app (project-specific) | Permanent, authoritative |
+| `qa-baseline-YYYY-MM-DD` | QA baseline: app installed + data populated | Permanent (QA VMs only) |
 | `clean-install` | Legacy baseline (fresh OS + SSH) | Permanent (fallback) |
-| `pre-test-YYYYMMDD-HHMMSS` | State before specific test run | Deleted after test |
+| `pre-test-YYYYMMDD-HHMMSS` | State before a specific test run | Deleted after test |
