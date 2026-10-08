@@ -2,10 +2,7 @@
 
 ## Default Test VM
 
-**test-vm-cachyos**: CachyOS with KDE desktop, 4GB RAM, 4 vCPUs, 40GB disk
-- Location: `/var/lib/libvirt/images/test-vm-cachyos.qcow2`
-- ISO Location: `/hddRaid1/ISOs/`
-- Auto-Detection: Phase 10a automatically finds VMs with "test" or "dev" in the name
+**test-vm-cachyos**: CachyOS + KDE, 4GB RAM, 4 vCPUs, 40GB disk. Image `/var/lib/libvirt/images/test-vm-cachyos.qcow2`; ISOs `/hddRaid1/ISOs/`. Phase 10a auto-detects VMs with "test" or "dev" in the name.
 
 ## Manifest Template
 
@@ -19,65 +16,53 @@ sudo virsh start test-vm-cachyos
 virt-viewer test-vm-cachyos
 sudo virsh snapshot-create-as test-vm-cachyos clean-install --description "Fresh install"
 sudo virsh snapshot-revert test-vm-cachyos clean-install
-# Project-specific pristine snapshots are defined in each project's vm-test-manifest.json
-# (see "snapshot" and "post_test_restore" fields)
+# Project pristine snapshots: each project's vm-test-manifest.json ("snapshot", "post_test_restore")
 ```
 
 ## VM Exclusivity Rules
 
-VM assignments are defined in `~/.claude/config/project-vm-map.json`. The `exclusive_to` field is a **bidirectional lock**: only the named project may use that VM, and no other project may.
+Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a **bidirectional lock**: only the named project may use that VM, and that project must not test on other VMs.
 
-**Example** (generic — actual assignments live in the JSON config):
-
-| VM | Exclusive To | Purpose | Snapshot |
+| VM (generic pattern) | Exclusive To | Purpose | Snapshot |
 |----|-------------|---------|----------|
 | `test-<project>-cachyos` | `<your-project>` | Integration/API/UI testing | `pristine-*` |
 | `qa-<project>-cachyos` | `<your-project>` | QA only — released versions, no test runs | `return-to-base-*` |
 | `test-vm-cachyos` | *(none)* | Default for all other projects | — |
 
-**Rules:**
-- VMs with `exclusive_to` set are reserved for the named project only. No other project may use them, and the named project must not use other VMs for testing.
-- QA VMs (if configured) receive only promoted releases — `/test` phases never run against them.
+- QA VMs receive only promoted releases — `/test` phases never run against them.
 - All other projects use `test-vm-cachyos` (or any non-exclusive VM for cross-distro testing).
 
 ## When Phase 10a Runs
 
-- Project has `vm-test-manifest.json` with `"enabled": true`
+- `vm-test-manifest.json` has `"enabled": true`
 - Project has dangerous operations (PAM, systemd, kernel)
-- User explicitly requests `--phase=10a`
+- User requests `--phase=10a`
 - Phase 2/3 detects install scripts modifying system-level configs
 
 ## VM Lifecycle for `post_test_restore=true` VMs
 
-For exclusive VMs with `post_test_restore=true`, the expected lifecycle is:
-
 | Phase | VM State | Action |
 |-------|----------|--------|
 | **Before /test** | Shut down + pristine | — |
-| **Startup (Phase 2/3)** | Check state | If running → dirty from interrupted test → force revert to pristine, then start. If shut down → start normally. |
+| **Startup (Phase 2/3)** | Check state | Running → dirty from interrupted test → force revert to pristine, then start. Shut down → start normally. |
 | **During testing** | Running | Install, deploy, test |
 | **Cleanup (Phase 11)** | Running (dirty) | ALWAYS: revert to pristine, shut down, leave shut down |
 
-**Key rules:**
-- Revert ALWAYS discards the overlay (never `qemu-img commit` — that bakes test changes into the base)
-- Phase 11 shuts down and reverts regardless of who started the VM
-- The VM is left shut down and pristine, ready for the next test run
+- Revert ALWAYS discards the overlay (never `qemu-img commit` — bakes test changes into the base)
+- Phase 11 reverts and shuts down regardless of who started the VM
 
 ## VM Snapshot Workflow (Shared VMs)
 
-For shared VMs (no `post_test_restore`), use pre-test snapshots:
+Shared VMs (no `post_test_restore`) use pre-test snapshots:
 
 ```bash
-# 1. BEFORE tests: Create pre-test snapshot
+# 1. BEFORE tests
 sudo virsh snapshot-create-as test-vm-cachyos pre-test-$(date +%Y%m%d-%H%M%S) \
     --description "Pre-test state before /test run"
-
 # 2. RUN tests
-
-# 3. AFTER tests: Revert to pre-test snapshot
+# 3. AFTER tests
 sudo virsh snapshot-revert test-vm-cachyos <snapshot-name>
-
-# 4. CLEANUP: Delete the temporary pre-test snapshot
+# 4. CLEANUP
 sudo virsh snapshot-delete test-vm-cachyos <snapshot-name>
 ```
 
@@ -85,7 +70,7 @@ sudo virsh snapshot-delete test-vm-cachyos <snapshot-name>
 
 | Snapshot | Purpose | Lifetime |
 |----------|---------|----------|
-| `pristine-*-YYYY-MM-DD` | Pristine OS + deps, no app installed (project-specific) | Permanent, authoritative |
-| `return-to-base-YYYY-MM-DD` | QA baseline with app installed + data populated | Permanent (QA VMs only) |
+| `pristine-*-YYYY-MM-DD` | Pristine OS + deps, no app (project-specific) | Permanent, authoritative |
+| `return-to-base-YYYY-MM-DD` | QA baseline: app installed + data populated | Permanent (QA VMs only) |
 | `clean-install` | Legacy baseline (fresh OS + SSH) | Permanent (fallback) |
-| `pre-test-YYYYMMDD-HHMMSS` | State before specific test run | Deleted after test |
+| `pre-test-YYYYMMDD-HHMMSS` | State before a specific test run | Deleted after test |

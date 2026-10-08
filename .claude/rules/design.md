@@ -2,40 +2,28 @@
 
 ## Design Principles
 
-1. **Project-Agnostic**: The skill contains NO references to specific projects
-2. **Context-Efficient**: Phases load on-demand via subagents
-3. **Autonomous by Default**: Fixes all issues without prompting (unless `--interactive`)
+1. **Project-Agnostic**: NO references to specific projects
+2. **Context-Efficient**: phases load on demand via subagents
+3. **Autonomous by Default**: fixes all issues without prompting (unless `--interactive`)
 
 ## Verification in /test Phases
 
-These are concrete applications of the global Proof Principle and `[SI-GATE]` in `~/.claude/rules/verification.md` — proof means exercising the user-facing pathway, not just confirming code exists.
-
-After ANY fix applied by /test:
-- Phase 6 (Fix): After applying a fix, MUST verify the fix works
+Applications of the global Proof Principle / `[SI-GATE]` (`~/.claude/rules/verification.md`). After ANY fix applied by /test:
+- Phase 6 (Fix): MUST verify the fix works
 - Phase 9b (Production): MUST run wrapper scripts, not just check they exist
 - Phase 7 (Verify): MUST execute actual tests, not just check test files exist
 
 ## Project-Specific Test Modules
 
-**Status**: Partially implemented (QA modules)
+**Status**: partially implemented (QA modules). Shortcuts `qaapp`, `qadocker`, `qaall`; dispatcher (`commands/test.md`: shortcut routing + module loading) globs the project root for `test-*-qa-{app,docker,all}.md`:
 
-**Implemented**: QA module discovery for `qaapp`, `qadocker`, `qaall` shortcuts.
-Dispatcher looks for `test-*-qa-{app,docker,all}.md` in project root.
-
-**Architecture**:
 ```
-Project Root (any project using /test)
-├── test-$project-qa-app.md     # QA native app regression module
-├── test-$project-qa-docker.md  # QA Docker regression module
-└── test-$project-qa-all.md     # QA orchestrator (runs both sequentially)
+test-$project-qa-app.md     # QA native app regression module
+test-$project-qa-docker.md  # QA Docker regression module
+test-$project-qa-all.md     # QA orchestrator (runs both sequentially)
 ```
 
-**Execution Model**:
 - QA shortcuts are **standalone** — bypass the phase dependency system entirely
-- Each module is loaded as a self-contained subagent instruction file (judgement tier: `JUDGEMENT_MODEL`)
-- Dispatcher discovers modules via glob: `test-*-qa-{app,docker,all}.md`
+- Each module loads as a self-contained subagent instruction file (judgement tier: `JUDGEMENT_MODEL`)
 - Modules handle their own VM connectivity, version checks, upgrades, DB sync, regression
-
-**Files modified**: `commands/test.md` (shortcut routing + QA module loading logic)
-
-**Future expansion**: The `test-*-qa-*.md` glob pattern supports additional QA module types beyond app/docker/all.
+- The `test-*-qa-*.md` glob supports future QA module types beyond app/docker/all
