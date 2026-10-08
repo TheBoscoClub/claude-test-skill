@@ -4,42 +4,31 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for virsh commands (use `timeout` for hung operations). Use `AskUserQuestion` if VM fails to start and user needs to choose alternative.
 
-Manages automatic VM startup and shutdown for isolated testing.
+Automatic VM startup/shutdown for isolated testing.
 
 ## Purpose
 
-- **Start** the test VM when Phase 2/3 determines VM isolation is needed
-- **Detect dirty VMs** — if a `post_test_restore=true` VM is running at startup, an interrupted test left it dirty; revert to pristine before proceeding
-- **Track** that the VM was started by `/test` (to know what to cleanup)
-- **Cleanup (Phase 11)** — for `post_test_restore=true` VMs: shut down only (do NOT revert to pristine — that happens at the START of the next test run, preserving post-test state for investigation). For shared VMs: only shut down if `/test` started it
+- **Start** the test VM when Phase 2/3 requires VM isolation
+- **Detect dirty VMs**: a `post_test_restore=true` VM running at startup means an interrupted test; revert to pristine first
+- **Track** whether `/test` started the VM
+- **Cleanup (Phase 11)**: `post_test_restore=true` VMs: shut down only, do NOT revert (revert happens at the START of the next run, preserving post-test state). Shared VMs: shut down only if `/test` started it
 
 ### Expected VM States
 
 | When | post_test_restore=true VM | Shared VM |
 |------|--------------------------|-----------|
-| Before `/test` starts | **Shut down + pristine** | Running or shut down |
+| Before `/test` | **Shut down + pristine** | Running or shut down |
 | During `/test` | Running (started by /test) | Running |
-| After Phase 11 cleanup | **Shut down (dirty — preserves post-test state)** | Restored to original state |
-| Before next `/test` | **Reverted to pristine during startup** | Running or shut down |
+| After Phase 11 | **Shut down (dirty)** | Restored to original state |
+| Before next `/test` | **Reverted to pristine at startup** | Running or shut down |
 
 ## Default Test VM
 
-**VM Name**: `test-vm-cachyos`
-- CachyOS with KDE desktop
-- 4GB RAM, 4 vCPUs, 40GB disk
-- VNC: 127.0.0.1:5900
+`test-vm-cachyos`: CachyOS + KDE, 4GB RAM, 4 vCPUs, 40GB disk, VNC 127.0.0.1:5900.
 
 ## VM Lifecycle State File
 
-Track VM state in project directory:
-```
-.test-vm-state
-├── vm_name: test-vm-cachyos
-├── started_by_test: true/false
-├── start_time: timestamp
-├── isolation_level: vm-required/vm-recommended
-└── original_state: running/stopped
-```
+State file `.test-vm-state` in the project directory.
 
 ## Start VM (Called after Discovery)
 
@@ -365,23 +354,18 @@ EOF
 
 ## Production Data Isolation (MANDATORY)
 
-**No test VM managed by this lifecycle module may have LIVE ACCESS to production storage.**
+No test VM may have LIVE ACCESS to production storage.
 
-- **NEVER** configure NFS, CIFS, virtiofs, or virtio-9p mounts from the host's production paths into the VM
-- Copying data *into* the VM (scp, rsync) is fine — once on the VM's disk, it's isolated
-- Test VM libraries should be ≤275GB on the VM's own disk
+- **NEVER** configure NFS, CIFS, virtiofs, or virtio-9p mounts from host production paths into the VM
+- Copying data *into* the VM (scp, rsync) is fine
+- Test VM libraries ≤275GB on the VM's own disk
 
 ## Install on Pristine VM (Called after VM boots)
 
-When a VM starts from a pristine snapshot (OS + deps only, no application installed),
-the test framework must bootstrap the application before tests can run.
-
-This function:
-1. Detects whether the app is installed (using the `detects_pristine_by` check from `vm-test-manifest.json`)
-2. If pristine AND `vm-test-manifest.json` has an `install` section with `required_on_pristine: true`:
-   - Copies the project to the VM
-   - Runs the install command non-interactively (e.g., `install.sh --system`)
-3. The service user/group (if any) is a no-login service account created by the install script
+A VM started from a pristine snapshot (OS + deps, no app) must be bootstrapped before tests. The function:
+1. Detects app presence via `detects_pristine_by` in `vm-test-manifest.json`
+2. If pristine AND `install.required_on_pristine: true`: copies the project to the VM and runs the install command non-interactively (e.g., `install.sh --system`)
+3. Any service user/group is a no-login account created by the install script
 
 ```bash
 install_on_pristine_vm() {
@@ -700,9 +684,7 @@ shutdown_test_vm() {
 
 ### After Phase 3 (Discovery) Completes
 
-The dispatcher should call `start_test_vm` when:
-1. Discovery determines `ISOLATION_LEVEL` is `vm-required` or `vm-recommended`
-2. Phase 2 (Pre-Flight) detected `VM_AVAILABLE=true`
+Dispatcher calls `start_test_vm` when `ISOLATION_LEVEL` is `vm-required` or `vm-recommended` AND Phase 2 detected `VM_AVAILABLE=true`:
 
 ```
 # In dispatcher, after Discovery completes:
@@ -715,7 +697,7 @@ fi
 
 ### During Phase 11 (Cleanup)
 
-Phase 11 should call `shutdown_test_vm` to clean up:
+Phase 11 calls `shutdown_test_vm`:
 
 ```
 # In Phase 11 cleanup:
@@ -725,108 +707,27 @@ shutdown_test_vm
 
 ## State File Format
 
-`.test-vm-state` contains:
-```
-vm_name=test-vm-cachyos
-started_by_test=true
-original_state=shutoff
-isolation_level=vm-required
-start_time=2026-02-18T15:30:00-05:00
-vm_ip=192.168.122.45
-vnc_port=5900
-pre_test_snapshot=pre-test-20260218-153000
-```
+`.test-vm-state` keys: `vm_name`, `started_by_test`, `original_state`, `isolation_level`, `start_time`, `vm_ip`, `vnc_port`, `pre_test_snapshot` (plus `pristine_type`, `pristine_path`, `active_disk` for external_qcow2).
 
 ## Report Format
 
+Report the echo output of `start_test_vm` / `shutdown_test_vm` as printed.
+
 ### Startup Report
-```
-═══════════════════════════════════════════════════════════════════
-  VM LIFECYCLE: STARTUP
-═══════════════════════════════════════════════════════════════════
 
-  Isolation Level: vm-required
-  VM isolation required/recommended
-
-  Selected VM: test-vm-cachyos
-  Current State: shutoff
-  Reverting to pristine snapshot...
-  Starting VM...
-  ✅ VM started successfully
-  Waiting for VM to boot (30s)...
-
-  📝 State saved to: .test-vm-state
-  🌐 VM IP: 192.168.122.45
-  🖥️  VNC: 127.0.0.1:5900
-
-  📸 Creating pre-test snapshot: pre-test-20260218-153000
-  ✅ Pre-test snapshot created
-
-───────────────────────────────────────────────────────────────────
-  VM READY FOR TESTING
-───────────────────────────────────────────────────────────────────
-
-VM Name: test-vm-cachyos
-Started by /test: true
-State File: .test-vm-state
-Pre-test Snapshot: pre-test-20260218-153000
-```
+Banner, isolation level, selected VM, state, boot, state file, VM IP, VNC, pre-test snapshot, "VM READY FOR TESTING".
 
 ### Cleanup Report (post_test_restore=true)
-```
-───────────────────────────────────────────────────────────────────
-  VM Lifecycle Cleanup
-───────────────────────────────────────────────────────────────────
 
-  VM: test-audiobook-cachyos
-  Started by /test: true
-  Original State: shutoff
-  Pre-test Snapshot: none
-
-  post_test_restore=true — shutting down VM only (preserving post-test state)
-  Will revert to pristine at start of next test run.
-
-  Attempting graceful shutdown...
-    Waiting... (5s)
-    Waiting... (10s)
-  ✅ VM shut down gracefully
-  ✅ VM shut down. Will revert to pristine at start of next test run.
-
-  📝 Removed state file: .test-vm-state
-```
+VM info, "shutting down VM only (preserving post-test state)", graceful shutdown, state file removed.
 
 ### Cleanup Report (shared VM)
-```
-───────────────────────────────────────────────────────────────────
-  VM Lifecycle Cleanup
-───────────────────────────────────────────────────────────────────
 
-  VM: test-vm-cachyos
-  Started by /test: true
-  Original State: shutoff
-  Pre-test Snapshot: pre-test-20260218-153000
-
-  📸 Reverting to pre-test snapshot: pre-test-20260218-153000
-  ✅ Reverted to pre-test state
-  🗑️  Deleting temporary snapshot...
-  ✅ Pre-test snapshot deleted
-
-  Shutting down VM to preserve system resources...
-  Attempting graceful shutdown...
-    Waiting... (5s)
-    Waiting... (10s)
-  ✅ VM shut down gracefully
-
-  📝 Removed state file: .test-vm-state
-
-VM Cleanup Complete:
-  - VM test-vm-cachyos stopped
-  - System resources freed (4GB RAM, 4 vCPUs)
-```
+VM info, revert to pre-test snapshot, snapshot deleted, shutdown, state file removed, "VM Cleanup Complete".
 
 ## Manual Override
 
-To keep the VM running after /test completes:
+Keep the VM running after /test:
 ```bash
 # Before running /test:
 export TEST_KEEP_VM_RUNNING=true

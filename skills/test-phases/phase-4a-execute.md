@@ -4,13 +4,13 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for test execution and coverage (use `timeout` for hung processes). `Read`, `Grep` for failure analysis.
 
-Run the project's test suite with coverage, parse results, analyze failures, and produce a structured report for downstream phases.
+Run the test suite with coverage, parse results, analyze failures, produce a structured report for downstream phases.
 
 ---
 
 ## Step 1: Detect Project Type & Test Framework
 
-Determine the project type from files present in the project root. Check in order — a project may have multiple (e.g., Python + Docker). Use the FIRST match as the primary framework.
+Detect from root files, in order; use the FIRST match as primary framework.
 
 | Marker File | Project Type | Test Runner | Coverage Tool |
 |-------------|-------------|-------------|---------------|
@@ -40,15 +40,15 @@ else
 fi
 ```
 
-If Phase 1 output is available, use its detected project type and any custom test flags instead of re-detecting.
+If Phase 1 output exists, use its project type and custom test flags instead of re-detecting.
 
 ---
 
 ## Step 2: Run Tests with Coverage
 
-Execute tests with a **5-minute timeout** per test suite. Capture all output to `test-output.log`. Run coverage collection inline with tests — do NOT run tests twice (once without coverage, once with).
-
-**PYTEST_EXTRA_FLAGS**: If the dispatcher set this from Phase 1 discovery (e.g., `--vm --hardware` for projects with custom pytest markers), include it. In autonomous mode, defaults to empty (unit tests only).
+- **5-minute timeout** per suite; capture all output to `test-output.log`.
+- Collect coverage inline; do NOT run tests twice.
+- **PYTEST_EXTRA_FLAGS**: include if the dispatcher set it from Phase 1 discovery (e.g., `--vm --hardware`); autonomous default is empty (unit tests only).
 
 ### Python
 
@@ -126,7 +126,7 @@ TEST_EXIT=$?
 
 ### Timeout Handling
 
-If `timeout` exits with code 124, the test suite was killed for exceeding the 5-minute limit. Record this as a critical failure:
+Exit code 124 = killed at the 5-minute limit; record as critical failure:
 
 ```bash
 if [ "$TEST_EXIT" -eq 124 ]; then
@@ -134,13 +134,13 @@ if [ "$TEST_EXIT" -eq 124 ]; then
 fi
 ```
 
-If a test process hangs, use `timeout --signal=KILL` to forcefully terminate it and its subprocesses.
+For hung processes use `timeout --signal=KILL` (kills subprocesses too).
 
 ---
 
 ## Step 3: Parse Test Results
 
-Extract structured counts from `test-output.log`. Parsing varies by framework.
+Extract counts from `test-output.log` per framework.
 
 ### Python (pytest)
 
@@ -218,14 +218,11 @@ fi
 
 ## Step 4: Failure Analysis
 
-For each failed test, perform root-cause analysis. Skip this step if all tests passed.
+Root-cause each failed test. Skip if all passed.
 
 ### 4a. Collect Failure Details
 
-For each failure, extract:
-- **Test name** and **file:line** location
-- **Error type**: assertion, exception, timeout, setup/fixture, import
-- **Error message** and **stack trace** (truncated to 15 lines max)
+Per failure extract: **test name**, **file:line**, **error type** (assertion, exception, timeout, setup/fixture, import), **error message** and **stack trace** (max 15 lines).
 
 ```bash
 # Python (pytest) — extract FAILED blocks from test-output.log
@@ -237,18 +234,18 @@ grep -B 20 "^FAILED " test-output.log
 
 | Category | Signal | Likely Root Cause |
 |----------|--------|-------------------|
-| **Assertion** | `AssertionError`, `AssertionFailure` | Expected behavior changed — code bug or outdated test expectation |
-| **Exception** | `TypeError`, `KeyError`, `ValueError`, `NullPointerException` | Missing null check, wrong type, API contract broken |
-| **Timeout** | `TimeoutError`, exit code 124 | Infinite loop, deadlock, slow external dependency |
-| **Setup/Fixture** | `fixture not found`, `setUp failed`, `before() error` | Missing test dependency, broken fixture, environment issue |
+| **Assertion** | `AssertionError`, `AssertionFailure` | Behavior changed: code bug or outdated expectation |
+| **Exception** | `TypeError`, `KeyError`, `ValueError`, `NullPointerException` | Missing null check, wrong type, broken API contract |
+| **Timeout** | `TimeoutError`, exit code 124 | Infinite loop, deadlock, slow dependency |
+| **Setup/Fixture** | `fixture not found`, `setUp failed`, `before() error` | Missing dependency, broken fixture, environment |
 | **Import** | `ImportError`, `ModuleNotFoundError` | Missing dependency, wrong virtualenv, circular import |
-| **Flaky** | Passed on previous runs, fails intermittently | Race condition, time-dependent, external service dependency |
+| **Flaky** | Passed before, fails intermittently | Race, time-dependent, external service |
 
-For complex or recurring test failures, the dispatcher may invoke the `test-analyzer` agent (see `agents/test-analyzer.md`), which performs deeper root-cause analysis including flakiness detection and affected code path tracing.
+For complex or recurring failures the dispatcher may invoke the `test-analyzer` agent (`agents/test-analyzer.md`): deeper root-cause, flakiness detection, code path tracing.
 
 ### 4c. Check Git History for Recent Changes
 
-For each failing test's source file AND the code file it tests:
+For each failing test's file AND the code it tests:
 
 ```bash
 # Check if the failing file or its test target changed recently
@@ -259,26 +256,26 @@ git log --oneline -5 -- <test_file>
 git diff HEAD~5 -- <source_file>
 ```
 
-If a file was modified in the last 5 commits, the failure is likely a **regression** — flag it as higher priority.
+File modified in last 5 commits = likely **regression**; flag higher priority.
 
 ### 4d. Determine Fix Complexity
 
 | Complexity | Criteria | Examples |
 |------------|----------|----------|
-| **Trivial** | Typo, wrong constant, simple value fix | Wrong expected value in assertion |
-| **Low** | One-line logic fix, missing null check | Add `if x is not None` guard |
-| **Medium** | Multi-line change, needs refactoring | Missing edge case handling, API contract change |
-| **High** | Architectural issue, design flaw | Circular dependency, fundamental race condition |
+| **Trivial** | Typo, wrong constant/value | Wrong expected value |
+| **Low** | One-line logic fix | Add `if x is not None` guard |
+| **Medium** | Multi-line, refactoring | Missing edge case, API contract change |
+| **High** | Architectural/design flaw | Circular dependency, fundamental race |
 
 ---
 
 ## Step 5: Identify Low-Coverage Areas
 
-Skip this step if coverage data is unavailable.
+Skip if no coverage data.
 
 ### Coverage Threshold
 
-Default coverage target: **80%** (configurable per project via `pyproject.toml` `[tool.coverage.report] fail_under`, `jest.config.js` `coverageThreshold`, or `Cargo.toml` `[package.metadata.tarpaulin]`).
+Default target **80%** (per-project override: `pyproject.toml` `[tool.coverage.report] fail_under`, `jest.config.js` `coverageThreshold`, `Cargo.toml` `[package.metadata.tarpaulin]`).
 
 ### Flag Problem Files
 
@@ -298,20 +295,18 @@ for fname, data in sorted(files.items(), key=lambda x: x[1].get('summary',{}).ge
 " 2>/dev/null
 ```
 
-Priority for coverage improvement:
-1. **Files < 50%**: Critical — likely core logic with no tests
-2. **Files 50-79%**: Low — error handling or edge cases untested
-3. **Files >= 80%**: Acceptable — minor gaps
+Priority:
+1. **Files < 50%**: Critical (core logic untested)
+2. **Files 50-79%**: Low (error handling/edge cases untested)
+3. **Files >= 80%**: Acceptable
 
-For deep coverage analysis beyond these automated checks, the dispatcher may invoke the `coverage-reviewer` agent (see `agents/coverage-reviewer.md`), which provides targeted test recommendations and priority rankings for coverage gaps.
+For deeper analysis the dispatcher may invoke the `coverage-reviewer` agent (`agents/coverage-reviewer.md`): targeted test recommendations and gap priorities.
 
 ---
 
 ## Step 6: Test Fixture Schema Compliance
 
-If a canonical schema file exists (e.g., `schema.sql`, `migrations/`), verify that all test fixture DDL matches it exactly. Test fixtures with divergent schemas mask production bugs — tests pass against wrong table definitions while the real database uses different column names, types, or constraints.
-
-This check applies to **all languages** — Python `CREATE TABLE` in test fixtures, Go test helpers, Rust `#[test]` setup code, etc.
+If a canonical schema exists (e.g., `schema.sql`, `migrations/`), all test fixture DDL must match it exactly (divergent fixtures mask production bugs). Applies to **all languages** (Python fixtures, Go helpers, Rust `#[test]` setup, etc.).
 
 ```bash
 echo ""
@@ -401,7 +396,7 @@ fi
 
 ## Phase Output
 
-This phase MUST produce the following structured output. Downstream phases (especially Phase 6 Fix) depend on this exact format.
+MUST produce this exact format (Phase 6 Fix depends on it).
 
 ```
 ===============================================================
@@ -466,28 +461,28 @@ Coverage Gap: 5.8% below target
 
 ### Output Fields Reference
 
-These fields are consumed by Phase 6 (Fix) and the final report:
+Consumed by Phase 6 (Fix) and the final report:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `PROJECT_TYPE` | string | Detected project type (python, node, go, rust, make, php, unknown) |
-| `TEST_RUNNER` | string | Actual test runner used (pytest, jest, go test, cargo test, etc.) |
-| `TEST_EXIT_CODE` | int | Exit code from the test runner (0=pass, 1=fail, 124=timeout) |
-| `TOTAL` | int | Total tests discovered and executed |
-| `PASSED` | int | Tests that passed |
-| `FAILED` | int | Tests that failed |
-| `SKIPPED` | int | Tests skipped or ignored |
-| `ERRORS` | int | Collection/setup errors (distinct from test failures) |
-| `DURATION` | string | Total test execution time |
-| `COVERAGE_PCT` | float | Overall coverage percentage (or "?" if unavailable) |
-| `COVERAGE_TARGET` | int | Target coverage percentage (default 80) |
-| Per-failure: `Test` | string | Test function/method name |
-| Per-failure: `Location` | string | file:line of the failing test |
+| `PROJECT_TYPE` | string | python, node, go, rust, make, php, unknown |
+| `TEST_RUNNER` | string | runner used (pytest, jest, go test, cargo test, etc.) |
+| `TEST_EXIT_CODE` | int | runner exit code (0=pass, 1=fail, 124=timeout) |
+| `TOTAL` | int | tests executed |
+| `PASSED` | int | passed |
+| `FAILED` | int | failed |
+| `SKIPPED` | int | skipped/ignored |
+| `ERRORS` | int | collection/setup errors (not test failures) |
+| `DURATION` | string | total time |
+| `COVERAGE_PCT` | float | overall % ("?" if unavailable) |
+| `COVERAGE_TARGET` | int | target % (default 80) |
+| Per-failure: `Test` | string | test name |
+| Per-failure: `Location` | string | file:line |
 | Per-failure: `Category` | string | Assertion, Exception, Timeout, Setup, Import, Flaky |
-| Per-failure: `Error` | string | Error message (one line) |
-| Per-failure: `Root Cause` | string | Source file:line and explanation |
+| Per-failure: `Error` | string | one-line message |
+| Per-failure: `Root Cause` | string | source file:line + explanation |
 | Per-failure: `Complexity` | string | Trivial, Low, Medium, High |
-| Per-failure: `Suggestion` | string | Recommended fix action |
+| Per-failure: `Suggestion` | string | fix action |
 
 ### Exit Criteria
 
@@ -502,7 +497,7 @@ These fields are consumed by Phase 6 (Fix) and the final report:
 
 ## Cleanup
 
-Remove temporary test artifacts after output is captured:
+Remove temp artifacts after output is captured:
 
 ```bash
 # Clean up generated files (keep test-output.log for Phase 6)

@@ -4,11 +4,7 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for system validation (use `timeout` for hung service checks). Use `AskUserQuestion` in `--interactive` mode for production remediation decisions.
 
-Validate that a project's installed production application is running correctly. Compares expected state (from `install-manifest.json` + install script analysis) against actual system state.
-
-**Key Difference from Phase 9a:** Phase 9a tests installation *in a sandbox*. Phase 9b validates *live production*.
-
-**Prerequisites:** Application must already be installed on the system.
+Validate the live installed app: compare expected state (`install-manifest.json` + install script analysis) to actual system state. Unlike Phase 9a (sandbox install), this checks live production. Prerequisite: app already installed.
 
 ## Manifest: `install-manifest.json`
 
@@ -134,7 +130,7 @@ validate_binaries() {
 
 ## Step 2b: Validate Wrapper Script Targets
 
-Wrapper scripts in `/usr/local/bin/` that `exec` into other scripts will fail silently if the target is missing.
+`/usr/local/bin/` wrappers that `exec` a missing target fail silently.
 
 ```bash
 validate_wrapper_targets() {
@@ -310,7 +306,7 @@ validate_permissions_and_ownership() {
 
 ## Step 5b: Validate Production/Development Separation
 
-Production installations MUST NOT reference development directories.
+Production MUST NOT reference development directories.
 
 ```bash
 validate_prod_dev_separation() {

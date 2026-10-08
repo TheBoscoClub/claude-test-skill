@@ -3,16 +3,16 @@
 > **Model**: `judgement` | **Phase**: 5a | **Modifies Files**: No (read-only)
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for security scanners, `WebSearch` to look up CVE details and check for known exploits for flagged vulnerabilities. Use `AskUserQuestion` in `--interactive` mode for security remediation decisions (e.g., breaking change vs. patching). Parallelize with other phase 5 phases. Includes cross-component data flow tracing and unvalidated input detection.
-> **Rate Limiting**: GitHub API calls are subject to rate limits. Use `gh api --cache 60s` where possible. Check `gh api rate_limit` before bulk API operations.
+> **Rate Limiting**: Use `gh api --cache 60s`; check `gh api rate_limit` before bulk API operations.
 
-**THE security phase** - tests and mitigates all security issues across:
-- **GitHub** - Repository security settings, alerts, workflows
-- **Local Project** - Code vulnerabilities, secrets, dependencies, SAST
-- **Installed App** - Production security verification (when applicable)
+Tests and mitigates all security issues across:
+- **GitHub** - repo security settings, alerts, workflows
+- **Local Project** - code vulns, secrets, dependencies, SAST
+- **Installed App** - production security (when applicable)
 
-For targeted deep-dive security audits beyond the automated checks below, the dispatcher may invoke the `security-scanner` agent (see `agents/security-scanner.md`), which provides OWASP Top 10 coverage and detailed remediation guidance.
+Deep-dive audits: dispatcher may invoke the `security-scanner` agent (`agents/security-scanner.md`; OWASP Top 10, remediation guidance).
 
-**Optional companion for skill supply-chain exposure**: when the project contains `.claude/skills/` or uses host-global skills, `/gstack-cso --skills` covers a blind spot of this phase — it scans skill files for curl-pipe-to-shell, unjustified credential access, writes outside the skill's own directory, and MCP server endpoints pointing at non-public domains. Run it out-of-phase when the skill inventory changes or before a release. It does not replace Phase 5a; it adds a layer Phase 5a does not cover.
+**Optional companion**: if the project has `.claude/skills/` or uses host-global skills, `/gstack-cso --skills` scans skill files for curl-pipe-to-shell, unjustified credential access, writes outside the skill's directory, and MCP endpoints on non-public domains. Run out-of-phase when the skill inventory changes or before a release. Adds a layer; does not replace Phase 5a.
 
 ## Invocation
 
@@ -163,7 +163,7 @@ echo "Primary language: $PRIMARY_LANG"
 
 ## Section 1: GitHub Security
 
-Tests and mitigates GitHub repository security settings and alerts.
+Tests and mitigates GitHub repo security settings and alerts.
 
 ```bash
 echo ""
@@ -576,7 +576,7 @@ fi
 
 ## Cross-Component Data Flow Analysis
 
-Every phase must analyze security holistically — not just within individual files but across the entire project's data flows. This section is mandatory for all /test audits.
+Mandatory for all /test audits: analyze security across the project's data flows, not just per file.
 
 ### 3a. Map Entry Points
 
@@ -654,7 +654,7 @@ grep -rn "req\.\(body\|params\|query\)\." --include="*.js" --include="*.ts" "$PR
   | grep -v "node_modules\|.snapshots\|test" | head -30
 ```
 
-Report: List each data flow (entry -> storage -> exit) and flag unvalidated paths.
+Report each data flow (entry -> storage -> exit); flag unvalidated paths.
 
 ### Data Flow Checklist
 
@@ -709,13 +709,13 @@ echo "════════════════════════�
 ## Integration Notes
 
 ### Invocation:
-- `/test` - Phase 5a runs in the analysis group
-- `/test --phase=5` or `/test --phase=SEC` - Standalone
-- `/test --phase=5 --audit-only` - No auto-fixes
+- `/test` - analysis group
+- `/test --phase=5` or `--phase=SEC` - standalone
+- `/test --phase=5 --audit-only` - no auto-fixes
 
 ### Auto-Mitigation:
 - Enables GitHub Dependabot/security features
-- Runs `pip-audit --fix` and `npm audit fix`
+- `pip-audit --fix`, `npm audit fix`
 - Fixes file permissions
 
 ### Tool Requirements:

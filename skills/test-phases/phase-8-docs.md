@@ -6,8 +6,6 @@
 
 ## Execution Mode
 
-This phase behaves differently based on execution mode:
-
 | Mode | Behavior |
 |------|----------|
 | **Autonomous** (default) | Fix ALL doc issues, always runs, no recommendations |
@@ -17,28 +15,26 @@ This phase behaves differently based on execution mode:
 
 ## Autonomous Mode (Default)
 
-**CRITICAL: This phase MUST fix ALL documentation issues, not just report them.**
+**CRITICAL: MUST fix ALL documentation issues, not just report them.**
 
-Documentation is code. If it's wrong, fix it. If it's missing, add it. If it's obsolete, remove it.
+Wrong: fix. Missing: add. Obsolete: remove.
 
-This phase ALWAYS runs in autonomous mode, even if prior phases had failures.
-Documentation must stay synchronized regardless of code state.
+ALWAYS runs, even if prior phases failed.
 
 ---
 
 ## Interactive Mode (`--interactive`)
 
-When running with `--interactive`, this phase:
-- May skip if prior phases failed (success gate behavior)
+- May skip if prior phases failed
 - May output "recommendations" instead of fixing
-- May leave complex documentation decisions to user
+- May leave complex decisions to user
 
 ---
 
 ## Core Directive
 
-Documentation MUST remain synchronized with:
-- Current codebase state
+Docs MUST stay synchronized with:
+- Codebase state
 - VERSION file (single source of truth for version)
 - Docker image versions
 - install-manifest.json
@@ -79,13 +75,13 @@ grep -rn "/hddRaid1/ClaudeCodeProjects" --include="*.md" --include="*.sh"
 ```
 
 **Fix by:**
-- Replacing dev paths with generic placeholders (`<project-root>`, `<install-dir>`)
-- Using production paths where appropriate (from install manifest or project config)
+- Replacing dev paths with placeholders (`<project-root>`, `<install-dir>`)
+- Using production paths where appropriate (install manifest or project config)
 - Removing references to deleted files/directories
 
 ### 3. README Completeness
 
-Check and ADD missing sections:
+ADD missing sections:
 - Installation instructions
 - Usage examples with current syntax
 - Configuration options (matching actual config)
@@ -104,7 +100,7 @@ fi
 
 ### 4a. Git Commit Synchronization
 
-**CRITICAL: Documentation MUST reflect recent commits.**
+**CRITICAL: Docs MUST reflect recent commits.**
 
 ```bash
 # Get commits since last documented version
@@ -150,17 +146,17 @@ fi
    ```
 
 2. **Cross-reference changed files with docs**:
-   - If `src/api/` changed → check API documentation
-   - If `install.sh` changed → check installation docs
-   - If `config/` changed → check configuration docs
-   - If phase files changed → check dispatcher and README
+   - `src/api/` changed → API docs
+   - `install.sh` changed → installation docs
+   - `config/` changed → configuration docs
+   - phase files changed → dispatcher and README
 
 3. **Verify CHANGELOG completeness**:
-   - Every `feat:` commit since last release → in Added section
-   - Every `fix:` commit since last release → in Fixed section
-   - Every `BREAKING` commit → in Changed section with migration notes
+   - Every `feat:` commit since last release → Added section
+   - Every `fix:` commit since last release → Fixed section
+   - Every `BREAKING` commit → Changed section with migration notes
 
-4. **Fix documentation gaps**:
+4. **Fix gaps**:
    - Add missing features to CHANGELOG
    - Update README if major features added
    - Add migration notes for breaking changes
@@ -168,19 +164,16 @@ fi
 
 ### 5. API Documentation
 
-For each endpoint in codebase:
-- Verify it's documented
-- Verify documentation matches implementation
-- Fix any discrepancies
+For each endpoint in codebase: verify it's documented and matches implementation; fix discrepancies.
 
 ### 6. Docker Documentation
 
 Verify and fix:
 - Dockerfile version labels match VERSION
-- docker-compose.yml examples are current
-- Environment variables documented match actual
-- Port mappings are accurate
-- Volume mounts are accurate
+- docker-compose.yml examples current
+- Environment variables match actual
+- Port mappings accurate
+- Volume mounts accurate
 
 ### 7. Obsolete Content Removal
 
@@ -193,7 +186,7 @@ Remove references to:
 
 ### 7a. AI Self-Promotion Purge
 
-**MANDATORY: Scan all documentation for AI-generated self-promotion, advertising, branding, and attribution.** Remove everything found — do not replace with alternative attribution.
+**MANDATORY: Scan all docs for AI-generated self-promotion, advertising, branding, and attribution.** Remove everything found; do NOT replace with alternative attribution.
 
 ```bash
 echo "=== AI Self-Promotion Purge (Documentation) ==="
@@ -222,24 +215,24 @@ fi
 ```
 
 **For each finding:**
-1. Read the file to understand context
-2. Remove the entire self-promotion line or block
-3. Do NOT add any replacement attribution
+1. Read the file for context
+2. Remove the whole self-promotion line or block
+3. Do NOT add replacement attribution
 4. Emit an FVP proof block showing the removal
 
-**Common patterns to remove:**
-- Footer lines like `🤖 Generated with [Claude Code](https://claude.ai/claude-code)`
-- PR template blocks that auto-inject AI branding
+**Patterns to remove:**
+- Footers like `🤖 Generated with [Claude Code](https://claude.ai/claude-code)`
+- PR template blocks injecting AI branding
 - README badges referencing AI tools
-- CHANGELOG entries that mention AI assistance
-- Commit message templates with `Co-Authored-By: Claude` lines
+- CHANGELOG entries mentioning AI assistance
+- Commit templates with `Co-Authored-By: Claude`
 
 ### 8. Docstring/Comment Updates
 
-For code that changed in this audit:
-- Update function docstrings
-- Update inline comments
-- Update type hints documentation
+For code changed in this audit, update:
+- Function docstrings
+- Inline comments
+- Type hints documentation
 
 ## Execution Flow
 
@@ -306,22 +299,11 @@ Status: ✅ PASS - All documentation synchronized with current commits
 
 ### Autonomous Mode (Default)
 
-This phase does NOT output "recommendations" or "suggestions".
-
-If documentation is wrong → FIX IT
-If documentation is missing → ADD IT
-If documentation is obsolete → REMOVE IT
-
-The only output is a report of what was FIXED.
+NO "recommendations" or "suggestions". Wrong → FIX. Missing → ADD. Obsolete → REMOVE. Output only a report of what was FIXED.
 
 ### Interactive Mode (`--interactive`)
 
-In interactive mode, this phase MAY:
-- Output recommendations for complex documentation decisions
-- Skip if prior phases failed
-- Leave ambiguous documentation for user review
-
-Interactive mode output may include:
+MAY output recommendations for complex decisions, skip if prior phases failed, and leave ambiguous docs for user review. Format:
 
 ```
 RECOMMENDATIONS:

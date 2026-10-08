@@ -4,20 +4,20 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for service checks (use `timeout` to prevent hangs). Can parallel with Phase 2.
 
-Verify running services and runtime dependencies by dynamically discovering what the project deploys, then checking each component.
+Discover what the project deploys, then verify each running service and runtime dependency.
 
 ---
 
 ## When to Run
 
-- Project has docker-compose.yml, Dockerfile, Procfile, or systemd service definitions
-- Project has web server configuration or startup scripts
-- Phase 1 discovery found running services or install-manifest.json
-- User explicitly requests runtime checks
+- docker-compose.yml, Dockerfile, Procfile, or systemd service definitions
+- Web server config or startup scripts
+- Phase 1 found running services or install-manifest.json
+- User requests runtime checks
 
 ## Step 1: Discover Expected Services
 
-Do NOT hardcode ports or process names. Discover them from the project's own configuration.
+Do NOT hardcode ports or process names; discover from project config.
 
 ### 1a. Docker Compose Services
 
@@ -103,11 +103,11 @@ find . -maxdepth 3 -name "*.service" -type f 2>/dev/null | while read unitfile; 
 done
 ```
 
-**Store all discovered ports in a variable for later steps.** If no ports are discovered, skip HTTP endpoint checks and report "No services detected."
+Store all discovered ports in a variable for later steps. If none, skip HTTP endpoint checks and report "No services detected."
 
 ## Step 2: Check Running Processes
 
-Match running processes against what the project actually deploys. Use the discovered service names, not generic patterns.
+Match running processes against discovered service names, not generic patterns.
 
 ```bash
 echo "=== Running process check ==="
@@ -166,7 +166,7 @@ fi
 
 ## Step 3: Health Endpoint Discovery
 
-Probe discovered ports for standard health endpoints. Only check ports found in Step 1.
+Probe only Step 1 ports for standard health endpoints.
 
 ```bash
 echo "=== Health endpoint probing ==="
@@ -216,7 +216,7 @@ fi
 
 ## Step 4: Database Connectivity
 
-Discover database connections from project config, then verify connectivity.
+Discover DB connections from project config; verify connectivity.
 
 ```bash
 echo "=== Database connectivity ==="
@@ -320,7 +320,7 @@ done
 
 ## Step 5: Docker Compose Full Validation
 
-If docker-compose exists, do a comprehensive check beyond just container status.
+If docker-compose exists, check beyond container status.
 
 ```bash
 if [ -f docker-compose.yml ] || [ -f docker-compose.yaml ] || [ -f compose.yml ] || [ -f compose.yaml ]; then
@@ -369,7 +369,7 @@ fi
 
 ## Step 6: Environment Variable Validation
 
-Check that required env vars are set (never print secret values).
+Check required env vars are set (NEVER print secret values).
 
 ```bash
 echo "=== Environment variable validation ==="
@@ -404,7 +404,7 @@ fi
 
 ## Output Format
 
-Produce a structured summary. Use `FINDING:` prefix for all issues so Phase 6 can parse them.
+Structured summary; prefix every issue with `FINDING:` (Phase 6 parses it).
 
 ```
 RUNTIME HEALTH CHECK
@@ -435,6 +435,6 @@ FINDINGS: 1
 
 ## Exit Criteria
 
-- **PASS**: All discovered services running, all databases reachable, all required env vars set
-- **WARN**: Some optional services not running or non-critical env vars missing
-- **FAIL**: Expected services not running, database unreachable, or critical env vars missing
+- **PASS**: all services running, databases reachable, required env vars set
+- **WARN**: optional services down or non-critical env vars missing
+- **FAIL**: expected services down, database unreachable, or critical env vars missing

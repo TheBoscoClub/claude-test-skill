@@ -4,7 +4,7 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for virsh/SSH commands (use `timeout` for hung operations). Use `AskUserQuestion` if VM connectivity fails.
 
-Test applications, releases, and system-level changes in fully isolated virtual machines.
+Test apps, releases, system-level changes in isolated VMs.
 
 ## When to Use
 
@@ -22,7 +22,7 @@ Test applications, releases, and system-level changes in fully isolated virtual 
 
 ## CRITICAL: Production Data Isolation
 
-Test VMs MUST NOT have live mounts to production storage (no NFS, CIFS, virtiofs, virtio-9p). Copying data *into* the VM via scp/rsync is allowed.
+Test VMs MUST NOT live-mount production storage (no NFS, CIFS, virtiofs, virtio-9p). Copying data *into* the VM via scp/rsync is allowed.
 
 ## VM Configuration
 
@@ -178,7 +178,7 @@ deploy_to_vm() {
 
 ## Step 5: Run Tests in VM
 
-Tests are driven by `test_sequences` in `vm-test-manifest.json` or by detected dangerous operations.
+Driven by manifest `test_sequences` or detected dangerous operations.
 
 ```bash
 run_vm_tests() {
@@ -261,7 +261,7 @@ test_docker_in_vm() {
 
 ## Staged Release Lifecycle Test
 
-If Discovery reported a valid staged release, test install -> upgrade -> deploy lifecycle on the VM.
+If Discovery reported a valid staged release, test install -> upgrade -> deploy on the VM.
 
 ```bash
 test_staged_release_lifecycle() {
@@ -512,7 +512,7 @@ Phase 10a reads `~/.claude/config/project-vm-map.json`:
 | No entry | `default.vm` (test-vm-cachyos) |
 | Default VM exclusive to another project | ERROR |
 
-**Exclusivity:** `exclusive_to` is bidirectional — only that project may use the VM, and the project can only use that VM.
+**Exclusivity:** `exclusive_to` is bidirectional: only that project uses the VM, and it uses only that VM.
 
 ## Conditional Execution Summary
 

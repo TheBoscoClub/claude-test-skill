@@ -4,20 +4,19 @@
 > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start, `TaskUpdate(taskId, status="completed")` when done.
 > **Key Tools**: `Bash` for re-running tests (use `timeout` if verification tests hang).
 
-**Purpose**: After Phase 6 (Fix) has applied changes, re-run all checks to CONFIRM the fixes worked and no regressions were introduced. This is the final gate before the audit is declared complete.
+**Purpose**: After Phase 6 (Fix), re-run all checks to confirm fixes worked and no regressions; final gate before audit completion.
 
 ---
 
 ## Prerequisites
 
-Phase 7 depends on data from earlier phases:
-- **Phase 2 test results**: The baseline pass/fail counts and coverage percentage
-- **Phase 6 fix list**: Which issues were fixed and what files were modified
-- If Phase 2 did not run or produced no test results, skip Step 1 and Step 5 (regression/coverage comparison) but still run Steps 2-4.
+- Phase 2 baseline pass/fail counts and coverage %.
+- Phase 6 fix list (issues fixed, files modified).
+- No Phase 2 results: skip Steps 1 and 5, still run Steps 2-4.
 
 ## Step 1: Re-Run Test Suite (Regression Check)
 
-Run the exact same test commands that Phase 2 used. Compare results against Phase 2 baseline.
+Run the same test commands as Phase 2; compare to its baseline.
 
 ### 1a. Detect Test Framework
 
@@ -159,11 +158,11 @@ if [ -f /tmp/phase12-test-output.txt ]; then
 fi
 ```
 
-**Subagent instruction**: Compare the Phase 7 pass count against Phase 2's recorded pass count. If any tests that previously passed now fail, report each as `REGRESSION: test_name`. If Phase 2 data is unavailable, report absolute results only.
+**Subagent**: compare pass count to Phase 2's. Report each previously-passing, now-failing test as `REGRESSION: test_name`. No Phase 2 data: report absolute results only.
 
 ## Step 1d: FVP Protocol Compliance Check
 
-**Before verifying individual fixes, check that Phase 6 emitted FVP proof blocks for every fix.**
+Before verifying individual fixes, check Phase 6 emitted FVP proof blocks for every fix.
 
 ```bash
 echo "=== FVP Protocol Compliance ==="
@@ -176,17 +175,17 @@ echo "FVP proof blocks found: N"
 echo "Unverified fixes: N"
 ```
 
-**Subagent instruction**: Parse the Phase 6 output. Count the total fixes applied and the number of `FVP PROOF` blocks emitted. If any fix lacks a corresponding proof block, report it as `UNVERIFIED_FIX: [description]`. Unverified fixes cause the audit to FAIL — Phase 6 must be re-run for those specific fixes with proper verification.
+**Subagent**: parse Phase 6 output; count fixes and `FVP PROOF` blocks. Report each fix lacking a proof block as `UNVERIFIED_FIX: [description]`. Unverified fixes FAIL the audit; Phase 6 must re-run for them.
 
-**If unverified fixes are found:**
+**If unverified fixes found:**
 1. Report each as `UNVERIFIED_FIX`
-2. Set overall Phase 7 result to `FAIL — FVP Protocol violation`
-3. The dispatcher loops back to Phase 6 to verify the unverified fixes
-4. Phase 7 re-runs after Phase 6 provides proof blocks
+2. Set Phase 7 result to `FAIL — FVP Protocol violation`
+3. Dispatcher loops back to Phase 6
+4. Phase 7 re-runs once proof blocks exist
 
 ## Step 2: Verify No Regressions in Specific Fixes
 
-For each fix applied by Phase 6, verify the specific issue is resolved.
+Verify each Phase 6 fix resolved its specific issue.
 
 ```bash
 echo "=== Verifying Phase 6 fixes ==="
@@ -200,18 +199,18 @@ echo "  - A security finding: re-run the security scanner"
 echo "  - A type error: re-run the type checker on the fixed file"
 ```
 
-**Subagent instruction**: For each fix Phase 6 reported, run the narrowest possible verification. Examples:
+**Subagent**: run the narrowest verification per fix, e.g.:
 
-- Fix was in `src/auth.py` for a test failure -> `pytest tests/test_auth.py -v`
-- Fix was a ruff warning in `app/views.py` -> `ruff check app/views.py`
-- Fix was a type error in `lib/utils.ts` -> `npx tsc --noEmit lib/utils.ts`
-- Fix was a security finding from bandit -> `bandit -r src/ -f json`
+- test failure in `src/auth.py` -> `pytest tests/test_auth.py -v`
+- ruff warning in `app/views.py` -> `ruff check app/views.py`
+- type error in `lib/utils.ts` -> `npx tsc --noEmit lib/utils.ts`
+- bandit finding -> `bandit -r src/ -f json`
 
-Report each fix as VERIFIED or STILL_FAILING with the specific output.
+Report each fix VERIFIED or STILL_FAILING with output.
 
 ## Step 3: Build/Compile Check
 
-Verify the project builds cleanly after all Phase 6 changes.
+Verify the project builds cleanly after Phase 6 changes.
 
 ```bash
 echo "=== Build verification ==="
@@ -295,7 +294,7 @@ fi
 
 ## Step 4: Smoke Test
 
-If the project defines a smoke test command, run it. Otherwise attempt a basic startup check.
+Run the project's smoke test command if defined; else a basic startup check.
 
 ```bash
 echo "=== Smoke test ==="
@@ -369,7 +368,7 @@ fi
 
 ## Step 5: Coverage Comparison
 
-If Phase 2 recorded a coverage percentage, verify it has not decreased.
+If Phase 2 recorded coverage, verify it did not decrease.
 
 ```bash
 echo "=== Coverage comparison ==="
@@ -398,17 +397,17 @@ if [ -f /tmp/phase12-test-output.txt ]; then
 fi
 ```
 
-**Subagent instruction**: If Phase 2 recorded a coverage number, compare it to Phase 7's number. If coverage decreased, report `REGRESSION: Coverage dropped from X% to Y%`. Small decreases (<1%) due to new code without tests may be acceptable but should still be flagged.
+**Subagent**: compare to Phase 2 coverage; if decreased report `REGRESSION: Coverage dropped from X% to Y%`. Small (<1%) drops from untested new code may be acceptable but still flag.
 
 ## Exit Criteria
 
-**ALL of these must be true for PASS:**
+**ALL must be true for PASS:**
 
-1. All tests that passed in Phase 2 still pass (no regressions)
-2. Phase 7 pass count >= Phase 2 pass count
-3. Every Phase 6 fix individually verified as working
-4. Build/compile succeeds without errors
-5. Coverage has not decreased from Phase 2 baseline (if measured)
+1. Every Phase 2 passing test still passes
+2. Phase 7 pass count >= Phase 2
+3. Every Phase 6 fix individually verified
+4. Build/compile succeeds
+5. Coverage not decreased (if measured)
 
 **Result classification:**
 
@@ -422,11 +421,10 @@ fi
 
 If tests still fail after Phase 6:
 
-1. **Do NOT fix within Phase 7** — Phase 7 is verification only, it does not apply fixes itself
-2. Report each still-failing test with its output
-3. For each failure, state whether it was a Phase 6 fix target (fix didn't work) or a regression (new failure introduced by Phase 6 changes)
-4. Include the specific error messages for diagnostic context
-5. Set overall result to FAIL — the dispatcher loops back to Phase 6 to fix the remaining issues (per the Governing Law: all errors must be fixed, none may be deferred)
+1. **Do NOT fix within Phase 7** (verification only)
+2. Report each failing test with output and error messages
+3. State per failure: Phase 6 fix target (fix didn't work) or regression (new from Phase 6 changes)
+4. Set result FAIL; dispatcher loops back to Phase 6 (Governing Law: all errors must be fixed, none deferred)
 
 ## Output Format
 

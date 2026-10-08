@@ -6,30 +6,20 @@
 
 ## Purpose
 
-Test the project's **deployable/installable application** separately from the source code. This ensures end users have a smooth experience with installation, updates, and migrations.
+Test the **deployable/installable application** separately from source: install, update, migration experience.
 
 ## Companion gstack skills for web-facing projects
 
-If Phase 3 (Discovery) detected a web UI, the following gstack skills are optional
-companions — none are blocking, none run inside Phase 9a, all are invoked out-of-phase
-by the user when the specific need arises:
+If Phase 3 detected a web UI, these optional gstack skills exist. None block, none run inside Phase 9a; the user invokes them directly. Phase 9a proceeds autonomously regardless.
 
-- **`/gstack-qa`** — interactive web-UI QA with fix-verify loop. Complements Phase 9a's
-  "does it run?" with "does it work end-to-end?". Useful during feature development.
-- **`/gstack-qa-only`** — same discovery, report-only (no auto-fix). Useful when you want
-  a bug log without mutation.
-- **`/gstack-benchmark`** — Core Web Vitals + page-load baselines + per-PR regression
-  comparison. Fills a gap Phase 9a does not cover (perf trend tracking).
-- **`/gstack-canary`** — post-deploy drift watch (console errors, perf regressions, page
-  failures over time). Complements Phase 9b's one-shot "did it ship cleanly?" with a
-  continuous "is it STAYING clean?".
-
-These are invoked by the user directly (e.g., `/gstack-qa`), not orchestrated from inside
-Phase 9a. Phase 9a proceeds autonomously regardless of whether they're used.
+- **`/gstack-qa`** — interactive web-UI QA with fix-verify loop (end-to-end)
+- **`/gstack-qa-only`** — same, report-only (no auto-fix)
+- **`/gstack-benchmark`** — Core Web Vitals, page-load baselines, per-PR regression comparison
+- **`/gstack-canary`** — post-deploy drift watch (console errors, perf, page failures over time)
 
 ## MCP: Playwright Integration
 
-When the **playwright MCP server** is enabled and the app has a web UI, use it for E2E browser testing:
+If the **playwright MCP server** is enabled and the app has a web UI, use it for E2E browser testing:
 
 ### Web UI Detection
 
@@ -60,7 +50,7 @@ detect_web_ui() {
 
 ### Playwright E2E Testing
 
-Check for Playwright MCP availability dynamically by attempting to call a Playwright tool. If the tool is not available (MCP not connected), fall back to standard functional testing.
+Check availability dynamically by calling a Playwright tool; if unavailable (MCP not connected), fall back to standard functional testing.
 
 ```
 # E2E Test Flow (requires Playwright MCP to be connected):
@@ -88,42 +78,28 @@ Check for Playwright MCP availability dynamically by attempting to call a Playwr
 
 ### Example Playwright Test Sequence
 
-```
-# Check Playwright MCP availability dynamically:
-# Attempt browser_navigate — if the tool is unavailable, the call will fail
-# and the phase should fall back to non-browser functional testing.
+If `detect_web_ui()`: `browser_navigate` to `http://localhost:${APP_PORT}` (tool not found -> skip Playwright, use HTTP checks); `browser_take_screenshot` baseline; per critical flow (login, main action) perform actions, verify state, capture console errors; report pages tested, errors, screenshots.
 
-IF detect_web_ui():
-    1. Try browser_navigate to http://localhost:${APP_PORT}
-       - If tool not found → skip Playwright tests, use standard HTTP checks
-    2. browser_take_screenshot for baseline
-    3. For each critical flow (login, main action, etc.):
-       - Perform actions
-       - Verify expected state
-       - Capture any console errors
-    4. Report: Pages tested, errors found, screenshots captured
-```
-
-**Note:** Playwright testing is optional. If Playwright MCP is not connected to this session, skip to standard functional testing (curl/wget HTTP checks).
+Playwright is optional; if not connected, use standard functional testing (curl/wget HTTP checks).
 
 ## CRITICAL: Production Data Isolation
 
-**Sandbox environments created by Phase 9a must NEVER have live mounts to production storage.**
+**Phase 9a sandboxes must NEVER have live mounts to production storage.**
 
 - **NEVER** mount or symlink host production paths into the sandbox
-- The sandbox should use its own fresh databases (created by install scripts or synthetic data)
-- Copying data into the sandbox is allowed — it's isolated in `/tmp`
+- Sandbox uses its own fresh databases (install scripts or synthetic data)
+- Copying data into the sandbox is allowed (isolated in `/tmp`)
 
 ## When to Run This Phase
 
-Run this phase when the project has:
-- An install script (`install.sh`, `setup.py install`, `npm install -g`, etc.)
-- A deploy script (`deploy.sh`)
+Run when the project has:
+- Install script (`install.sh`, `setup.py install`, `npm install -g`, etc.)
+- Deploy script (`deploy.sh`)
 - Systemd service files
 - Docker deployment
 - Package distribution (`pip`, `npm`, `cargo install`, etc.)
 
-**Skip this phase if**: The project is a library-only or has no standalone deployment.
+**Skip if**: library-only or no standalone deployment.
 
 ## Detection Script
 
@@ -592,7 +568,7 @@ run_phase_A() {
 
 ## Cleanup (MANDATORY)
 
-**This cleanup MUST run at the end of Phase 9a, even if tests fail.**
+**MUST run at the end of Phase 9a, even if tests fail.**
 
 ```bash
 cleanup_app_sandbox() {

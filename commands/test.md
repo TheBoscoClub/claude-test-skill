@@ -1,5 +1,5 @@
 ---
-description: Modular project audit - testing, security, debugging, fixing (phase-based loading for context efficiency, holistic by design) (user)
+description: Modular project audit - testing, security, debugging, fixing (phase files loaded on demand, holistic by design) (user)
 allowed-tools:
   - Bash
   - Read
@@ -21,40 +21,40 @@ argument-hint: "[help] [prodapp] [docker] [qaapp] [qadocker] [qaall] [security] 
 
 # Modular Project Audit (/test)
 
-A context-efficient project audit that loads phase instructions on-demand using subagents.
+Context-efficient audit: this dispatcher loads phase instructions on demand in subagents.
 
 ## GOVERNING LAW: All Errors, Warnings, and Issues Must Be Fixed
 
 **All errors, warnings, and issues — pre-existing or otherwise — MUST be analyzed, root-caused, and fixed successfully. None may be skipped or deferred for any reason.**
 
-This is the supreme governing law of /test. It cannot be superseded, diluted, narrowed, or circumvented by any project-specific test module, project-specific test rule, phase instruction, execution mode, or any other mechanism. If any project-level rule, test configuration, or phase instruction creates ambiguity, conflict, or confusion with this law, the source of that conflict must be identified and eliminated at the project level. This law is always the sole authority.
+Supreme law of /test. No project test module, project rule, phase instruction, execution mode, flag or other mechanism may supersede, dilute, narrow, or circumvent it. Any project-level source of ambiguity or conflict with it must be eliminated at the project level.
 
-**Prohibited actions under this law:**
-- Labeling any issue as "pre-existing", "cosmetic", "non-blocking", "low priority", "advisory", "won't fix", "not our changes", or any equivalent classification that results in not fixing it
-- Deferring any issue to a "future" session, task, or release cycle
-- Narrowing the scope of what "all" means based on context, judgment, or interpretation
-- Producing lists of "manual changes required" or "recommended fixes" instead of fixing them
-- Exercising discretion about which issues to fix — all means all, unconditionally
+**Prohibited:**
+- Labeling any issue "pre-existing", "cosmetic", "non-blocking", "low priority", "advisory", "won't fix", "not our changes", or any equivalent that results in not fixing it
+- Deferring any issue to a future session, task, or release cycle
+- Narrowing what "all" means by context, judgment, or interpretation
+- Producing "manual changes required" / "recommended fixes" lists instead of fixing
+- Choosing which issues to fix — all means all, unconditionally
 
 **No exception exists. No mode, flag, or option can override this law.**
 
 ### One-Way Ratchet
 
-Project-specific test modules, rules, configurations, and definitions may strengthen the Governing Law's requirements for their respective project (e.g., stricter coverage thresholds, additional security checks, tighter config consistency). However, nothing at the project level may weaken, dilute, supersede, skip, or be interpreted in a way whose outcome would weaken any provision of this law. If a project-level rule creates ambiguity or appears to conflict with the Governing Law, the Governing Law prevails unconditionally — the project-level rule must be amended or removed.
+Project-level test modules, rules, configs, and definitions may strengthen this law for their project (stricter coverage, extra security checks, tighter config consistency). Nothing at project level may weaken, dilute, supersede, skip, or be read so as to weaken any provision. On ambiguity or conflict the Governing Law prevails unconditionally; amend or remove the project rule.
 
 ### Commit and Release Integration
 
-All fixes applied during a /test audit MUST be committed. If a locally staged, unpromoted release exists (`.staged-release` breadcrumb), all fix commits MUST be included in that staged release.
+Commit all fixes made during a /test audit. If a locally staged, unpromoted release exists (`.staged-release` breadcrumb), all fix commits MUST be included in that staged release.
 
 ### Iterative Until Clean
 
-All /test audits (except `--interactive`) are iterative. If any issues were detected and fixed during a /test audit, another complete audit of the same kind MUST be run after the fixes are committed. This cycle repeats until the audit completes with zero issues found. A single pass that finds and fixes issues is not a completed audit — only a clean pass is.
+All audits except `--interactive` iterate: if any issue was found and fixed, run another complete audit of the same kind after committing the fixes; repeat until a pass finds zero issues. Only a clean pass is a completed audit.
 
 ### Fix-Verify-Proof (FVP) Protocol — Mandatory Enforcement
 
-**Every individual fix — not just every phase, every INDIVIDUAL FIX — requires a structured proof block.** A fix without a proof block is an incomplete fix. This is not a guideline; it is a mechanical requirement enforced by the output format.
+**Every INDIVIDUAL fix (not just every phase) requires a structured proof block.** A fix without one is incomplete; this is mechanical, enforced by the output format.
 
-**The FVP loop for every fix:**
+FVP loop per fix:
 
 ```
 1. IDENTIFY the issue (with file, line, specific symptom)
@@ -65,7 +65,7 @@ All /test audits (except `--interactive`) are iterative. If any issues were dete
 6. EMIT the collateral proof block
 ```
 
-**Mandatory proof block format — must appear after EVERY fix:**
+Proof block — MUST follow EVERY fix:
 
 ```
 ┌─ FVP PROOF ────────────────────────────────────────────┐
@@ -79,165 +79,98 @@ All /test audits (except `--interactive`) are iterative. If any issues were dete
 └────────────────────────────────────────────────────────┘
 ```
 
-**Rules:**
-- The `Verify` field must contain an **actually executed command** — not "should work", not "the code looks correct", not "verified by inspection"
-- The `Before` and `After` fields must contain **observable output differences** — not descriptions of what the code does
-- The `Proof` field must be `PASS` with specific evidence or `FAIL` with what went wrong
-- If `Proof` is `FAIL`, the fix is not complete — loop back to step 2
-- If `Collateral` shows any new failures, the fix introduced a regression — revert and try again
-- A phase that applies N fixes must emit N proof blocks. A phase summary with "15 issues fixed" but zero proof blocks is a **protocol violation**
+Rules:
+- `Verify`: an **actually executed command** — never "should work", "the code looks correct", "verified by inspection"
+- `Before`/`After`: **observable output differences**, not descriptions of the code
+- `Proof`: `PASS` + specific evidence, or `FAIL` + what went wrong; `FAIL` → fix incomplete, back to step 2
+- New failures in `Collateral` = regression → revert and retry
+- N fixes ⇒ N proof blocks; "15 issues fixed" with zero proof blocks is a **protocol violation**
 
-**Enforcement at phase boundaries:**
-- Phase 6 (Fix): Every fix emits an FVP proof block. The phase output MUST contain one proof block per fix applied
-- Phase 7 (Verify): Re-runs ALL checks. If any fix lacks a proof block from Phase 6, Phase 7 MUST flag it as `UNVERIFIED_FIX` and the audit cannot pass
-- Phase 9a-9d (Validation): Each finding and fix emits its own proof block
-- QA modules: Every regression test step emits proof (command output, HTTP response, etc.)
+Phase-boundary enforcement:
+- Phase 6 (Fix): output MUST contain one proof block per fix applied
+- Phase 7 (Verify): re-runs ALL checks; any Phase 6 fix lacking a proof block MUST be flagged `UNVERIFIED_FIX` and the audit cannot pass
+- Phase 9a-9d (Validation): each finding and fix emits its own proof block
+- QA modules and all project-specific test modules: same protocol; every step emits observable proof (command output, HTTP response); "step passed" without output is not proof
 
-**Iterative re-testing after fixes:**
-When Phase 7 finds failures introduced by Phase 6 fixes:
-1. Loop back to Phase 6 with the new failures
-2. Phase 6 fixes them, emitting FVP proof blocks for each
-3. Phase 7 re-verifies, emitting its own verification proof
-4. This loop repeats until Phase 7 produces a clean pass WITH proof
-5. After the fix-verify loop converges, the ENTIRE audit re-runs from Phase 4a
-6. Only a full audit pass with zero issues AND proof blocks for every prior fix constitutes completion
-
-**Project-specific test modules** (QA app, QA docker, etc.) are subject to the same FVP Protocol. Every test step must produce observable proof. "Step passed" without command output is not proof.
+When Phase 7 finds failures introduced by Phase 6:
+1. Loop back to Phase 6 with the new failures; each fix emits an FVP proof block
+2. Phase 7 re-verifies with its own proof; repeat until Phase 7 passes clean WITH proof
+3. Then the ENTIRE audit re-runs from Phase 4a
+4. Complete only when a full pass has zero issues AND every prior fix has a proof block
 
 ### All Audits Are Holistic
 
-Cross-component analysis is a structural property of **every** /test phase, not just analysis phases. Every phase that examines or modifies code MUST consider how its scope interacts with the rest of the system. There is no separate "holistic" mode or phase — holistic analysis is integral to all testing throughout the entire audit.
+Cross-component analysis is a structural property of **every** phase; there is no separate holistic mode or phase. Every phase that examines or modifies code MUST consider how its scope interacts with the rest of the system:
+- **Phase 4a**: tests cover cross-component interactions, not just unit boundaries
+- **Phase 5a-5d**: mandatory cross-component sections (security across boundaries, dependency chains, quality across modules, infrastructure integration surfaces)
+- **Phase 6**: fixes verified against cross-component impact — fixing one module must not break another
+- **Phase 7**: cross-component regression checks
+- **Phase 9a-9d**: production, Docker, and GitHub validation verify cross-system consistency
 
-**Applies to ALL phases, not just analysis:**
-- **Phase 4a (Execute)**: Tests must cover cross-component interactions, not just unit boundaries
-- **Phase 5a-5d (Analysis)**: Each includes mandatory cross-component sections (security across boundaries, dependency chains, quality across modules, infrastructure integration surfaces)
-- **Phase 6 (Fix)**: Fixes must be verified against cross-component impacts — fixing one module must not break another
-- **Phase 7 (Verify)**: Re-verification must include cross-component regression checks
-- **Phase 9a-9d (Validation)**: Production, Docker, and GitHub validation must verify cross-system consistency
-
-**One-way ratchet:** Project-specific test modules, rules, configurations, and definitions may strengthen cross-component requirements for their respective project (e.g., require additional contract checks, stricter config consistency), but nothing at the project level may weaken, dilute, supersede, skip, or be interpreted in a way whose outcome would weaken the global law. The Governing Law is always the sole and final authority.
+One-way ratchet applies: projects may strengthen cross-component requirements (extra contract checks, stricter config consistency), never weaken them.
 
 ### Verified Proof Required
 
-**No phase may be marked complete or successful without verified, verifiable proof.** "The code looks correct" and "it should work" are not proof. Every phase completion must include a proof artifact — command output, test results, tool output, or observable behavior — that demonstrates the claimed outcome actually occurred.
-
-**Phase-specific proof requirements:**
-- **Phase 4a**: Test pass/fail counts, coverage percentages, actual command output
-- **Phase 5a-5d**: Scanner output with specific findings (or clean scan output proving no findings)
-- **Phase 6**: FVP proof block per fix (see FVP Protocol above) — before/after with executed commands
-- **Phase 7**: Test output showing pass counts >= pre-fix counts, no regressions, proof of each Phase 6 fix still holding
-- **Phase 9b**: Live service responses, systemd status output, port check results
-- **Phase 9c**: Docker build output, container health check results, registry version verification
+**No phase may be marked complete or successful without verifiable proof** — command output, test results, tool output, or observable behavior. "Looks correct" / "should work" is not proof. Per phase:
+- **Phase 4a**: pass/fail counts, coverage percentages, actual command output
+- **Phase 5a-5d**: scanner output with findings (or clean scan output)
+- **Phase 6**: FVP proof block per fix — before/after with executed commands
+- **Phase 7**: pass counts >= pre-fix counts, no regressions, each Phase 6 fix still holding
+- **Phase 9b**: live service responses, systemd status, port checks
+- **Phase 9c**: Docker build output, container health checks, registry version verification
 - **Phase 9d**: GitHub API responses confirming security settings
 
-**If proof cannot be produced** (e.g., no browser available for UI verification), the phase MUST explicitly state what could not be verified and ask the user to confirm. Never substitute "should work" for proof.
+If proof cannot be produced (e.g. no browser for UI verification), state exactly what could not be verified and ask the user to confirm. Never substitute "should work".
 
 ### AI Self-Promotion Purge — Mandatory
 
-**All /test audits MUST scan for and remove AI-generated self-promotion, advertising, branding, and attribution injected by language models.** This is a code quality issue and a documentation hygiene issue.
+**Every /test audit MUST find and remove AI-injected self-promotion, advertising, branding, and attribution** (a code-quality and doc-hygiene issue).
 
-**What to scan for and remove:**
-- `Co-Authored-By:` lines referencing Claude, Anthropic, GPT, OpenAI, Copilot, or any AI assistant — in commits, code comments, and documentation
-- "Generated with [AI tool]", "Built with Claude", "Powered by Anthropic", "Created by Claude Code" — in README, CHANGELOG, docs, code comments, PR descriptions
-- Anthropic URLs injected as attribution (`claude.ai`, `anthropic.com`) — in code, docs, templates, PR bodies
-- AI watermarking patterns: emojis used as AI branding (robot emoji preceding attribution), "AI-assisted" badges, "Made with AI" footers
-- Marketing language for AI tools embedded in project documentation or commit messages
+Scan for:
+- `Co-Authored-By:` naming Claude, Anthropic, GPT, OpenAI, Copilot, or any AI assistant — commits, code comments, docs
+- "Generated with [AI tool]", "Built with Claude", "Powered by Anthropic", "Created by Claude Code"
+- Attribution URLs (`claude.ai`, `anthropic.com`) in code, docs, templates, PR bodies
+- AI watermarks: robot emoji preceding attribution, "AI-assisted" badges, "Made with AI" footers
+- AI-tool marketing language in docs or commit messages
 
-**Where to scan:**
-- All documentation files (`*.md`, `*.txt`, `*.rst`)
-- All code comments (inline and block)
-- Git commit messages: `git log --all --format='%H %s' | grep -iE 'co-authored|claude|anthropic|generated.with'`
-- PR and issue templates (`.github/`)
-- Package metadata (`package.json` description, `pyproject.toml` description, `Cargo.toml` description)
-- Dockerfile labels and comments
-- CI/CD workflow files
+Where: docs (`*.md`, `*.txt`, `*.rst`); all code comments; commit messages (`git log --all --format='%H %s' | grep -iE 'co-authored|claude|anthropic|generated.with'`); PR/issue templates (`.github/`); package metadata descriptions (`package.json`, `pyproject.toml`, `Cargo.toml`); Dockerfile labels/comments; CI/CD workflows.
 
-**How to fix:**
-- Remove the self-promotion line/block entirely — do not replace with alternative attribution
-- For commits with `Co-Authored-By` in their message: cannot rewrite published history, but flag for awareness and ensure no new commits include it
-- For template files that auto-inject AI branding: remove the injection template
+Fix:
+- Remove the line/block entirely — no replacement attribution
+- Published commits with `Co-Authored-By`: cannot rewrite; flag it and ensure no new commit includes it
+- Templates that auto-inject AI branding: remove the injection
 
-**Enforcement:**
-- Phase 5c (Quality): Scans code and comments for AI self-promotion patterns
-- Phase 8 (Docs): Scans all documentation for AI branding and removes it
-- Both phases: Report findings as quality issues subject to Phase 6 fix
-- Project-specific QA modules: Include AI self-promotion check in regression testing
+Enforcement: Phase 5c scans code/comments; Phase 8 scans and cleans all docs; both report findings as quality issues for Phase 6; project QA modules include the check in regression.
 
 ---
 
 ## CRITICAL: Autonomous Resolution Directive
 
-**The /test skill MUST fix and resolve ALL issues autonomously.**
-
-This skill operates **entirely non-interactively** except in extremely rare cases requiring major architectural changes affecting the entire codebase, production application, AND Docker deployment simultaneously.
+**/test MUST fix and resolve ALL issues autonomously**, entirely non-interactively — except in extremely rare cases needing major architectural changes to the codebase, production app, AND Docker deployment simultaneously.
 
 ### Behavioral Requirements
 
-1. **Fix ALL Issues**: Every issue found — regardless of priority, severity, or complexity — MUST be fixed. No "advisory" or "low priority" issues left for manual resolution.
-
-2. **No Manual Lists**: Never return a list of "manual changes required" or "recommended fixes". If it can be identified, it can be fixed.
-
-3. **Documentation is Code**: Documentation MUST remain synchronized with:
-   - Current codebase state
-   - VERSION file
-   - Docker image versions
-   - All obsolete references removed
-
-4. **Autonomous Operation**: The only acceptable user prompts are:
-   - SAFETY: Confirming destructive operations on production systems
-   - ARCHITECTURE: Changes requiring complete rewrites of core systems
-   - EXTERNAL: Issues requiring credentials or external service access
-
-5. **Iterative Until Clean (FVP Enforced)**: Phase 6 (Fix) and Phase 7 (Verify) form a loop within each audit pass. Every individual fix MUST emit an FVP proof block (see FVP Protocol). If verification finds new issues introduced by fixes, fix those too — each with its own proof block. After all fixes are committed, the entire audit of the same kind re-runs from the beginning. This continues until a complete audit pass finds zero issues. A single pass that finds and fixes issues is not a completed audit.
-
-6. **Production Data Isolation**: No test VM, QA VM, or test/QA Docker container may have LIVE ACCESS (mounts) to production storage. NFS, CIFS, virtiofs, virtio-9p mounts and Docker `-v` bind-mounts to host production paths are forbidden. Copying production data *into* a test/QA environment is allowed — once on the VM's own disk, it's fully isolated. Test VM libraries should be ≤275GB. This boundary is enforced across all phases (A, D, V, VM-lifecycle).
+1. **Fix ALL Issues** regardless of priority, severity, or complexity. Nothing "advisory" or "low priority" is left for manual resolution.
+2. **No Manual Lists**: never return "manual changes required" / "recommended fixes". If it can be identified, it can be fixed.
+3. **Documentation is Code**: docs stay synced with the codebase, VERSION file, and Docker image versions; obsolete references removed.
+4. **Autonomous Operation**: the only acceptable prompts are SAFETY (destructive operations on production), ARCHITECTURE (complete rewrites of core systems), EXTERNAL (credentials or external service access).
+5. **Iterative Until Clean (FVP Enforced)**: Phases 6 and 7 loop within each pass; every fix emits an FVP proof block, including fixes for issues introduced by fixes. After fixes are committed, the whole audit of the same kind re-runs until a pass finds zero issues.
+6. **Production Data Isolation**: no test VM, QA VM, or test/QA Docker container may have LIVE ACCESS (mounts) to production storage — NFS, CIFS, virtiofs, virtio-9p, and Docker `-v` bind-mounts of host production paths are forbidden. Copying production data *into* the environment is allowed (isolated once on the VM's own disk). Test VM libraries ≤275GB. Enforced across all phases (A, D, V, VM-lifecycle).
 
 ---
-
-## Quick Reference
-
-```
-/test                    # Full audit (autonomous - fixes everything)
-/test prodapp            # Validate installed production app (Phase 9b)
-/test docker             # Validate Docker image and registry (Phase 9c)
-/test qaapp              # QA VM: regression test native app (auto-upgrade + DB sync)
-/test qadocker           # QA VM: regression test Docker container (auto-upgrade + DB sync)
-/test qaall              # QA VM: regression test both native and Docker sequentially
-/test security           # Comprehensive security audit (Phase 5a/SEC)
-/test github             # Audit GitHub repository settings (Phase 9d)
-/test --phase=10a        # Force VM testing (Phase 10a)
-/test --phase=9a         # Run single phase
-/test --phase=1-3        # Run phase range
-/test --list-phases      # Show available phases
-/test --interactive      # Enable interactive mode (prompts, manual items allowed)
-/test --force-sandbox    # DANGEROUS: Skip VM requirement for vm-required projects
-/test --budget           # Judgement-tier phases run on the session model (no Opus floor)
-/test --phase=5 --interactive  # Combine with other options
-/test help               # Show help
-```
 
 ### Execution Modes
 
 | Mode | Flag | Behavior |
 |------|------|----------|
-| **Autonomous** (default) | (none) | Fixes ALL issues, no prompts, loops until clean |
-| **Interactive** | `--interactive` | May prompt user for decisions, still fixes ALL issues |
+| **Autonomous** (default) | (none) | Fixes ALL issues; no prompts except SAFETY/ARCHITECTURE/EXTERNAL; loops until all tests pass and all issues resolved; docs synced automatically |
+| **Interactive** | `--interactive` | May prompt (e.g. Phase 9b/9c decisions); still fixes ALL issues and loops — changes prompting, never the fix mandate |
 
-**Autonomous mode** (default):
-- Fixes every issue regardless of priority/severity
-- No user prompts except for safety/architecture/external blocks
-- Loops until all tests pass and all issues resolved
-- Documentation automatically synchronized
-
-**Interactive mode** (`--interactive`):
-- May prompt for decisions (Phase 9b/9c conditional execution)
-- Still fixes ALL issues — interactive mode changes prompting behavior, not the fix mandate
-- Loops until all tests pass and all issues resolved
-- The Governing Law applies unconditionally in both modes
+The Governing Law applies unconditionally in both modes. Usage, flags, and shortcuts: the help block under Dispatcher Logic.
 
 ## Available Phases
 
-The phase number IS the execution order. Same-number sub-phases (a/b/c/d) run in parallel or are conditional.
+Phase number = execution order. Same-number sub-phases (a/b/c/d) run in parallel or are conditional.
 
 | Phase | Name | Description | Modifies Files? |
 |-------|------|-------------|-----------------|
@@ -262,33 +195,13 @@ The phase number IS the execution order. Same-number sub-phases (a/b/c/d) run in
 | 11 | Cleanup | Restore environment (always runs last) | Cleans up |
 | ST | Self-Test | Validate test-skill framework (explicit `--phase=ST` only) | No |
 
-### Quick Reference
-
-| Phase | Depends On | Parallel With |
-|-------|------------|---------------|
-| 1 | None | — |
-| 2 | 1 | — |
-| 3 | 1, 2 | — (GATE) |
-| 4a, 4b | 3 | Each other |
-| 5a, 5b, 5c, 5d | 3, 4 | Each other |
-| **6** | **All phase 5** | **None (BLOCKING)** |
-| 7 | 6 | — |
-| 8 | 7 (only if all prior passed) | — |
-| 9a, 9b, 9c, 9d | 6 + Discovery flags | Conditional |
-| 10a, 10b | 3 (isolation-required) | Conditional |
-| 11 | All | Always last |
-| ST | None | Isolated (never in normal runs) |
-
-**Legend:**
-- **Bold** phases modify files — they run strictly sequentially
+- **Bold** phases modify files — strictly sequential
 - Phase 9b/9c/9d are **conditional** — skipped if Discovery doesn't detect the relevant target
-- Phase 10a/10b are **conditional** — run when `ISOLATION_LEVEL` is `vm-required` or `vm-recommended`
-- Phase 8 **ALWAYS runs** - documentation must stay synchronized with code
-- Phase ST is **isolated** - ONLY runs when explicitly called with `--phase=ST` (never in normal runs)
+- Phase 10a/10b are **conditional** — run when `ISOLATION_LEVEL` is `vm-required` or `vm-recommended`, or a staged release is valid
+- Phase 8 **ALWAYS runs** — docs must stay synchronized with code
+- Phase ST is **isolated** — ONLY with `--phase=ST`, never in normal runs
 
 ### Phase 9b Conditional Execution
-
-Phase 9b (Production Validation) execution depends on Discovery (Phase 3) results:
 
 | Discovery: Installable App | Discovery: Production Status | Phase 9b Action |
 |---------------------------|------------------------------|----------------|
@@ -297,11 +210,7 @@ Phase 9b (Production Validation) execution depends on Discovery (Phase 3) result
 | Any | `installed-not-running` | **RUN** - Check why not running |
 | Any | `not-installed` | **SKIP** - App not installed on this system |
 
-When Phase 9b is skipped, Phase 9c proceeds (or 9d if 9c also skipped).
-
 ### Phase 9c Conditional Execution
-
-Phase 9c (Docker Validation) execution depends on Discovery (Phase 3) results:
 
 | Discovery: Dockerfile | Discovery: Registry Package | Phase 9c Action |
 |-----------------------|----------------------------|----------------|
@@ -310,11 +219,7 @@ Phase 9c (Docker Validation) execution depends on Discovery (Phase 3) results:
 | exists | `found` | **RUN** - Validate image and registry package |
 | exists | `version-mismatch` | **RUN** - Flag and FIX version sync issue |
 
-When Phase 9c is skipped, Phase 9d proceeds (or phase 10 if 9d also skipped).
-
 ### Phase 9d Conditional Execution
-
-Phase 9d (GitHub Audit) execution depends on Discovery (Phase 3) results:
 
 | Discovery: GitHub Remote | Discovery: gh CLI Auth | Phase 9d Action |
 |--------------------------|------------------------|----------------|
@@ -322,11 +227,11 @@ Phase 9d (GitHub Audit) execution depends on Discovery (Phase 3) results:
 | exists | `not-authenticated` | **SKIP** - Cannot audit without gh CLI auth |
 | exists | `authenticated` | **RUN** - Full GitHub repository audit |
 
-When Phase 9d is skipped, phase 10 (VM) proceeds (or phase 11 Cleanup if VM also skipped).
+A skipped sub-phase passes to the next (9b → 9c → 9d → phase 10 VM → phase 11 Cleanup).
 
 ### Phase 10a (VM Testing) Conditional Execution
 
-Phase 10a execution depends on **both** Discovery (Phase 3) isolation analysis AND Pre-Flight (Phase 2) VM availability, **plus staged release detection**:
+Depends on Discovery (Phase 3) isolation level, staged release detection, AND Pre-Flight (Phase 2) VM availability:
 
 | Discovery: Isolation Level | Staged Release | Pre-Flight: VM Available | Phase 10a Action |
 |---------------------------|----------------|-------------------------|----------------|
@@ -339,32 +244,13 @@ Phase 10a execution depends on **both** Discovery (Phase 3) isolation analysis A
 | `vm-required` | Any | `false` | **⛔ ABORT** - Cannot safely test this project |
 | `vm-required` | Any | `true` | **RUN** - VM isolation mandatory |
 
-**Two independent triggers for Phase 10a:**
-1. **Isolation Level** — project contains dangerous patterns requiring VM isolation
-2. **Staged Release** — `.staged-release` breadcrumb exists and is valid
+Two independent triggers, either activates Phase 10a when a VM is available: (1) isolation level — dangerous patterns need VM isolation; (2) valid `.staged-release` breadcrumb.
 
-Either trigger independently activates Phase 10a when a VM is available.
+- **Isolation Level** (Discovery): scans for dangerous patterns (PAM configs, kernel params, systemd services, bootloader, etc.), computes weighted `DANGER_SCORE`, outputs `ISOLATION_LEVEL`: `sandbox`, `sandbox-warn`, `vm-recommended`, or `vm-required`
+- **Staged Release** (Discovery): checks the `.staged-release` breadcrumb written by `/git-release --local`, validates the tag exists and points to the right commit, detects Docker staging images matching project name and version; outputs `Staged Release`: `valid`, `invalid`, or `none`
+- **VM Availability** (Pre-Flight): libvirt/virsh installed and libvirtd running; lists VMs (especially `*-test`, `*-dev`); detects ISO library for new VMs; checks SSH to running test VMs; optionally detects physical test hardware (Raspberry Pi, spare systems)
 
-**Isolation Level Detection** (performed by Discovery):
-- Scans project for dangerous patterns: PAM configs, kernel params, systemd services, bootloader, etc.
-- Calculates `DANGER_SCORE` based on weighted pattern matches
-- Outputs `ISOLATION_LEVEL`: `sandbox`, `sandbox-warn`, `vm-recommended`, or `vm-required`
-
-**Staged Release Detection** (performed by Discovery):
-- Checks for `.staged-release` breadcrumb file written by `/git-release --local`
-- Validates tag exists and points to correct commit
-- Detects Docker staging images matching project name and version
-- Outputs `Staged Release`: `valid`, `invalid`, or `none`
-
-**VM Availability Detection** (performed by Pre-Flight):
-- Checks for libvirt/virsh installation and libvirtd service
-- Lists existing VMs (especially test VMs matching `*-test`, `*-dev` patterns)
-- Detects ISO library for creating new VMs if needed
-- Checks SSH connectivity to running test VMs
-- Optionally detects physical test hardware (Raspberry Pi, spare systems)
-
-**Critical Safety Rule:**
-If `ISOLATION_LEVEL == "vm-required"` and `VM_AVAILABLE == false`:
+**Critical Safety Rule** — if `ISOLATION_LEVEL == "vm-required"` and `VM_AVAILABLE == false`:
 ```
 ⛔ CRITICAL: This project modifies system authentication, kernel, or boot configuration.
 ⛔ Testing these changes requires VM isolation to prevent bricking the host system.
@@ -375,9 +261,15 @@ To proceed:
 2. Or explicitly bypass (DANGEROUS): /test --force-sandbox
 ```
 
-### Sandbox vs Phase 10a Selection
+**Isolation gate, applied right after Discovery completes:**
+- `vm-required`, no VM → abort as above (include danger score and indicators; `virsh start <vm-name>` also satisfies it)
+- `vm-required` or `vm-recommended`, VM available → `start_test_vm()`, use the VM
+- `vm-recommended`, no VM → warn, proceed in sandbox with caution
+- `sandbox-warn` → sandbox with extra monitoring; `sandbox` → standard sandbox
+- Staged release `valid` and VM not already in use → log that Phase 10a will deploy and verify v{stagedVersion}; start the VM if available, else warn that lifecycle tests cannot run
+- VM shutdown is Phase 11's job (reads `.test-vm-state`)
 
-The dispatcher automatically selects the appropriate isolation:
+### Sandbox vs Phase 10a Selection
 
 | Isolation Level | Sandbox (Phase 2) | Phase 10a (VM) |
 |-----------------|-------------------|--------------|
@@ -388,345 +280,48 @@ The dispatcher automatically selects the appropriate isolation:
 
 ## Phase Dependencies & Execution Order
 
-**CRITICAL**: Phases have dependencies that MUST be respected. Running phases in parallel
-when they have unmet dependencies will cause incorrect results, race conditions, or
-invalidated rollback points.
+**CRITICAL**: dependencies MUST be respected. Unmet dependencies cause wrong results, races (Fix editing lines Security is reporting), or invalid rollback points (snapshot of a mid-modification tree).
 
-### Dependency Rules
+| Phase | Depends On | Parallel? | Gate |
+|-------|------------|-----------|------|
+| 1 | None | ❌ single | SNAPSHOT: Snapshot Ready |
+| 2, 3 | 1 (3 also on 2) | ❌ sequential | DISCOVERY: Project Known (GATE) |
+| 4a, 4b | 3 | ✅ with each other | TESTS: Tests Complete |
+| 5a, 5b, 5c, 5d | 3, 4 | ✅ with each other (read-only) | ANALYSIS: Analysis Complete |
+| **6** | **All phase 5** | **❌ None (BLOCKING)** | FIXES: Fixes Applied |
+| 7 | 6 | ❌ | VERIFY: Verified (failures → loop to 6) |
+| 8 | 7 | ❌ | DOCS: Docs Complete (always runs) |
+| 9a, 9b, 9c, 9d | 6 + Discovery flags | ❌ sequential 9a→9b→9c→9d, conditional | VALIDATION: done or skipped |
+| 10a, 10b | 3 (isolation level / staged release) | ❌ conditional | VM: done or skipped |
+| 11 | All | ❌ always last | CLEANUP: always runs, even after failures |
+| ST | None | Isolated (never in normal runs) | — |
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         PHASE DEPENDENCY GRAPH                              │
-│  Phase number = execution order. Sub-phases (a/b/c/d) = parallel/cond.     │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  1: SNAPSHOT (Complete before ANY file modifications)                       │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 1 (Snapshot) ──> Clean old snapshots, create safety snapshot        │   │
-│  │                   └──> GATE: Snapshot Ready                         │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  2-3: PREFLIGHT & DISCOVERY (Everything depends on these completing)       │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 2 (Pre-Flight) ──> Config validation, sandbox setup, env checks     │   │
-│  │ 3 (Discovery) ──> Project type, tests, isolation level              │   │
-│  │   - Detects: Installable app? Production installed? Docker? GitHub? │   │
-│  │   - Sets conditional phase flags: 9b/9c/9d SKIP/RUN                │   │
-│  │                   └──> GATE: Project Known                          │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  4: TEST EXECUTION (parallel sub-phases)                                   │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 4a (Execute & Analyze) ─┬─> Run tests, coverage, failure analysis  │   │
-│  │ 4b (Runtime)            ─┘   Can run in PARALLEL                    │   │
-│  │                   └──> GATE: Tests Complete                         │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  5: READ-ONLY ANALYSIS (parallel sub-phases, no file modifications)        │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ These phases ONLY READ files - safe to run in parallel:             │   │
-│  │ 5a (Security), 5b (Dependencies), 5c (Quality), 5d (Infrastructure)│   │
-│  │                   └──> GATE: Analysis Complete                      │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  6: FIX (STRICTLY SEQUENTIAL - Never parallel!)                            │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 6 (Fix) ────> MODIFIES FILES                                        │   │
-│  │   ⛔ ALL analysis phases (5a-5d) MUST complete before this starts   │   │
-│  │   ⛔ NO other phases can run while this is running                  │   │
-│  │                   └──> GATE: Fixes Applied                          │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  7: VERIFICATION (After modifications)                                     │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 7 (Verify) ──> Re-run tests after fixes                             │   │
-│  │   If failures → loop back to phase 6                                │   │
-│  │                   └──> GATE: Verified                               │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  8: DOCUMENTATION (ALWAYS runs)                                            │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 8 (Docs) ──> Documentation review/update — MODIFIES FILES           │   │
-│  │   ✅ ALWAYS runs - docs must stay in sync with code                 │   │
-│  │                   └──> GATE: Docs Complete                          │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  9: APP, PRODUCTION, DOCKER & GITHUB (Conditional sub-phases)              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 9a (App Test) ──> Sandbox installation & deployment testing         │   │
-│  │ 9b (Production) ──> Validates live installed app                    │   │
-│  │ 9c (Docker) ──> Validates Docker image and registry package         │   │
-│  │ 9d (GitHub) ──> Audits GitHub repository security and settings      │   │
-│  │   📋 Each conditionally SKIP or RUN based on Discovery flags        │   │
-│  │                   └──> GATE: Validation Done                        │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  10: VM TESTING (Conditional on isolation level or staged release)          │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 10a (VM Testing) ──> Heavy isolation in libvirt/QEMU VM             │   │
-│  │ 10b (VM Lifecycle) ──> Snapshot create/revert/delete management     │   │
-│  │                   └──> GATE: VM Complete                            │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  11: CLEANUP (ALWAYS LAST)                                                  │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ 11 (Cleanup) ──> MUST be last phase, never parallel                 │   │
-│  │   Always runs regardless of prior failures (cleanup is mandatory)   │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│  SPECIAL (Independent — never in normal runs):                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ ST (Self-Test) ─> ISOLATED: validates test-skill framework itself   │   │
-│  │   ⛔ ONLY runs when explicitly called: /test --phase=ST             │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Parallel Execution Rules
-
-| Phase | Sub-phases | Parallel? | Gate Condition |
-|-------|-----------|-----------|----------------|
-| 1 | — | ❌ No (single) | Snapshot complete |
-| 2, 3 | — | ❌ No (sequential) | Pre-Flight + Discovery complete |
-| 4 | 4a, 4b | ✅ Yes | Tests complete |
-| 5 | 5a, 5b, 5c, 5d | ✅ Yes | All analysis complete |
-| 6 | — | ❌ No (blocking) | Fixes complete |
-| 7 | — | ❌ No | Verification complete |
-| 8 | — | ❌ No | Docs complete (always runs) |
-| 9 | 9a, 9b, 9c, 9d | ❌ No (conditional) | Validation complete OR skipped |
-| 10 | 10a, 10b | ❌ No (conditional) | VM testing complete OR skipped |
-| 11 | — | ❌ No (always last) | Cleanup complete (always runs) |
-
-### Execution Algorithm
-
-```
-function executeAudit(requestedPhases):
-    # Build execution plan respecting dependencies
-    executionPlan = []
-    allPhasesSucceeded = true
-
-    # Phase 1: Snapshot
-    if 1 in requestedPhases:
-        executionPlan.append({phases: [1], parallel: false, gate: "SNAPSHOT"})
-
-    # Phases 2-3: Pre-Flight + Discovery (sequential - BLOCKER)
-    # Pre-Flight includes config validation and sandbox setup
-    # Discovery determines conditional flags AND isolation level
-    setup = intersection(requestedPhases, [2, 3])
-    if setup:
-        executionPlan.append({phases: setup, parallel: false, gate: "DISCOVERY"})
-        # After Discovery (phase 3) completes, extract:
-        #   - phase9bRecommendation: "SKIP" | "RUN" (Production)
-        #   - phase9cRecommendation: "SKIP" | "RUN" (Docker)
-        #   - phase9dRecommendation: "SKIP" | "RUN" (GitHub)
-        #   - isolationLevel: "sandbox" | "sandbox-warn" | "vm-recommended" | "vm-required"
-        #   - dangerScore: numeric score from pattern detection
-        #   - stagedRelease: "valid" | "invalid" | "none"
-        #   - stagedVersion: version string (or empty)
-
-    # Phase 4: Test Execution (parallel sub-phases)
-    phase4 = intersection(requestedPhases, ["4a", "4b"])
-    if phase4:
-        executionPlan.append({phases: phase4, parallel: true, gate: "TESTS"})
-
-    # Phase 5: Analysis (parallel sub-phases, all read-only)
-    phase5 = intersection(requestedPhases, ["5a", "5b", "5c", "5d"])
-    if phase5:
-        executionPlan.append({phases: phase5, parallel: true, gate: "ANALYSIS"})
-
-    # Phase 6: Fix (NEVER parallel)
-    if 6 in requestedPhases:
-        executionPlan.append({phases: [6], parallel: false, gate: "FIXES"})
-
-    # Phase 7: Verification
-    if 7 in requestedPhases:
-        executionPlan.append({phases: [7], parallel: false, gate: "VERIFY"})
-
-    # Phase 8: Documentation (ALWAYS runs)
-    if 8 in requestedPhases:
-        executionPlan.append({phases: [8], parallel: false, gate: "DOCS"})
-
-    # Phase 9: App, Production, Docker & GitHub Validation (CONDITIONAL)
-    phase9 = []
-    if "9a" in requestedPhases:
-        phase9.append({phase: "9a", condition: "always"})
-    if "9b" in requestedPhases:
-        phase9.append({phase: "9b", condition: "phase9bRecommendation"})
-    if "9c" in requestedPhases:
-        phase9.append({phase: "9c", condition: "phase9cRecommendation"})
-    if "9d" in requestedPhases:
-        phase9.append({phase: "9d", condition: "phase9dRecommendation"})
-    if phase9:
-        executionPlan.append({
-            phases: phase9,
-            parallel: false,  # Run 9a then 9b then 9c then 9d sequentially
-            gate: "VALIDATION",
-            conditional: true
-        })
-
-    # Phase 10: VM Testing (CONDITIONAL on isolation level or staged release)
-    phase10 = intersection(requestedPhases, ["10a", "10b"])
-    if phase10:
-        executionPlan.append({
-            phases: phase10,
-            parallel: false,
-            gate: "VM",
-            conditional: true
-        })
-
-    # Phase 11: Cleanup (always last, always runs)
-    if 11 in requestedPhases:
-        executionPlan.append({phases: [11], parallel: false, gate: "CLEANUP", alwaysRun: true})
-
-    # Execute plan sequentially
-    for step in executionPlan:
-        # Handle conditional execution (Phase 9 sub-phases)
-        if step.conditional:
-            for phaseInfo in step.phases:
-                if phaseInfo.phase == "9a":
-                    pass  # App testing always runs if requested
-                elif phaseInfo.phase == "9b":
-                    if phase9bRecommendation == "SKIP":
-                        log("Phase 9b skipped: No installable app or not installed")
-                        continue
-                elif phaseInfo.phase == "9c":
-                    if phase9cRecommendation == "SKIP":
-                        log("Phase 9c skipped: No Dockerfile or registry package")
-                        continue
-                elif phaseInfo.phase == "9d":
-                    if phase9dRecommendation == "SKIP":
-                        log("Phase 9d skipped: No GitHub remote or gh not authenticated")
-                        continue
-
-        # Execute the step
-        if step.parallel:
-            results = parallelExecute(step.phases)  # Use Task tool in parallel
-        else:
-            results = sequentialExecute(step.phases)
-
-        # Check gate - track failures
-        if any(result.status == FAIL for result in results):
-            allPhasesSucceeded = false
-            if step.gate in ["SNAPSHOT", "DISCOVERY"]:
-                abort("Critical gate failed: " + step.gate)
-            else:
-                warn("Gate " + step.gate + " had failures")
-
-        # ISOLATION LEVEL GATE (after Discovery completes)
-        if step.gate == "DISCOVERY":
-            if isolationLevel == "vm-required" and not vmAvailable:
-                abort("""
-⛔ CRITICAL: This project requires VM isolation.
-⛔ Danger Score: {dangerScore}
-⛔ Indicators: {dangerIndicators}
-⛔ No VM available. Aborting to protect host system.
-
-To proceed:
-1. Set up a test VM: virsh start <vm-name>
-2. Or bypass (DANGEROUS): /test --force-sandbox
-""")
-            elif isolationLevel == "vm-required" and vmAvailable:
-                log("VM isolation REQUIRED - starting test VM...")
-                start_test_vm()
-                useVM = true
-            elif isolationLevel == "vm-recommended" and vmAvailable:
-                log("VM isolation recommended and available - starting test VM...")
-                start_test_vm()
-                useVM = true
-            elif isolationLevel == "vm-recommended" and not vmAvailable:
-                warn("VM isolation recommended but not available")
-                warn("Proceeding with sandbox - exercise caution")
-                useVM = false
-            elif isolationLevel == "sandbox-warn":
-                log("Sandbox with extra monitoring")
-                useVM = false
-            else:  # sandbox
-                log("Standard sandbox isolation sufficient")
-                useVM = false
-
-            # STAGED RELEASE GATE (additional Phase 10a trigger)
-            if stagedRelease == "valid" and not useVM:
-                log("Staged release v{stagedVersion} detected — Phase 10a will deploy and verify")
-                if vmAvailable:
-                    start_test_vm()
-                    useVM = true
-                else:
-                    warn("Staged release detected but no VM available")
-                    warn("Cannot run lifecycle tests without VM")
-
-            # Note: VM shutdown is handled by Phase 11 cleanup (reads .test-vm-state)
-
-        waitForGate(step.gate)
-```
-
-### Why This Matters
-
-**Without dependency enforcement:**
-```
-❌ Phase 6 (Fix) runs parallel with Phase 5a (Security)
-   → Security finds vulnerability in line 45
-   → Fix modifies line 45 at the same time
-   → Race condition: Report shows stale findings
-
-❌ Phase 1 (Snapshot) runs parallel with Phase 6 (Fix)
-   → Snapshot captures mid-modification state
-   → Rollback would restore corrupted state
-
-❌ Phase 5c (Quality) runs before Phase 4a (Execute)
-   → No test results available for dead code analysis
-   → Phase 5c reports incomplete findings
-```
-
-**With dependency enforcement:**
-```
-✅ 1 completes → snapshot is clean baseline
-✅ 2, 3 complete → config validated, project type known
-✅ 4a, 4b complete → test results + coverage + failure analysis available
-✅ 5a-5d run parallel (read-only) → safe
-✅ 6 runs alone → no race conditions
-✅ 7 verifies → confirms fixes work
-✅ 11 runs last → clean exit
-```
+Gate failure: SNAPSHOT or DISCOVERY → abort the audit; any other gate → warn and continue.
 
 ---
 
 ## Execution Strategy
 
-This skill uses **phase subagents** to minimize context consumption:
+- **Dispatcher** (this file): parses args, enforces dependencies
+- **Phase files**: `~/.claude/skills/test-phases/phase-*.md`, read on demand by **subagents** spawned via Task with model selection; each runs in its own context and returns a summary
+- **Gates**: tier-completion checkpoints before the next tier
+- **Task tracking**: TaskCreate/TaskUpdate for phase progress
 
-1. **Dispatcher** (this file) - parses args, enforces dependencies
-2. **Phase Files** - `~/.claude/skills/test-phases/phase-*.md`
-3. **Subagents** - Load phase files on-demand via Task tool with model selection
-4. **Gates** - Tier completion checkpoints before next tier
-5. **Task tracking** - Use TaskCreate/TaskUpdate for phase progress visibility
-
-Each phase runs in its own subagent context, then returns a summary.
 **Sub-phases (a/b/c/d) may run in parallel. Phases run sequentially.**
 
 ### Subagent Model Selection
 
-Phases run on three tiers. Two are fixed names; the **judgement** tier is resolved
-from the session model once per run, before any phase is spawned.
+Three tiers. Two are fixed names; **judgement** is resolved from the session model once per run, before any phase is spawned.
 
 | Tier | Phases | Model passed to Task | Rationale |
 |------|--------|----------------------|-----------|
-| **judgement** | 3, 5a, 5c, 6, 9a, 9b, 9c, 9d, ST | `JUDGEMENT_MODEL` (resolved below) | Finding defects and fixing them — where reasoning depth decides the result |
-| **sonnet** | 2, 4a, 4b, 5b, 7, 8, 5d, 10a, 10b | `sonnet` | Moderate complexity: test execution, dependency checks, verification |
-| **haiku** | 1, 11 | `haiku` | Lightweight: snapshots, cleanup |
+| **judgement** | 3, 5a, 5c, 6, 9a, 9b, 9c, 9d, ST | `JUDGEMENT_MODEL` (resolved below) | Finding and fixing defects — reasoning depth decides the result |
+| **sonnet** | 2, 4a, 4b, 5b, 7, 8, 5d, 10a, 10b | `sonnet` | Test execution, dependency checks, verification |
+| **haiku** | 1, 11 | `haiku` | Snapshots, cleanup |
 
 #### Resolving `JUDGEMENT_MODEL`
 
-Capability order: `fable` > `opus` > `sonnet` > `haiku`. Identify the model the
-dispatcher itself is running on from its own system context, then:
+Capability order: `fable` > `opus` > `sonnet` > `haiku`. Identify the dispatcher's own model from its system context, then:
 
 | Session model | Default | With `--budget` |
 |---------------|---------|-----------------|
@@ -735,41 +330,21 @@ dispatcher itself is running on from its own system context, then:
 | `sonnet` | `opus` | `sonnet` |
 | `haiku` | `opus` | `haiku` |
 
-- **Default = the more capable of the session model and `opus`.** A fixed `opus`
-  pin would audit a Fable-built project below its builder; the floor stops a
-  cheap session from producing a cheap audit by accident — an auditor weaker
-  than the builder shares the builder's blind spots.
+- **Default = the more capable of the session model and `opus`** (an auditor weaker than the builder shares its blind spots).
 - **`--budget` removes the floor**: the judgement tier runs on the session model.
-  Spending less is then a visible choice, not a side effect of the session.
-- If the session model is none of the four names, use `opus` (with or without
-  `--budget`) and say so in the report header.
-- **Always pass the resolved name explicitly** as `model=`. Never omit it — an
-  omitted model can resolve to an agent definition's own model rather than the
-  session's.
-- The fixed tiers do not move with the session: snapshots and test runs gain
-  nothing from a larger model.
-
-**Example Task calls:**
-```
-Task(subagent_type="general-purpose", model=JUDGEMENT_MODEL, prompt="Read phase file and execute...")
-Task(subagent_type="general-purpose", model="haiku", prompt="Read phase file and execute...")
-```
+- Session model none of the four → use `opus` (with or without `--budget`) and say so in the report header.
+- **Always pass the resolved name explicitly** as `model=`; never omit it (an omitted model can resolve to an agent definition's own model).
+- Fixed tiers never move with the session.
 
 ### Task Progress Tracking
 
-Use TaskCreate at the start of the audit to create a task for each phase being run.
-Update task status as phases execute:
-- `pending` → `in_progress` when a phase subagent is spawned
-- `in_progress` → `completed` when the phase returns successfully
-- Use `addBlockedBy` to express tier dependencies between tasks
-
-This gives the user real-time visibility into audit progress.
+At audit start, TaskCreate one task per phase being run. `pending` → `in_progress` when its subagent spawns; → `completed` when it returns successfully. Express tier dependencies with `addBlockedBy`.
 
 ---
 
 ## Phase Execution
 
-When running phases, spawn a Task subagent for each phase:
+Spawn a Task subagent for each phase:
 
 ```
 For each requested phase:
@@ -783,7 +358,7 @@ For each requested phase:
 
 ### Inline Fallback Instructions
 
-If phase files don't exist, use these minimal instructions:
+Only when phase files are missing:
 
 **Phase 1 (Snapshot)**:
 ```bash
@@ -796,24 +371,11 @@ if df -T "$PROJECT_DIR" | grep -q btrfs; then
 fi
 ```
 
-**Phase 2 (Pre-Flight)** — includes config validation and sandbox setup:
-- Check dependencies: `pip check` / `npm ls` / `go mod verify`
-- Verify env vars exist
-- Test service connectivity
-- Check file permissions
-- Validate configuration files
-- Set up safe sandbox environment
+**Phase 2 (Pre-Flight)**: dependencies (`pip check` / `npm ls` / `go mod verify`); env vars exist; service connectivity; file permissions; config files valid; set up a safe sandbox.
 
-**Phase 3 (Discovery)**:
-- Identify project type (Python/Node/Go/Rust/etc.)
-- Find test files
-- Locate config files
+**Phase 3 (Discovery)**: project type (Python/Node/Go/Rust/etc.), test files, config files.
 
-**Phase 4a (Execute Tests & Analyze)** — includes coverage, reporting, and failure analysis:
-- Run: `pytest` / `npm test` / `go test` / `cargo test`
-- Check actual output, not just exit codes
-- Run coverage tool and enforce 85% minimum (configurable)
-- Summarize test results and analyze failures
+**Phase 4a (Execute Tests & Analyze)**: run `pytest` / `npm test` / `go test` / `cargo test`; check actual output, not just exit codes; coverage with 85% minimum (configurable); summarize results and analyze failures.
 
 **Phase 9a (App Testing)** - Sandbox Installation:
 ```
@@ -842,16 +404,13 @@ Key steps:
 9. Generate production-issues.log
 ```
 
-**Phase 5a (Security)**:
-- `pip-audit` / `npm audit` / `cargo audit`
-- Grep for hardcoded secrets
-- Check CVEs
+**Phase 5a (Security)**: `pip-audit` / `npm audit` / `cargo audit`; grep for hardcoded secrets; check CVEs.
 
 ---
 
 ## Output Format
 
-Each phase returns a summary block:
+Each phase returns:
 
 ```
 ═══════════════════════════════════════════════════════════════════
@@ -864,11 +423,9 @@ Status: ✅ PASS / ⚠️ ISSUES / ❌ FAIL
 Issues: [count]
 ```
 
----
-
 ## Final Summary
 
-After all phases complete:
+After all phases:
 
 ```markdown
 # Audit Summary
@@ -889,30 +446,11 @@ Judgement tier: <JUDGEMENT_MODEL> (session: <model>; --budget: yes/no)
 Output Log: audit-YYYYMMDD-HHMMSS.log
 ```
 
-**Note**: The audit is NOT complete until `Issues Fixed == Issues Found` and all tests pass.
-
----
+The audit is NOT complete until `Issues Fixed == Issues Found` and all tests pass.
 
 ## How to Add New Phases
 
-1. Create file: `~/.claude/skills/test-phases/phase-X-name.md`
-2. Follow the structure of existing phase files
-3. Add phase to the Available Phases table above
-4. The dispatcher will automatically load it
-
----
-
-## Context Efficiency Notes
-
-**Why modular?**
-- Old skill: 3,600 lines loaded every time
-- New approach: ~200 line dispatcher + phase files loaded on-demand
-- Only active phases consume context
-
-**Subagent strategy:**
-- Each phase runs in its own Task subagent
-- Subagent reads the phase file, executes, returns summary
-- Main context only sees summaries, not full instructions
+Create `~/.claude/skills/test-phases/phase-X-name.md` following existing phase files' structure, and add it to the Available Phases table; the dispatcher loads it automatically.
 
 ---
 
@@ -921,13 +459,11 @@ Output Log: audit-YYYYMMDD-HHMMSS.log
 When `/test` is invoked:
 
 1. **Parse arguments**
-   - Check for `--interactive` flag → set `INTERACTIVE_MODE=true` (default: false)
-   - Check for `--budget` flag → set `BUDGET_MODE=true` (default: false)
-   - Resolve `JUDGEMENT_MODEL` from the session model and `BUDGET_MODE` (see
-     "Resolving `JUDGEMENT_MODEL`") and state it in the first line of audit
-     output (not for `help` / `--list-phases`, which print their block verbatim)
-   - All other flags work the same in both modes
-2. If `help` or `--list-phases`: display the canonical help block below **verbatim** and exit. Do not summarize or rephrase — output the block exactly as written:
+   - `--interactive` → set `INTERACTIVE_MODE=true` (default: false)
+   - `--budget` → set `BUDGET_MODE=true` (default: false)
+   - Resolve `JUDGEMENT_MODEL` from the session model and `BUDGET_MODE` (see "Resolving `JUDGEMENT_MODEL`"); state it in the first line of audit output (not for `help` / `--list-phases`)
+   - All other flags behave the same in both modes
+2. If `help` or `--list-phases`: output this block **verbatim** (no summarizing or rephrasing) and exit:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -998,24 +534,21 @@ When `/test` is invoked:
 ```
 
 3. **Handle shortcuts:**
-   - `prodapp` → `--phase=9b` (production validation)
-   - `docker` → `--phase=9c` (Docker validation)
-   - `qaapp` → load project QA app module (test-*-qa-app.md from project root)
-   - `qadocker` → load project QA docker module (test-*-qa-docker.md from project root)
-   - `qaall` → load project QA all module (test-*-qa-all.md from project root)
+   - `prodapp` → `--phase=9b` (production validation against the project's `install-manifest.json`)
+   - `docker` → `--phase=9c` (image builds; registry package version matches project VERSION)
+   - `qaapp` → load project QA app module (test-*-qa-app.md from project root): auto-upgrade QA VM native app to latest release, sync production DB, full regression (API, web, auth, services, logs)
+   - `qadocker` → load project QA docker module (test-*-qa-docker.md from project root): same for the Docker container, plus consistency check against the native app
+   - `qaall` → load project QA all module (test-*-qa-all.md from project root): native, then Docker, then cross-validate version agreement, library counts, API responses
    - `security` → `--phase=5a` (comprehensive security audit)
-   - `github` → `--phase=9d` (GitHub repository audit)
+   - `github` → `--phase=9d` (GitHub repository audit; auto-enables missing security features)
    - `--phase=SEC` → `--phase=5a` (alias for security phase)
 4. **Build execution plan from requested phases**
 
 ### QA Module Loading (Project-Specific)
 
-When the argument is `qaapp`, `qadocker`, or `qaall`:
+For `qaapp`, `qadocker`, or `qaall`:
 
-1. **Map shortcut to file suffix:**
-   - `qaapp` → `app`
-   - `qadocker` → `docker`
-   - `qaall` → `all`
+1. **Map shortcut to file suffix:** `qaapp` → `app`, `qadocker` → `docker`, `qaall` → `all`
 
 2. **Find module file in project root:**
    ```bash
@@ -1023,36 +556,22 @@ When the argument is `qaapp`, `qadocker`, or `qaall`:
    MODULE_FILE=$(ls ${PROJECT_DIR}/test-*-qa-${SUFFIX}.md 2>/dev/null | head -1)
    ```
 
-3. **Validate module exists:**
-   - If no file found:
+3. **No file found** → print and **ABORT** (never fall back to a built-in phase):
      ```
      ERROR: No QA ${SUFFIX} module found in project root.
      Expected: test-*-qa-${SUFFIX}.md
      Create a project-specific QA test module to use this shortcut.
      ```
-     **ABORT** — do not fall back to any built-in phase.
 
 4. **Read vm-test-manifest.json QA config:**
    ```bash
    QA_CONFIG=$(python3 -c "import json; print(json.dumps(json.load(open('${PROJECT_DIR}/vm-test-manifest.json')).get('qa_vm', {})))" 2>/dev/null)
    ```
-   If no `qa_vm` section found, WARN but continue (module may have inline config).
+   No `qa_vm` section → WARN and continue (module may have inline config).
 
-5. **Execute as standalone subagent:**
-   - Read the module file contents
-   - Spawn a single Task subagent with `model=JUDGEMENT_MODEL` (judgement tier)
-   - Pass the module contents as the subagent's instructions
-   - Include context: `PROJECT_DIR`, QA VM config from manifest, SSH config
-   - **QA modules are STANDALONE** — no phase prerequisites
-   - The module handles its own VM connectivity, version checks, upgrades, DB sync
-   - **No other phases run** — qaapp/qadocker/qaall are self-contained
+5. **Execute as one standalone Task subagent** with `model=JUDGEMENT_MODEL` (judgement tier), the module contents as its instructions, plus context `PROJECT_DIR`, the manifest's QA VM config, and SSH config. QA modules are **STANDALONE**: no phase prerequisites, **no other phases run**, and they bypass the tier/gate system; the module handles its own VM connectivity, version checks, upgrades, DB sync.
 
-6. **Report results:**
-   - Collect subagent output
-   - Display QA test summary
-   - Return overall PASS/FAIL status
-
-**Key difference from built-in phases:** QA shortcuts bypass the entire tier/gate execution system. They are project-specific, standalone operations that load their own instructions.
+6. **Report**: collect output, display the QA summary, return overall PASS/FAIL.
 
 ### Mode-Specific Behavior
 
@@ -1077,279 +596,86 @@ ELSE (Autonomous - DEFAULT):
 5. **Execute by tier (respecting dependencies):**
 
    ```
-   Phase 1: Snapshot - Run SEQUENTIALLY
-   ──────────────────────────────────────────────────────────────────
-   Wait for completion → GATE: Snapshot Ready
-   If --skip-snapshot: exclude phase 1
+   Phase 1: Snapshot — SEQUENTIAL → GATE: Snapshot Ready
+     --skip-snapshot: exclude phase 1
 
-   Phases 2-3: Pre-Flight & Discovery - Run SEQUENTIALLY
-   ──────────────────────────────────────────────────────────────────
-   Phase 2 includes config validation and sandbox setup
-   Wait for completion → GATE: Project Known
-   ⛔ ABORT if this fails - nothing else can proceed
-   📋 Extract conditional phase flags from output:
-      - Installable App: [type or "none"]
-      - Production Status: [installed|not-installed|installed-not-running]
-      - Phase 9b Recommendation: [SKIP|RUN]
-      - Phase 9c Recommendation: [SKIP|RUN]
-      - Phase 9d Recommendation: [SKIP|RUN]
-   📋 Extract staged release status from output:
-      - Staged Release: [valid|invalid|none]
-      - Staged Version: [X.Y.Z or empty]
-      - If "valid": Phase 10a will be triggered for lifecycle testing
-   📋 Extract custom pytest options from output:
-      - Parse `Pytest Custom Option: --flag | help text | resource-type` lines
-      - Resource types: vm, hardware, other
-      - **ALWAYS prompt for vm/hardware flags** (even in autonomous mode):
-        These require physical resources or human action that can't be automated.
-        Use AskUserQuestion (multiSelect: true) with only the vm/hardware flags.
-        This is the sole autonomous-mode exception for pytest flag prompting.
-      - If user selects --hardware, show reminder:
-        "Hardware tests require manual action (e.g., touch your security key
-        when it flashes, or approve on your passkey device). Stay attentive
-        during Phase 4a."
-      - For `other` flags: only prompt in --interactive mode, skip in autonomous
-      - If no resource flags and autonomous: Set PYTEST_EXTRA_FLAGS=""
-      - Pass PYTEST_EXTRA_FLAGS as context to Phase 4a subagent
+   Phases 2-3: Pre-Flight & Discovery — SEQUENTIAL → GATE: Project Known
+     ⛔ ABORT if this fails — nothing else can proceed
+     📋 Extract from Discovery output:
+        - Installable App: [type or "none"]
+        - Production Status: [installed|not-installed|installed-not-running]
+        - Phase 9b Recommendation: [SKIP|RUN]
+        - Phase 9c Recommendation: [SKIP|RUN]
+        - Phase 9d Recommendation: [SKIP|RUN]
+        - Staged Release: [valid|invalid|none]; Staged Version: [X.Y.Z or empty]
+          ("valid" → Phase 10a runs lifecycle testing)
+     📋 Custom pytest options: parse `Pytest Custom Option: --flag | help text | resource-type`
+        lines (resource types: vm, hardware, other)
+        - vm/hardware flags: ALWAYS prompt, even in autonomous mode (sole autonomous-mode
+          exception) — AskUserQuestion (multiSelect: true) with only those flags
+        - If --hardware selected, remind: "Hardware tests require manual action (e.g.,
+          touch your security key when it flashes, or approve on your passkey device).
+          Stay attentive during Phase 4a."
+        - `other` flags: prompt only in --interactive, skip in autonomous
+        - No resource flags and autonomous: PYTEST_EXTRA_FLAGS=""
 
-   Phase 4: Test Execution [4a, 4b] - Run in PARALLEL
-   ──────────────────────────────────────────────────────────────────
-   Phase 4a includes coverage, reporting, and failure analysis
-   📋 Pass PYTEST_EXTRA_FLAGS to Phase 4a subagent context:
-      "Set PYTEST_EXTRA_FLAGS to: [flags from Discovery]"
-      (empty string if no flags selected)
-   Wait for all to complete → GATE: Tests Complete
+   Phase 4: Test Execution [4a, 4b] — PARALLEL → GATE: Tests Complete
+     Pass to 4a subagent: "Set PYTEST_EXTRA_FLAGS to: [flags from Discovery]" (empty if none)
 
-   Phase 5: Analysis [5a, 5b, 5c, 5d] - Run in PARALLEL
-   ──────────────────────────────────────────────────────────────────
-   All are READ-ONLY, safe to parallelize
-   Phase 5c includes dead code detection
-   Wait for all to complete → GATE: Analysis Complete
+   Phase 5: Analysis [5a, 5b, 5c, 5d] — PARALLEL (all READ-ONLY) → GATE: Analysis Complete
 
-   Phase 6: Fix - Run ALONE (no parallel)
-   ──────────────────────────────────────────────────────────────────
-   ⛔ Must wait for ALL phase 5 sub-phases to complete
-   ⛔ No other phases can run during this
-   Wait for completion → GATE: Fixes Applied
+   Phase 6: Fix — ALONE → GATE: Fixes Applied
+     ⛔ Wait for ALL phase 5 sub-phases; nothing else runs meanwhile
 
-   Phase 7: Verification - Run SEQUENTIALLY
-   ──────────────────────────────────────────────────────────────────
-   Wait for completion → GATE: Verified
-   If tests fail, loop back to phase 6 (Fix) until clean
-   After all fixes committed, re-run entire audit until clean pass
+   Phase 7: Verification — SEQUENTIAL → GATE: Verified
+     Failures → loop back to phase 6 until clean
+     After all fixes committed → re-run entire audit until clean pass
 
-   Phase 8: Documentation - ALWAYS RUNS
-   ──────────────────────────────────────────────────────────────────
-   ✅ ALWAYS runs - documentation must stay current
-   ✅ Fixes ALL doc issues: versions, paths, obsolete content
-   Wait for completion → GATE: Docs Complete
+   Phase 8: Documentation — ALWAYS RUNS → GATE: Docs Complete
+     Fixes ALL doc issues: versions, paths, obsolete content
 
-   Phase 9: Validation [9a, 9b, 9c, 9d] - CONDITIONAL
-   ──────────────────────────────────────────────────────────────────
-   **Phase 9a** - App Testing:
-     - Sandbox installation & deployment testing
-     - Runs if project has deployable app components
+   Phase 9: Validation [9a, 9b, 9c, 9d] — CONDITIONAL, sequential, no prompts
+     9a: runs if project has deployable app components
+     9b/9c/9d: per Discovery recommendation — SKIP: log reason, go to next;
+       RUN: execute and fix all issues found
+     → GATE: Validation Done
 
-   **Phase 9b** - Check Recommendation from Discovery:
-     - SKIP: Log "No installable app or not installed" and proceed to 9c
-     - RUN: Execute Phase 9b, fix any issues found
-     (No prompts - fully autonomous)
+   Phase 10: VM Testing [10a, 10b] — CONDITIONAL (isolation level or staged release)
+     → GATE: VM Complete
 
-   **Phase 9c** - Check Recommendation from Discovery:
-     - SKIP: Log "No Dockerfile or registry package" and proceed to 9d
-     - RUN: Execute Phase 9c, fix any version sync issues
-     (No prompts - fully autonomous)
-
-   **Phase 9d** - Check Recommendation from Discovery:
-     - SKIP: Log "No GitHub remote or gh not authenticated" and proceed to phase 10
-     - RUN: Execute Phase 9d, audit and fix GitHub security settings
-     (No prompts - fully autonomous)
-   Wait for completion (or skip) → GATE: Validation Done
-
-   Phase 10: VM Testing [10a, 10b] - CONDITIONAL
-   ──────────────────────────────────────────────────────────────────
-   Conditional on isolation level or staged release detection
-   10a: Heavy isolation testing in VM
-   10b: VM lifecycle snapshot management
-   Wait for completion (or skip) → GATE: VM Complete
-
-   Phase 11: Cleanup - Run LAST (never parallel, always runs)
-   ──────────────────────────────────────────────────────────────────
-   Always runs regardless of prior failures (cleanup is mandatory)
+   Phase 11: Cleanup — LAST, never parallel, always runs regardless of prior failures
    ```
 
 6. **For each tier, spawn Task subagent(s) with model selection:**
-   - **Parallel tier**: Multiple Task tool calls in SINGLE message
-   - **Sequential tier**: Single Task tool call, wait for result
-   - Each subagent reads `~/.claude/skills/test-phases/phase-{X}-{name}.md`
-   - Each returns summary with Status, Issue count, Key findings
-   - **Model selection per phase** (use `model` parameter on Task tool):
+   - **Parallel tier**: multiple Task calls in a SINGLE message
+   - **Sequential tier**: one Task call, wait for result
+   - Each subagent reads `~/.claude/skills/test-phases/phase-{X}-{name}.md` and returns Status, Issue count, Key findings
+   - **Model selection per phase** (`model` parameter on Task):
      - `JUDGEMENT_MODEL`: Phases 3, 5a, 5c, 6, 9a, 9b, 9c, 9d, ST
      - `sonnet`: Phases 2, 4a, 4b, 5b, 7, 8, 5d, 10a, 10b
      - `haiku`: Phases 1, 11
-   - Use `run_in_background: true` for long-running phases where appropriate
+   - `run_in_background: true` for long-running phases where appropriate
 
-7. **Gate validation between tiers:**
-   - Collect all results from current tier
-   - Check for failures
-   - SAFETY/DISCOVERY failures → abort audit
-   - Other failures → warn and continue
+7. **Gate validation between tiers:** collect results, check failures; SAFETY/DISCOVERY failures → abort; others → warn and continue.
 
 8. **Generate final report after all tiers complete**
 
 ### Special Phase Handling
 
-**Phase 9a (App Testing):**
-- Runs after phase 8 (Docs), alongside 9b/9c/9d
-- Depends on: Phase 3 (Discovery) completing
-- Runs in sandbox - separate from production validation
+- **Phase 9a (App Testing)**: after phase 8, alongside 9b/9c/9d; depends on Phase 3; sandbox only, separate from production validation.
+- **Phase 9d (GitHub)**: audits Dependabot, CodeQL workflows, secret scanning, branch protection; auto-enables missing security features when possible.
+- **Phase 8 (Docs)**: after 7, before 9; fixes ALL doc issues (version refs, obsolete paths, outdated content) so docs match the codebase even when issues remain.
+- **Phase 10a (VM Testing)**: outcomes SKIP (no trigger), RUN (trigger + VM), ABORT (`vm-required`, no VM).
+  - Project-VM routing via `~/.claude/config/project-vm-map.json`: `exclusive_to` mappings route projects to dedicated VMs; reserved VMs cannot be used by other projects; unmapped projects use the default VM
+  - Capabilities: deploy to existing test VM via SSH; **staged release lifecycle testing** (install → upgrade → deploy → verify); **Docker staging image testing** (transfer + smoke test on VM); create VM from ISO library; full OS isolation; snapshot/restore rollback after dangerous tests; cross-distro (Ubuntu, Fedora, Debian, CachyOS, Windows)
+  - Use cases: PAM, kernel params, systemd services, bootloader, **release verification**
+- **Phase ST (Self-Test)**: NEVER in normal `/test` runs (not even full audit); ONLY `/test --phase=ST`; no dependencies. Validates the framework itself — phase files, symlinks, dispatcher, tool availability. Run after modifying phase files, symlinks, or installing tools.
 
-**Phase 9b (Production) - Autonomous:**
-- Conditional execution based on Discovery results
-- Two possible outcomes (no prompts):
-  1. **SKIP**: No installable app or not installed → proceed to 9c
-  2. **RUN**: Production app is installed → validate and fix issues
-
-**Phase 9c (Docker) - Autonomous:**
-- Runs after 9b
-- Conditional execution based on Discovery results
-- Two possible outcomes (no prompts):
-  1. **SKIP**: No Dockerfile or registry package → proceed to 9d
-  2. **RUN**: Dockerfile + registry package found → validate and fix version sync
-
-**Phase 9d (GitHub) - Autonomous:**
-- Runs after 9c
-- Conditional execution based on Discovery results
-- Two possible outcomes (no prompts):
-  1. **SKIP**: No GitHub remote or gh CLI not authenticated → proceed to phase 10
-  2. **RUN**: GitHub remote + gh authenticated → full security audit
-- Audits: Dependabot, CodeQL workflows, secret scanning, branch protection
-- Auto-enables missing security features when possible
-
-**Phase 8 (Docs) - ALWAYS Runs:**
-- Runs after phase 7 (Verify), before phase 9 (Validation)
-- ALWAYS runs regardless of prior phase status
-- Fixes ALL documentation issues: version refs, obsolete paths, outdated content
-- Documentation MUST match current codebase state
-- Rationale: Docs should always be current, even if codebase has issues to track
-
-**Phase 11 (Cleanup) - Always Runs:**
-- Always executes regardless of prior failures
-- Cleanup is mandatory for environment hygiene
-
-**Phase 10a (VM Testing) - Conditional on Isolation Level OR Staged Release:**
-- VM isolation when sandbox is insufficient
-- Conditional execution based on Discovery `ISOLATION_LEVEL` output OR staged release detection
-- Two independent triggers (either activates Phase 10a):
-  1. **Isolation Level**: `vm-required` or `vm-recommended` with VM available
-  2. **Staged Release**: `.staged-release` exists and is valid
-- Possible outcomes:
-  1. **SKIP**: No trigger active (sandbox isolation, no staged release)
-  2. **RUN**: Either trigger active AND VM available
-  3. **ABORT**: `ISOLATION_LEVEL` is `vm-required` AND no VM available
-- Project-VM routing via `~/.claude/config/project-vm-map.json`:
-  - Projects with dedicated VMs are routed automatically based on `exclusive_to` mappings
-  - Exclusivity enforced — reserved VMs cannot be used by other projects
-  - Default VM used for projects without explicit mapping
-- Capabilities:
-  - Deploy project to existing test VM via SSH
-  - **Staged release lifecycle testing**: install → upgrade → deploy → verify
-  - **Docker staging image testing**: transfer and smoke test on VM
-  - Create new VM from ISO library if needed
-  - Run tests in full OS isolation
-  - Snapshot/restore for rollback after dangerous tests
-  - Cross-distro testing (Ubuntu, Fedora, Debian, CachyOS, Windows)
-- Use cases: PAM modifications, kernel params, systemd services, bootloader changes, **release verification**
-
-**Phase ST (Self-Test) - Explicit Only:**
-- ISOLATED — never part of normal phase execution
-- NEVER included in normal `/test` runs (not even full audit)
-- ONLY runs when explicitly called: `/test --phase=ST`
-- No dependencies - runs completely standalone
-- Purpose: Validates the test-skill framework itself (meta-testing)
-- Checks: Phase file existence, symlinks, dispatcher, tool availability
-- Use cases: After modifying phase files, updating symlinks, installing tools
-
-**When user requests only specific phases:**
-- Still enforce dependencies
-- Example: `/test --phase=5a` still requires phase 3 (Discovery) to run first
-- Example: `/test --phase=9b` requires Discovery AND all prior phases
-- Example: `/test --phase=8` requires ALL phases 1-7 to have passed
-
----
-
-## Recommended Execution
-
-For full audit:
-```
-/test
-```
-
-For quick check:
-```
-/test --phase=1-3
-```
-
-For app deployment testing only:
-```
-/test --phase=9a
-```
-
-For comprehensive security audit (standalone):
-```
-/test security
-# or: /test --phase=5a
-# or: /test --phase=SEC
-```
-
-For production validation (installed app):
-```
-/test prodapp
-```
-This validates the live production installation against the project's `install-manifest.json`.
-
-For Docker validation (image and registry):
-```
-/test docker
-```
-This validates the Docker image builds correctly and the registry package version matches the project VERSION.
-
-For QA native app regression:
-```
-/test qaapp
-```
-Auto-upgrades the QA VM native app to the latest release, syncs the production database, and runs full regression (API, web, auth, services, logs).
-
-For QA Docker regression:
-```
-/test qadocker
-```
-Same as qaapp but for the Docker container. Includes consistency check comparing Docker against native app.
-
-For complete QA regression (both):
-```
-/test qaall
-```
-Runs native regression first, then Docker regression, then cross-validates version agreement, library counts, and API responses.
-
-For GitHub repository audit:
-```
-/test github
-```
-This audits the project's GitHub repository for security settings (Dependabot, CodeQL, secret scanning, branch protection) and auto-enables missing security features.
-
-For test-skill framework validation (meta-testing):
-```
-/test --phase=ST
-```
-This validates the test-skill framework itself - phase files, symlinks, dispatcher, and tool availability.
-**Note:** Phase ST is NEVER included in normal `/test` runs. It only runs when explicitly called.
+**Specific phases requested → still enforce dependencies**: `--phase=5a` needs phase 3 first; `--phase=9b` needs Discovery AND all prior phases; `--phase=8` needs phases 1-7 passed.
 
 ---
 
 ## MCP Server Integration
-
-The `/test` skill can leverage MCP (Model Context Protocol) servers for enhanced testing when available:
 
 | MCP Server | Used By | Enhancement |
 |------------|---------|-------------|
@@ -1364,64 +690,26 @@ The `/test` skill can leverage MCP (Model Context Protocol) servers for enhanced
 
 ### Auto-Enable/Disable
 
-**`/test` automatically manages MCP servers:**
+1. Discovery (Phase 3) detects beneficial MCP servers
+2. Disabled beneficial servers are **temporarily enabled**, tracked in `.test-mcp-enabled`
+3. Cleanup (Phase 11) disables every auto-enabled server and removes `.test-mcp-enabled`, restoring the original plugin config
 
-1. **Discovery (Phase 3)** detects which MCP servers would benefit the project
-2. If a beneficial server is disabled, `/test` **temporarily enables it**
-3. Enabled servers are tracked in `.test-mcp-enabled`
-4. **Cleanup (Phase 11)** automatically disables any servers that were auto-enabled
-5. Your original plugin configuration is restored
-
-**Example flow:**
-```
-Phase 3 (Discovery):
-  Project has: React frontend, Python backend
-  Auto-enabling: playwright (for E2E), pyright-lsp (for type checking)
-  Saved to: .test-mcp-enabled
-
-Phase 9a (App Testing):
-  Using playwright for E2E browser tests... ✅
-
-Phase 5c (Quality):
-  Using pyright-lsp for type checking... ✅
-
-Phase 11 (Cleanup):
-  Disabling playwright (was auto-enabled) ✅
-  Disabling pyright-lsp (was auto-enabled) ✅
-  Removed .test-mcp-enabled ✅
-```
-
-**No manual intervention needed** - your settings are preserved automatically.
-
-To skip auto-enable behavior, use:
-```
-/test --no-mcp-enable
-```
+`--no-mcp-enable` skips auto-enable.
 
 ---
 
 ## Companion Tools (out-of-phase, optional)
 
-`/test` is a comprehensive 20-phase audit. For narrower jobs that don't need the full
-sweep, or for strategic/taste decisions that operate above the code level, the following
-gstack skills are complementary — they do not replace `/test`, and `/test` does not
-invoke them:
+Complementary gstack skills; they do not replace `/test`, and `/test` does not invoke them:
 
-- **`/gstack-health`** — fast 0-10 quality-score dashboard (seconds, not minutes).
-  Use as a daily pulse; use `/test` weekly and before releases.
-- **`/gstack-cso --skills`** — skill-supply-chain audit (referenced in Phase 5a). Run
-  when the `.claude/skills/` inventory changes.
-- **`/gstack-qa`**, **`/gstack-benchmark`**, **`/gstack-canary`** — web-facing companions
-  for Phase 9a / 9b (referenced in Phase 9a).
-- **`/gstack-autoplan`** — strategic multi-lens sign-off (CEO / eng / design / DX) after
-  a clean `/test`. Use when a release touches product decisions, not just correctness.
-- **`/gstack-investigate`** — root-cause-first debugging when Phase 7 uncovers a failure
-  that `/test`'s auto-fix can't explain.
+- **`/gstack-health`** — fast 0-10 quality dashboard; daily pulse (`/test` weekly and before releases)
+- **`/gstack-cso --skills`** — skill-supply-chain audit (referenced in Phase 5a); run when `.claude/skills/` changes
+- **`/gstack-qa`**, **`/gstack-benchmark`**, **`/gstack-canary`** — web-facing companions for Phase 9a / 9b
+- **`/gstack-autoplan`** — strategic CEO/eng/design/DX sign-off after a clean `/test` when a release touches product decisions
+- **`/gstack-investigate`** — root-cause debugging when Phase 7 uncovers a failure auto-fix can't explain
 
-The `Governing Law` above applies to `/test`'s own phases, not to these companions.
-Running a companion does not satisfy `/test`'s completeness requirement — `/test` must
-still reach a clean pass on its own.
+The `Governing Law` governs `/test`'s own phases, not companions. Running a companion never satisfies `/test`'s completeness requirement.
 
 ---
 
-*Document Version: 5.0.0 — Unified sequential phase numbering (phase number = execution order), eliminated dual tier/phase system*
+*Document Version: 5.0.0 — unified sequential phase numbering (phase number = execution order)*
