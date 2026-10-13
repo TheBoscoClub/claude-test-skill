@@ -50,7 +50,7 @@ bd close <id>         # Mark complete
 bd orphans            # Open issues referenced by a commit (done, never closed)
 bd lint               # Issues missing template sections
 bd stale              # Issues with no recent activity
-# bd doctor          # DOES NOT WORK in embedded mode; use preflight instead
+# bd doctor is unsupported in embedded mode (bd 1.0.3) — prints troubleshooting only
 ```
 
 ### Rules
