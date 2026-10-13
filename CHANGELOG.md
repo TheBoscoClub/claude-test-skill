@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`AGENTS.md` regenerated from the house template**: `bd doctor` entry (previously a local note pointing at `bd preflight`) now marked unsupported in embedded mode (bd 1.0.3 prints troubleshooting only)
 - **Judgement-tier phases follow the session model, with an Opus floor** — phases 3, 5a, 5c, 6, 9a–9d and ST were pinned to `opus`, so a Fable session audited below its builder. They now run on `JUDGEMENT_MODEL`, resolved once per run to the more capable of the session model and `opus` (`fable` > `opus` > `sonnet` > `haiku`) and stated in the final report; QA modules use it too. The Opus floor is deliberate — a Sonnet or Haiku session still audits judgement phases on Opus unless `--budget` is passed. The `sonnet` and `haiku` tiers are unchanged. The dispatcher's frontmatter `model: opus` is removed, so the dispatcher itself runs on the session model
 - **Self-test 6.2 and 6.4 enforce the judgement tier** — 6.2 expects `judgement` in the nine phase headers; 6.4 fails on a frontmatter model pin, a missing `JUDGEMENT_MODEL` resolution or `--budget` flag, or a subagent spawn hard-coded to `opus`
 
