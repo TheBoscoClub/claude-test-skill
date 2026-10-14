@@ -332,3 +332,7 @@ SESSION_RECORD*.md.zst
 
 # CLAUDE.md and .claude/rules/ are tracked project content (2026-10-08); local-only values go here
 .claude/rules/local-*.md
+
+# bd issue export: local only. The tracker stays on this machine (BTRFS + backups);
+# publishing it exposed issue text in public repos (2026-10-14).
+.beads/issues.jsonl

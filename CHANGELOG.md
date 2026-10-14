@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Phase 9d Step 8 can count orphaned bd issues again** — it grepped `bd preflight` output for "orphan", but on bd 1.0.3 that command prints a PR checklist for bd's own Go repository and exits 0, so the count was always zero. It now runs `bd orphans --json` through the parse-checked `json_count` (`null` is a real zero; a `bd` failure or non-JSON output is reported UNKNOWN, not clean), with `bd stale` and `bd lint` shown as information. Regression test `tests/test-bd-health.sh` extracts Step 8 from the skill and runs it in a throwaway bd repository: 9/9 against the fix, 8 of 9 failing against the old step
 - **Self-test 6.3 no longer reports success on failure** — its summary line printed `✅ Dispatcher declares 14/15 core allowed tools` even with a tool missing; it is now conditional, and the expected total is derived from `EXPECTED_TOOLS` instead of a hardcoded count
 
+### Security
+
+- **Keep bd issues local**: `.beads/issues.jsonl` is now gitignored and
+  untracked, and bd's `export.git-add` is off — the issue tracker stays on
+  the maintainer's machine instead of being published with every commit
+
 ## [4.1.1] - 2026-04-23
 
 ### Added
