@@ -28,7 +28,7 @@ for t in bd git jq; do
 done
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+trap 'rm -rf "${WORK:?}"' EXIT
 STEP="$WORK/step8.sh"
 python3 - "$SKILL" "$STEP" <<'PY' || exit 2
 import sys

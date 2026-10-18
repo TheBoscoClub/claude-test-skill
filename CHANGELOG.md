@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Every deletion target is a literal absolute path or a `"${VAR:?}"` expansion** (the `trap` cleanups in `tests/test-bd-health.sh`, `test-gh-json.sh`, `test-scan-count.sh`) — an empty or unset variable now aborts instead of deleting from `/` or the cwd
 - **Keep bd issues local**: `.beads/issues.jsonl` is now gitignored and
   untracked, and bd's `export.git-add` is off — the issue tracker stays on
   the maintainer's machine instead of being published with every commit

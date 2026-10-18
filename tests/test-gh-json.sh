@@ -23,7 +23,7 @@ SKILL=skills/test-phases/phase-9d-github.md
 }
 
 HELPER="$(mktemp)"
-trap 'rm -f "$HELPER"' EXIT
+trap 'rm -f "${HELPER:?}"' EXIT
 python3 - "$SKILL" "$HELPER" <<'PY' || exit 2
 import sys
 s = open(sys.argv[1]).read()
