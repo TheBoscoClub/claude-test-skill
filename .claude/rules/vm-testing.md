@@ -55,16 +55,18 @@ Shared VMs (no `post_test_restore`) use pre-test snapshots:
 **Internal snapshots need the VM SHUT OFF** (a live `snapshot-create-as` fails with `require QCOW2 nvram format`). Snapshot first, then start.
 
 ```bash
-# 1. BEFORE tests — VM must be shut off
-sudo virsh domstate "$VM" | grep -q 'shut off' || sudo virsh shutdown "$VM"
-sudo virsh snapshot-create-as "$VM" pre-test-$(date +%Y%m%d-%H%M%S) \
-    --description "Pre-test state before /test run"
-sudo virsh start "$VM"
+LIB="${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh"
+# 1. BEFORE tests — the configured VM only, already shut off (else this stops); SNAP names the snapshot
+source "$LIB" && VM=$(resolve_test_vm "$PWD") && SNAP=pre-test-$(date +%Y%m%d-%H%M%S) &&
+    sudo virsh domstate "$VM" | grep -q 'shut off' &&
+    sudo virsh snapshot-create-as "$VM" "$SNAP" --description "Pre-test state before /test run" &&
+    sudo virsh start "$VM"
 # 2. RUN tests
-# 3. AFTER tests
-sudo virsh snapshot-revert "$VM" <snapshot-name>
-# 4. CLEANUP
-sudo virsh snapshot-delete "$VM" <snapshot-name>
+# 3. AFTER tests — back to the snapshot step 1 made, never another one
+source "$LIB" && check_test_vm "$PWD" "$VM" && is_pretest_snapshot "$SNAP" &&
+    sudo virsh snapshot-revert "$VM" "$SNAP"
+# 4. CLEANUP — the only delete; refuses anything but a pre-test name, and every pristine snapshot
+source "$LIB" && check_test_vm "$PWD" "$VM" && delete_pretest_snapshot "$VM" "$SNAP"
 ```
 
 ### Snapshot Types
