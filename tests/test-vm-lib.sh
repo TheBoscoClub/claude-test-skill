@@ -144,6 +144,8 @@ case_env runv-ok P1 "$MAP" MISSING
 printf '%s\n' pristine >"$C/fix/snaps-shared-vm"
 out=$(run 10a 'run_phase_V >/dev/null 2>&1; echo "RC=$?"')
 [[ "$out" != *"RC=2"* ]] && logged 'virsh snapshot-revert shared-vm pristine' && ok "run_phase_V with the helpers resolves and resets the configured VM" || bad "run_phase_V with the helpers: $out"
+logged "^ssh -i /k .* u@10\.0\.0\.10 echo 'SSH OK'" && ! logged 'vm_test_key|testuser@' &&
+    ok "run_phase_V deploys with the configured SSH identity" || bad "run_phase_V deploy identity: $(grep -m1 "SSH OK" "$C/log")"
 
 echo "2. Only VMs the installation lists under vms; the manifest can choose among them, never add one"
 # resolve CASE PROJECT MAP MANIFEST EXPECT — EXPECT a VM name, or FAIL; start_test_vm must touch only it

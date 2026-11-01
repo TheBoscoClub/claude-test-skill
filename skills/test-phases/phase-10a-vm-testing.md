@@ -477,6 +477,8 @@ run_phase_V() {
     detect_vm_environment
 
     SSH_KEY="${SSH_KEY/#\~/$HOME}"
+    # deploy_to_vm and run_vm_tests read the identity from VM_SSH_USER / VM_SSH_KEY
+    export VM_SSH_USER="$SSH_USER" VM_SSH_KEY="$SSH_KEY"
 
     # Auto-detect VM IP if needed
     if [[ -z "$VM_IP" || "$VM_IP" == "null" ]]; then
