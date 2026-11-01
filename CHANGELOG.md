@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Phase ST runs the regression tests bounded**: `tests/test-*.sh` ran as plain `bash`; they now run under `bounded-test` when the host has it (own PID namespace, memory and task caps) and under `timeout 600` otherwise
 - **The shared-VM snapshot workflow in `.claude/rules/vm-testing.md` can no longer delete a pristine snapshot** — steps 3 and 4 ran `snapshot-revert`/`snapshot-delete` on any `$VM` and a typed-in `<snapshot-name>`, so filling in `pristine` deleted it; the snippet now resolves the VM with `resolve_test_vm`, names the run's snapshot once (`SNAP=pre-test-…`), reverts only to it and deletes only through `check_test_vm` + `delete_pretest_snapshot`
 - **Phase 10a deploys with the configured SSH identity** — `run_phase_V` resolved the user and key from the map or manifest but never exported them, so `deploy_to_vm` and `run_vm_tests` fell back to `testuser` and `~/.ssh/vm_test_key`; it now exports `VM_SSH_USER` / `VM_SSH_KEY` (case in `tests/test-vm-lib.sh`)
 - **The `post_test_restore` lifecycle table agrees with Phase 10b again** (`.claude/rules/vm-testing.md`) — the trim left the startup row saying "Shut down → start normally" beside a later row saying revert; restored as one startup row (force-stop if running, then revert to pristine in either state, then start), and the "Before" row no longer claims the VM is pristine. Phase 10b's own state table and Phase 1's recovery note (which still said Phase 11 restores pristine) are corrected the same way

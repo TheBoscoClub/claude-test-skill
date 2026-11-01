@@ -1517,9 +1517,19 @@ else
     echo "  ✅ ${#REGRESSION_TESTS[@]} regression test(s) found"
 fi
 
+# Code under test runs bounded: bounded-test (task, memory and signal bounds) when the host has it,
+# otherwise a plain timeout so a hung test cannot stall the audit.
+RT_BOUND=()
+if [[ -x "$HOME/.claude/bin/bounded-test" ]]; then
+    RT_BOUND=("$HOME/.claude/bin/bounded-test" --)
+else
+    RT_BOUND=(timeout 600)
+    echo "  ℹ️  bounded-test not installed — regression tests run under timeout 600 only"
+fi
+
 for rt in "${REGRESSION_TESTS[@]}"; do
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    rt_out=$(bash "$rt" 2>&1)
+    rt_out=$("${RT_BOUND[@]}" bash "$rt" 2>&1)
     rt_rc=$?
     rt_last=$(printf '%s\n' "$rt_out" | tail -1)
     if [[ $rt_rc -eq 0 ]]; then
