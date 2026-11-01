@@ -69,6 +69,13 @@ shutdown_test_vm() {
     echo "───────────────────────────────────────────────────────────────────"
     echo ""
 
+    # Every VM this function stops — the one .test-vm-state names, or the map's exclusive fallback below —
+    # must pass check_test_vm (lib/test-vm.sh): listed under vms in project-vm-map.json, exclusivity
+    # honoured. The state file is data, not authority; a VM that fails the check is left alone.
+    source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+        declare -F check_test_vm >/dev/null ||
+        { echo "  ⛔ ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh) — VM left as is"; return 2; }
+
     # No state file? Check project-vm-map.json for an exclusive VM with
     # post_test_restore: true. Such VMs must be shut down at end-of-/test
     # even if /test didn't write a state file (e.g. VM was already running
@@ -89,6 +96,10 @@ try:
 except Exception:
     pass
 " 2>/dev/null)
+            if [[ -n "$MAPPED_VM" ]] && ! check_test_vm "$PROJECT_DIR" "$MAPPED_VM"; then
+                echo "  ⛔ project-vm-map maps $PROJECT_NAME to $MAPPED_VM, not a VM this project may use — left alone"
+                return 1
+            fi
             if [[ -n "$MAPPED_VM" ]]; then
                 local STATE=$(sudo virsh domstate "$MAPPED_VM" 2>/dev/null | tr -d '[:space:]')
                 if [[ "$STATE" == "running" ]]; then
@@ -132,6 +143,11 @@ except Exception:
         echo "  ⚠️ State file missing vm_name — removing stale state file"
         rm -f "$STATE_FILE"
         return 0
+    fi
+
+    if ! check_test_vm "$PROJECT_DIR" "$VM_NAME"; then
+        echo "  ⛔ $STATE_FILE names $VM_NAME, not a VM this project may use — left alone (state file kept)"
+        return 1
     fi
 
     echo "  VM: $VM_NAME"

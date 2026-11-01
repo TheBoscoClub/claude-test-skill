@@ -1,7 +1,7 @@
 #!/bin/bash
 # Regression guard for the test-VM helpers (skills/test-phases/lib/test-vm.sh) and the phase functions
 # that act on VMs: Phase 1 sweep, Phase 10a create/reset/snapshot/cross-distro/run_phase_V, Phase 10b
-# start/shutdown (bd claude-test-skill-zy9).
+# start/shutdown, Phase 11 shutdown (bd claude-test-skill-zy9).
 #
 # WHY THIS EXISTS
 # - Each phase runs in its own subagent and reads only its own phase file. When resolve_test_vm lived
@@ -23,7 +23,7 @@
 set -uo pipefail
 REPO_DIR="${REPO_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 PHASES="$REPO_DIR/skills/test-phases"
-for f in phase-1-snapshot.md phase-10a-vm-testing.md phase-10b-vm-lifecycle.md; do
+for f in phase-1-snapshot.md phase-10a-vm-testing.md phase-10b-vm-lifecycle.md phase-11-cleanup.md; do
     [[ -r "$PHASES/$f" ]] || {
         echo "FAIL: cannot read $PHASES/$f" >&2
         exit 2
@@ -42,8 +42,10 @@ src, out = sys.argv[1], sys.argv[2]
 need = {"1": {"sweep_pretest_snapshots"},
         "10a": {"create_test_vm", "manage_vm_snapshot", "reset_vm_to_pristine", "reset_vm_to_clean",
                 "run_cross_distro_tests", "run_phase_V"},
-        "10b": {"start_test_vm", "shutdown_test_vm"}}
-files = {"1": "phase-1-snapshot.md", "10a": "phase-10a-vm-testing.md", "10b": "phase-10b-vm-lifecycle.md"}
+        "10b": {"start_test_vm", "shutdown_test_vm"},
+        "11": {"shutdown_test_vm"}}
+files = {"1": "phase-1-snapshot.md", "10a": "phase-10a-vm-testing.md", "10b": "phase-10b-vm-lifecycle.md",
+         "11": "phase-11-cleanup.md"}
 for ph, f in files.items():
     code = []
     for block in re.findall(r"```bash\n(.*?)```", open(os.path.join(src, f)).read(), re.S):
@@ -107,7 +109,7 @@ case_env() {
     [[ "$4" != MISSING ]] && printf '%s' "$4" >"$P/vm-test-manifest.json"
     return 0
 }
-# run PHASE CODE — run CODE in a fresh shell that has loaded only PHASE's functions (1, 10a, 10b);
+# run PHASE CODE — run CODE in a fresh shell that has loaded only PHASE's functions (1, 10a, 10b, 11);
 # the helpers directory is overridable via LIBDIR
 run() {
     (cd "$P" && HOME="$C/home" LOG="$C/log" FIX="$C/fix" PATH="$S:/usr/bin:/bin" \
@@ -116,7 +118,7 @@ run() {
 }
 logged() { grep -qE -- "$1" "$C/log"; }
 
-MAP='{"default":{"vm":"shared-vm"},"projects":{"Excl Proj":{"vm":"excl-vm"}},"vms":{"shared-vm":{"ssh_user":"u","ssh_key":"/k","ip":"10.0.0.10"},"excl-vm":{"exclusive_to":"Excl Proj","ssh_user":"u","ssh_key":"/k"},"excl-vm2":{"exclusive_to":"Excl Proj"}}}'
+MAP='{"default":{"vm":"shared-vm"},"projects":{"Excl Proj":{"vm":"excl-vm"}},"vms":{"shared-vm":{"ssh_user":"u","ssh_key":"/k","ip":"10.0.0.10"},"excl-vm":{"exclusive_to":"Excl Proj","ssh_user":"u","ssh_key":"/k"},"excl-vm2":{"exclusive_to":"Excl Proj"},"example-recovery-vm-A":{"exclusive_to":"Other Owner"}}}'
 EMPTYLIB="$T/emptylib"
 mkdir -p "$EMPTYLIB/lib"
 
@@ -226,6 +228,48 @@ case_env shutdown-ok P1 "$MAP" MISSING
 printf 'vm_name=shared-vm\nstarted_by_test=true\noriginal_state=shutoff\npre_test_snapshot=pre-test-20260101-000000\n' >"$P/.test-vm-state"
 out=$(run 10b 'shutdown_test_vm; echo "RC=$?"')
 logged 'snapshot-revert shared-vm pre-test-20260101-000000' && logged 'snapshot-delete shared-vm pre-test-20260101-000000' && ok "shutdown reverts to and deletes its own pre-test snapshot" || bad "shutdown with a pre-test name: $(tr '\n' ' ' <"$C/log")"
+
+echo "4. Shutdown acts only on a VM this project may use, whatever the state file names (both phases)"
+# A VM the map lists but reserves for another project (stands in for any VM another tool owns)
+REC=example-recovery-vm-A
+MUT='^(sudo )?virsh (shutdown|destroy|snapshot-revert|snapshot-delete|start|undefine)'
+# state_env NAME VM — a running VM named by a state file that /test supposedly started
+state_env() {
+    case_env "$1" P1 "$MAP" MISSING
+    echo "$2" >>"$C/fix/virsh-list" && echo running >"$C/fix/state-$2"
+    printf 'vm_name=%s\nstarted_by_test=true\noriginal_state=shutoff\npre_test_snapshot=pre-test-20260101-000000\n' "$2" >"$P/.test-vm-state"
+}
+# state_case NAME PHASE VM — state_env, then run that phase's shutdown_test_vm
+state_case() {
+    state_env "$1" "$3"
+    out=$(run "$2" 'shutdown_test_vm; echo "RC=$?"')
+}
+for ph in 10b 11; do
+    for vm in "$REC" excl-vm unlisted-vm; do
+        state_case "shutdown-$ph-refuse-$vm" "$ph" "$vm"
+        [[ "$out" == *"RC=1"* && "$out" == *"left alone"* ]] && ! logged "$MUT" && [[ -f "$P/.test-vm-state" ]] &&
+            ok "Phase $ph shutdown refuses state-file vm_name=$vm (no VM call, state file kept)" ||
+            bad "Phase $ph shutdown vm_name=$vm: $(grep -E "$MUT" "$C/log" | tr '\n' ' ') / ${out: -160}"
+    done
+    state_case "shutdown-$ph-listed" "$ph" shared-vm
+    logged '^sudo virsh shutdown shared-vm$' && [[ ! -f "$P/.test-vm-state" ]] &&
+        ok "Phase $ph shutdown still stops a listed VM and removes the state file" || bad "Phase $ph shutdown listed VM: $(tr '\n' ' ' <"$C/log") / ${out: -160}"
+    state_env "shutdown-$ph-nolib" shared-vm
+    out=$(LIBDIR=$EMPTYLIB run "$ph" 'shutdown_test_vm; echo "RC=$?"')
+    [[ "$out" == *"RC=2"* && "$out" == *"not loaded"* ]] && ! logged "$MUT" && [[ -f "$P/.test-vm-state" ]] &&
+        ok "Phase $ph shutdown without the helpers: exit 2, no VM call, state file kept" || bad "Phase $ph shutdown without the helpers: $(grep -E "$MUT" "$C/log" | tr '\n' ' ') / ${out: -160}"
+done
+state_case shutdown-10b-listed-revert 10b shared-vm
+logged '^sudo virsh snapshot-revert shared-vm pre-test-20260101-000000$' && ok "Phase 10b shutdown of a listed VM still reverts its pre-test snapshot" || bad "Phase 10b listed revert: $(tr '\n' ' ' <"$C/log")"
+# Phase 11 with no state file falls back to the map's projects.<project>.vm when post_test_restore is set
+case_env shutdown-11-fallback-excl P1 '{"projects":{"P1":{"vm":"excl-vm"}},"vms":{"excl-vm":{"exclusive_to":"Excl Proj","post_test_restore":true}}}' MISSING
+echo running >"$C/fix/state-excl-vm"
+out=$(run 11 'shutdown_test_vm; echo "RC=$?"')
+! logged "$MUT" && [[ "$out" == *"left alone"* ]] && ok "Phase 11 no-state fallback refuses a mapped VM exclusive to another project" || bad "Phase 11 fallback exclusive: $(grep -E "$MUT" "$C/log" | tr '\n' ' ') / ${out: -160}"
+case_env shutdown-11-fallback-own "Excl Proj" '{"projects":{"Excl Proj":{"vm":"excl-vm"}},"vms":{"excl-vm":{"exclusive_to":"Excl Proj","post_test_restore":true}}}' MISSING
+echo running >"$C/fix/state-excl-vm"
+out=$(run 11 'shutdown_test_vm; echo "RC=$?"')
+logged '^sudo virsh shutdown excl-vm$' && ok "Phase 11 no-state fallback still stops the project's own exclusive VM" || bad "Phase 11 fallback own: $(tr '\n' ' ' <"$C/log") / ${out: -160}"
 
 echo
 echo "passed=$pass failed=$fail"

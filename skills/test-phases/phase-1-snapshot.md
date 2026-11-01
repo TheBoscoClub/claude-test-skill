@@ -155,8 +155,12 @@ sudo btrfs subvolume snapshot "$SNAPSHOT_PATH" "$PROJECT_DIR"
 The pre-test snapshot for the current run is created by Phase 10b and named in `.test-vm-state` (`pre_test_snapshot=`); Phase 10b cleanup reverts to it and deletes it.
 
 ```bash
-# VM must be shut off (pflash + raw NVRAM)
-sudo virsh snapshot-revert $VM_NAME "$(grep ^pre_test_snapshot= .test-vm-state | cut -d= -f2)"
+# VM must be shut off (pflash + raw NVRAM). Both names come from the state file: check them first.
+VM_NAME=$(grep ^vm_name= .test-vm-state | cut -d= -f2)
+SNAP=$(grep ^pre_test_snapshot= .test-vm-state | cut -d= -f2)
+source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+    check_test_vm "$PWD" "$VM_NAME" && is_pretest_snapshot "$SNAP" &&
+    sudo virsh snapshot-revert "$VM_NAME" "$SNAP"
 
 # For projects with post_test_restore=true in vm-test-manifest.json,
 # Phase 11 only shuts the VM down; the next run's Phase 10b startup

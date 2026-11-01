@@ -46,6 +46,7 @@ Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a 
 
 - Reset is a snapshot revert only (never `qemu-img commit` — bakes test changes into the base). `/test` never deletes or recreates a pristine snapshot, never overwrites a disk and never undefines a VM; the only snapshot it deletes is its own `pre-test-YYYYMMDD-HHMMSS` (`delete_pretest_snapshot`). A failed pristine revert stops for manual recovery
 - Phase 11 shuts down `post_test_restore=true` VMs regardless of who started them (it does not revert; the revert happens at the next start); shared VMs are shut down only if `/test` started them
+- Shutdown (Phase 10b and Phase 11) acts only on a VM `check_test_vm` accepts; a `.test-vm-state` naming any other VM (unlisted, another project's exclusive VM) is reported and left in place, and the VM is not touched
 
 ## VM Snapshot Workflow (Shared VMs)
 

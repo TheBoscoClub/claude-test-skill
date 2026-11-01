@@ -525,8 +525,12 @@ shutdown_test_vm() {
     # pre-test name (delete_pretest_snapshot, lib/test-vm.sh). Anything else — "pristine", the manifest's
     # pristine_snapshot, a hand edit — is reported and left alone.
     source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
-        declare -F delete_pretest_snapshot >/dev/null ||
+        declare -F delete_pretest_snapshot check_test_vm >/dev/null ||
         { echo "  ⛔ ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh) — VM left as is"; return 2; }
+    # The VM it names gets the same check: only a VM this project may use (listed under vms, exclusivity
+    # honoured) is stopped, reverted or has a snapshot deleted. A stale or foreign state file is left in place.
+    check_test_vm "$PROJECT_DIR" "$VM_NAME" ||
+        { echo "  ⛔ $STATE_FILE names $VM_NAME, not a VM this project may use — left alone (state file kept)"; return 1; }
     if [[ -n "$PRE_TEST_SNAPSHOT" ]] && ! is_pretest_snapshot "$PRE_TEST_SNAPSHOT"; then
         echo "  ⛔ $STATE_FILE names pre_test_snapshot=$PRE_TEST_SNAPSHOT, which is not a pre-test-YYYYMMDD-HHMMSS name"
         echo "     Not reverting to it and not deleting it"
@@ -685,13 +689,10 @@ fi
 
 ### During Phase 11 (Cleanup)
 
-Phase 11 calls `shutdown_test_vm`:
-
-```text
-# In Phase 11 cleanup:
-source ~/.claude/skills/test-phases/phase-10b-vm-lifecycle.md
-shutdown_test_vm
-```
+Phase 11 runs its own `shutdown_test_vm` (`phase-11-cleanup.md` § 3a); the function above is this phase's
+copy. Both call `check_test_vm` on the VM `.test-vm-state` names before any `virsh` call: a VM that fails the
+check (not listed under `vms`, or exclusive to another project) is left alone, the state file stays in place
+and the function returns 1.
 
 ## State File Format
 
@@ -708,6 +709,10 @@ Banner, isolation level, selected VM, state, boot, state file, VM IP, VNC, pre-t
 ### Cleanup Report (post_test_restore=true)
 
 VM info, "shutting down VM only (preserving post-test state)", graceful shutdown, state file removed.
+
+### Cleanup Report (refused)
+
+`names VM, not a VM this project may use — left alone (state file kept)`, after the reason from `check_test_vm`.
 
 ### Cleanup Report (shared VM)
 
