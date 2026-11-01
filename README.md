@@ -361,7 +361,7 @@ claude-test-skill/
 │       ├── phase-10b-vm-lifecycle.md   # [sonnet]
 │       ├── phase-11-cleanup.md         # [haiku]
 │       ├── phase-ST-self-test.md       # [judgement]
-│       └── lib/test-vm.sh              # shared test-VM helpers (Phases 1, 10a, 10b)
+│       └── lib/test-vm.sh              # shared test-VM helpers (Phases 1, 10a, 10b, 11)
 ├── agents/                  # Integrated into phases (reference docs)
 │   ├── coverage-reviewer.md # → Phase 4a
 │   ├── security-scanner.md  # → Phase 5a

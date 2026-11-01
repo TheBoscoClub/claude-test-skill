@@ -4,7 +4,7 @@ Detail, incidents and reasoning per section: `.claude/docs/rules-reference/vm-te
 
 ## Default Test VM
 
-The default test VM is the one named by `default.vm` in `~/.claude/config/project-vm-map.json`; its disk image and the install ISOs live where the installation says (`vms.<vm>.active_disk`, `paths.iso_dir`; real values only on the host, e.g. the gitignored `.claude/rules/local-vm-paths.md`). The skill has no built-in VM name. Only a VM listed under the map's `vms` is ever used — a project's tracked manifest chooses among them, never adds one. Phases 1, 10a and 10b each source `skills/test-phases/lib/test-vm.sh` and choose the VM with its `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection); none picks a VM by matching names in `virsh list`.
+The default test VM is the one named by `default.vm` in `~/.claude/config/project-vm-map.json`; its disk image and the install ISOs live where the installation says (`vms.<vm>.active_disk`, `paths.iso_dir`; real values only on the host, e.g. the gitignored `.claude/rules/local-vm-paths.md`). The skill has no built-in VM name. Only a VM listed under the map's `vms` is ever used — a project's tracked manifest chooses among them, never adds one. Phases 1, 10a, 10b and 11 each source `skills/test-phases/lib/test-vm.sh`; the VM is chosen by its `resolve_test_vm` or validated by its `check_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection); none picks a VM by matching names in `virsh list`.
 
 ## Manifest Template
 
@@ -16,7 +16,7 @@ Basics: `sudo virsh list --all|start|snapshot-create-as|snapshot-revert`, `virt-
 
 ## VM Exclusivity Rules
 
-Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a **bidirectional lock**: only the named project may use that VM, and that project must not test on other VMs. `resolve_test_vm` refuses either crossing.
+Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` (a project name, or a list of them) is a **bidirectional lock**: only the named project(s) may use that VM, and such a project must not test on other VMs. `resolve_test_vm` refuses either crossing.
 
 | VM (generic pattern) | Exclusive To | Purpose | Snapshot |
 | ---- | ------------- | --------- | ---------- |
@@ -24,9 +24,9 @@ Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a 
 | `qa-<project>` | `<your-project>` | QA only — released versions, no test runs | the QA baseline snapshot |
 | `<default-vm>` (`default.vm`) | *(none)* | Default for all other projects | — |
 
-- QA VMs receive only promoted releases — `/test` phases never run against them.
+- QA VMs receive only promoted releases — `/test` phases never run against them: a VM whose map entry has `"role": "qa"` is refused by `resolve_test_vm` and `check_test_vm`, however it is named (map, manifest, `test_environments`, state file).
 - All other projects use the `default.vm` VM (cross-distro testing: listed, non-exclusive VMs named in the manifest's `test_environments`).
-- Nothing configured, the chosen VM not listed under `vms`, or exclusive to another project → the VM phases abort; there is no fallback VM.
+- Nothing configured, the chosen VM not listed under `vms`, exclusive to another project, a QA VM, or a malformed VM name (anything but `[A-Za-z0-9][A-Za-z0-9._-]*`, taken exactly — never trimmed) → the VM phases abort; there is no fallback VM.
 
 ## When Phase 10a Runs
 
@@ -44,7 +44,7 @@ Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a 
 | **During testing** | Running | Install, deploy, test |
 | **Cleanup (Phase 11)** | Running (dirty) | Shut down, leave shut down (`post_test_restore=true` VMs: no revert here) |
 
-- Reset is a snapshot revert only (never `qemu-img commit` — bakes test changes into the base). `/test` never deletes or recreates a pristine snapshot, never overwrites a disk and never undefines a VM; the only snapshot it deletes is its own `pre-test-YYYYMMDD-HHMMSS` (`delete_pretest_snapshot`). A failed pristine revert stops for manual recovery
+- Reset is a snapshot revert only (never `qemu-img commit` — bakes test changes into the base). `/test` never deletes or recreates a pristine snapshot, never overwrites a disk and never undefines a VM; the only snapshot it deletes is its own `pre-test-YYYYMMDD-HHMMSS` (`delete_pretest_snapshot`, which also refuses any name containing `pristine` and any configured `pristine_snapshot`, the manifest's or the map's `vms.<vm>.pristine_snapshot`). A failed pristine revert stops for manual recovery
 - Phase 11 shuts down `post_test_restore=true` VMs regardless of who started them (it does not revert; the revert happens at the next start); shared VMs are shut down only if `/test` started them
 - Shutdown (Phase 10b and Phase 11) acts only on a VM `check_test_vm` accepts; a `.test-vm-state` naming any other VM (unlisted, another project's exclusive VM) is reported and left in place, and the VM is not touched
 

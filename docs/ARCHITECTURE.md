@@ -90,7 +90,7 @@ claude-test-skill/
 │       ├── phase-ST-self-test.md       # Framework self-validation      [judgement]
 │       ├── phase-10a-vm-testing.md     # VM isolation testing           [sonnet]
 │       ├── phase-10b-vm-lifecycle.md   # VM startup/shutdown            [sonnet]
-│       └── lib/test-vm.sh              # Shared test-VM helpers (Phases 1, 10a, 10b)
+│       └── lib/test-vm.sh              # Shared test-VM helpers (Phases 1, 10a, 10b, 11)
 │
 ├── agents/                     # Specialized subagents (integrated into phases)
 │   ├── coverage-reviewer.md    # Test coverage analysis (integrated into Phase 4a)

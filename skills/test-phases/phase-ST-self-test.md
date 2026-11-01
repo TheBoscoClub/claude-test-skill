@@ -630,6 +630,18 @@ else
     done
 fi
 
+# Shared helpers that Phases 1, 10a, 10b and 11 source (lib/test-vm.sh): present, parsable, and defining
+# the functions those phases check for. Without it every VM phase stops with "helpers not loaded".
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+if [[ -r "$SKILLS_DIR/lib/test-vm.sh" ]] && bash -n "$SKILLS_DIR/lib/test-vm.sh" 2>/dev/null &&
+    bash -c 'source "$1" && declare -F resolve_test_vm check_test_vm is_test_vm_name test_vm_state_get is_pretest_snapshot delete_pretest_snapshot' _ "$SKILLS_DIR/lib/test-vm.sh" >/dev/null 2>&1; then
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    echo "  ✅ Shared test-VM helpers present (lib/test-vm.sh)"
+else
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+    echo "  ❌ Shared test-VM helpers missing, unparsable or incomplete: $SKILLS_DIR/lib/test-vm.sh"
+fi
+
 echo ""
 echo "───────────────────────────────────────────────────────────────────"
 echo "  1.2 Phase File Readability"
