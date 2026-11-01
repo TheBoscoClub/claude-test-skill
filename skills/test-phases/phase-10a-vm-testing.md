@@ -26,7 +26,7 @@ Test VMs MUST NOT live-mount production storage (no NFS, CIFS, virtiofs, virtio-
 
 ## VM Configuration
 
-**Storage locations** come from the installation, never from this skill: `paths.iso_dir` (ISO library for new VMs) and `paths.vm_storage_dirs` (a list of directories holding VM disk images) in `~/.claude/config/project-vm-map.json`. Neither has a built-in default, and only `create_test_vm` reads them: without either key it refuses before touching anything. `create_test_vm` also refuses a name libvirt already defines — it never destroys or undefines an existing VM.
+**Storage locations** come from the installation, never from this skill: `paths.iso_dir` (ISO library for new VMs) and `paths.vm_storage_dirs` (a list of directories holding VM disk images) in `~/.claude/config/project-vm-map.json`. Neither has a built-in default. `create_test_vm` is the only code that writes under them: without either key it refuses before touching anything. Phase 2's `detect_vm_availability` only lists ISOs found there (read-only). `create_test_vm` also refuses a name libvirt already defines — it never destroys or undefines an existing VM.
 
 **Which VMs this phase may touch**: only VMs the map lists under `vms`, chosen by `resolve_test_vm` or validated by `check_test_vm` (`skills/test-phases/lib/test-vm.sh`, see `phase-10b-vm-lifecycle.md` § Test VM Selection). Each function below that acts on an existing VM sources that file itself. Snapshot deletes go only through `delete_pretest_snapshot`, which refuses anything but a `pre-test-YYYYMMDD-HHMMSS` name, so a pristine snapshot is never deleted. Example:
 
@@ -244,7 +244,8 @@ run_cross_distro_tests() {
     # VMs come from configuration only: the arguments, else the manifest's test_environments entries of
     # type "existing" (their vm_name). No built-in names. Each must pass check_test_vm (listed under the
     # map's vms, exclusivity respected) before it is reset, started or deployed to.
-    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}" MANIFEST="${PROJECT_DIR:-$(pwd)}/vm-test-manifest.json"
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+    local MANIFEST="$PROJECT_DIR/vm-test-manifest.json"
     source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
         declare -F check_test_vm >/dev/null ||
         { echo "ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh)"; return 2; }
