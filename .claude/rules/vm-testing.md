@@ -4,7 +4,7 @@ Detail, incidents and reasoning per section: `.claude/docs/rules-reference/vm-te
 
 ## Default Test VM
 
-**example-test-vm**: an existing libvirt VM. Disk image and install ISOs: the host's libvirt image and ISO directories (real paths in the gitignored `.claude/rules/local-vm-paths.md`). Phase 10a auto-detects VMs with "test" or "dev" in the name.
+The default test VM is the one named by `default.vm` in `~/.claude/config/project-vm-map.json`; its disk image and the install ISOs live where the installation says (`vms.<vm>.active_disk`, `paths.iso_dir`; real values only on the host, e.g. the gitignored `.claude/rules/local-vm-paths.md`). The skill has no built-in VM name. Phases 1, 10a and 10b choose the VM with `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection) and never pick a VM by matching names in `virsh list`.
 
 ## Manifest Template
 
@@ -12,20 +12,21 @@ Detail, incidents and reasoning per section: `.claude/docs/rules-reference/vm-te
 
 ## VM Management
 
-Basics: `sudo virsh list --all|start|snapshot-create-as|snapshot-revert`, `virt-viewer example-test-vm`. Project pristine snapshots: each project's `vm-test-manifest.json` (`"snapshot"`, `"post_test_restore"`).
+Basics: `sudo virsh list --all|start|snapshot-create-as|snapshot-revert`, `virt-viewer <vm>`. Project pristine snapshots: each project's `vm-test-manifest.json` (`"snapshot"`, `"post_test_restore"`).
 
 ## VM Exclusivity Rules
 
-Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a **bidirectional lock**: only the named project may use that VM, and that project must not test on other VMs.
+Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a **bidirectional lock**: only the named project may use that VM, and that project must not test on other VMs. `resolve_test_vm` refuses either crossing.
 
 | VM (generic pattern) | Exclusive To | Purpose | Snapshot |
 | ---- | ------------- | --------- | ---------- |
-| `test-<project>-cachyos` | `<your-project>` | Integration/API/UI testing | `pristine-*` |
-| `qa-<project>-cachyos` | `<your-project>` | QA only — released versions, no test runs | `qa-baseline-*` |
-| `example-test-vm` | *(none)* | Default for all other projects | — |
+| `test-<project>` | `<your-project>` | Integration/API/UI testing | the manifest's `pristine_snapshot` |
+| `qa-<project>` | `<your-project>` | QA only — released versions, no test runs | the QA baseline snapshot |
+| `<default-vm>` (`default.vm`) | *(none)* | Default for all other projects | — |
 
 - QA VMs receive only promoted releases — `/test` phases never run against them.
-- All other projects use `example-test-vm` (or any non-exclusive VM for cross-distro testing).
+- All other projects use the `default.vm` VM (or any non-exclusive VM for cross-distro testing).
+- Nothing configured, or the chosen VM exclusive to another project → the VM phases abort; there is no fallback VM.
 
 ## When Phase 10a Runs
 
@@ -38,13 +39,13 @@ Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a 
 
 | Phase | VM State | Action |
 | ------- | ---------- | -------- |
-| **Before /test** | Shut down + pristine | — |
-| **Startup (Phase 2/3)** | Check state | Running → dirty from interrupted test → force revert to pristine, then start. Shut down → start normally. |
+| **Before /test** | Shut down (dirty from last run, or pristine) | — |
+| **Startup (Phase 10b)** | Check state | VM = `resolve_test_vm` (abort if none configured or exclusive to another project). Running → interrupted test → force stop. Then, in either state, revert to pristine (Phase 10b), then start. |
 | **During testing** | Running | Install, deploy, test |
 | **Cleanup (Phase 11)** | Running (dirty) | Shut down, leave shut down (`post_test_restore=true` VMs: no revert here) |
-| **Next /test start** | Shut down (dirty) | Revert to pristine at startup (Phase 2/3/10b), preserving post-test state until then |
 
 - Revert ALWAYS discards the overlay (never `qemu-img commit` — bakes test changes into the base)
+- Overlay files are deleted only under directories listed in `paths.vm_storage_dirs`; with that key absent the overlay steps are skipped and only snapshot reverts run
 - Phase 11 shuts down `post_test_restore=true` VMs regardless of who started them (it does not revert; the revert happens at the next start); shared VMs are shut down only if `/test` started them
 
 ## VM Snapshot Workflow (Shared VMs)
@@ -55,22 +56,22 @@ Shared VMs (no `post_test_restore`) use pre-test snapshots:
 
 ```bash
 # 1. BEFORE tests — VM must be shut off
-sudo virsh domstate example-test-vm | grep -q 'shut off' || sudo virsh shutdown example-test-vm
-sudo virsh snapshot-create-as example-test-vm pre-test-$(date +%Y%m%d-%H%M%S) \
+sudo virsh domstate "$VM" | grep -q 'shut off' || sudo virsh shutdown "$VM"
+sudo virsh snapshot-create-as "$VM" pre-test-$(date +%Y%m%d-%H%M%S) \
     --description "Pre-test state before /test run"
-sudo virsh start example-test-vm
+sudo virsh start "$VM"
 # 2. RUN tests
 # 3. AFTER tests
-sudo virsh snapshot-revert example-test-vm <snapshot-name>
+sudo virsh snapshot-revert "$VM" <snapshot-name>
 # 4. CLEANUP
-sudo virsh snapshot-delete example-test-vm <snapshot-name>
+sudo virsh snapshot-delete "$VM" <snapshot-name>
 ```
 
 ### Snapshot Types
 
 | Snapshot | Purpose | Lifetime |
 | ---------- | --------- | ---------- |
-| `pristine-*-YYYY-MM-DD` | Pristine OS + deps, no app (project-specific) | Permanent, authoritative |
-| `qa-baseline-YYYY-MM-DD` | QA baseline: app installed + data populated | Permanent (QA VMs only) |
+| the manifest's `pristine_snapshot` (e.g. `pristine`) | Pristine OS + deps, no app (project-specific) | Permanent, authoritative |
+| QA baseline (the QA VM's own snapshot) | QA baseline: app installed + data populated | Permanent (QA VMs only) |
 | `clean-install` | Legacy baseline (fresh OS + SSH) | Permanent (fallback) |
-| `pre-test-YYYYMMDD-HHMMSS` | State before a specific test run | Deleted after test by Phase 10b; leftovers swept by `/test` Phase 1 (`~/.claude/scripts/vm-pretest-sweep.sh`) |
+| `pre-test-YYYYMMDD-HHMMSS` | State before a specific test run | Deleted after test by Phase 10b; leftovers swept by `/test` Phase 1 (`sweep_pretest_snapshots`) |

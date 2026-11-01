@@ -6,9 +6,9 @@ Holds the detail behind `.claude/rules/vm-testing.md`, under the same headings.
 
 ```bash
 sudo virsh list --all
-virt-viewer example-test-vm
-sudo virsh snapshot-create-as example-test-vm clean-install --description "Fresh install"   # VM shut off (see below)
-sudo virsh snapshot-revert example-test-vm clean-install
+virt-viewer "$VM"
+sudo virsh snapshot-create-as "$VM" clean-install --description "Fresh install"   # VM shut off (see below)
+sudo virsh snapshot-revert "$VM" clean-install
 # Project pristine snapshots: each project's vm-test-manifest.json ("snapshot", "post_test_restore")
 ```
 
@@ -28,3 +28,12 @@ Lines removed from the loaded rule because they disagreed with `~/.claude/skills
 ## Superseded 2026-11-01 (Phase 11 only shuts post_test_restore VMs down; the revert happens at the next run's start — phase-10b-vm-lifecycle.md:14)
 
 | **Cleanup (Phase 11)** | Running (dirty) | ALWAYS: revert to pristine, shut down, leave shut down |
+
+## Superseded 2026-11-01 (VM selection and lifecycle table; bd `claude-test-skill-zy9`)
+
+*Superseded 2026-11-01: VM selection is configured-only (`resolve_test_vm`, phase-10b-vm-lifecycle.md § Test VM Selection) and the startup row reverts a `post_test_restore=true` VM in either state; see bd `claude-test-skill-zy9`.*
+
+- Phase 10a auto-detects VMs with "test" or "dev" in the name.
+- | **Before /test** | Shut down + pristine | — |
+- | **Startup (Phase 2/3)** | Check state | Running → dirty from interrupted test → force revert to pristine, then start. Shut down → start normally. |
+- | **Next /test start** | Shut down (dirty) | Revert to pristine at startup (Phase 2/3/10b), preserving post-test state until then |
