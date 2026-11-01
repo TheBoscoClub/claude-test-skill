@@ -102,13 +102,16 @@ fi
 
 ### Step 3: Sweep Leftover VM Pre-Test Snapshots (MANDATORY)
 
-The sweep resolves the VM exactly as Phase 10b does — it calls the same `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection; load that function first) — deletes every snapshot of that VM named `pre-test-YYYYMMDD-HHMMSS`, and touches no other name and no other VM. No VM configured, or the configured VM exclusive to another project: nothing is swept. A pre-test snapshot protects nothing once its run has ended, so none is ever kept. Internal snapshots of a pflash VM delete only while it is shut off; a running VM is reported and left for the next sweep.
+The sweep resolves the VM exactly as Phase 10b does — it sources the shared helpers `skills/test-phases/lib/test-vm.sh` and calls the same `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection) — deletes every snapshot of that VM named `pre-test-YYYYMMDD-HHMMSS` through `delete_pretest_snapshot` (which refuses any other name), and touches no other name and no other VM. No VM configured, a VM the map's `vms` does not list, or the configured VM exclusive to another project: nothing is swept (exit 0). Helpers not loaded is an error (exit 2), never reported as "nothing configured". A pre-test snapshot protects nothing once its run has ended, so none is ever kept. Internal snapshots of a pflash VM delete only while it is shut off; a running VM is reported and left for the next sweep.
 
 ```bash
 sweep_pretest_snapshots() {
     local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}" vm state s left=0
     local snaps=()
     command -v virsh >/dev/null 2>&1 || { echo "  virsh not installed — no VM sweep"; return 0; }
+    source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+        declare -F resolve_test_vm >/dev/null && declare -F delete_pretest_snapshot >/dev/null ||
+        { echo "  ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh) — sweep NOT run"; return 2; }
     vm=$(resolve_test_vm "$PROJECT_DIR") || { echo "  No usable test VM configured — nothing swept"; return 0; }
     sudo virsh dominfo "$vm" >/dev/null 2>&1 || { echo "  $vm: not defined — skipped"; return 0; }
     mapfile -t snaps < <(sudo virsh snapshot-list "$vm" --name 2>/dev/null | grep -E '^pre-test-[0-9]{8}-[0-9]{6}$')
@@ -120,7 +123,7 @@ sweep_pretest_snapshots() {
         return 1
     fi
     for s in "${snaps[@]}"; do
-        if sudo virsh snapshot-delete "$vm" "$s" >/dev/null 2>&1; then
+        if delete_pretest_snapshot "$vm" "$s" "$PROJECT_DIR"; then
             echo "  $vm: deleted $s"
         else
             echo "  $vm: FAILED to delete $s"
@@ -131,7 +134,8 @@ sweep_pretest_snapshots() {
 }
 
 sweep_pretest_snapshots
-# exit 0: nothing left; 1: leftovers remain (VM running) — report them, do not fail the phase
+# exit 0: nothing left; 1: leftovers remain (VM running) — report them, do not fail the phase;
+# exit 2: the helpers did not load — report it as an ERROR (the sweep did not run)
 ```
 
 ## Recovery

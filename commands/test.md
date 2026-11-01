@@ -684,7 +684,7 @@ ELSE (Autonomous - DEFAULT):
 - **Phase 9d (GitHub)**: audits Dependabot, CodeQL workflows, secret scanning, branch protection; auto-enables missing security features when possible.
 - **Phase 8 (Docs)**: after 7, before 9; fixes ALL doc issues (version refs, obsolete paths, outdated content) so docs match the codebase even when issues remain.
 - **Phase 10a (VM Testing)**: outcomes SKIP (no trigger), RUN (trigger + VM), ABORT (`vm-required`, no VM).
-  - Project-VM routing via `~/.claude/config/project-vm-map.json`: `exclusive_to` mappings route projects to dedicated VMs; reserved VMs cannot be used by other projects; unmapped projects use the default VM
+  - Project-VM routing via `~/.claude/config/project-vm-map.json`: only VMs listed under its `vms` are used (`skills/test-phases/lib/test-vm.sh`); `exclusive_to` mappings route projects to dedicated VMs; reserved VMs cannot be used by other projects; unmapped projects use the default VM
   - Capabilities: deploy to existing test VM via SSH; **staged release lifecycle testing** (install → upgrade → deploy → verify); **Docker staging image testing** (transfer + smoke test on VM); create VM from ISO library; full OS isolation; snapshot/restore rollback after dangerous tests; cross-distro (Ubuntu, Fedora, Debian, CachyOS, Windows)
   - Use cases: PAM, kernel params, systemd services, bootloader, **release verification**
 - **Phase ST (Self-Test)**: NEVER in normal `/test` runs (not even full audit); ONLY `/test --phase=ST`; no dependencies. Validates the framework itself — phase files, symlinks, dispatcher, tool availability. Run after modifying phase files, symlinks, or installing tools.

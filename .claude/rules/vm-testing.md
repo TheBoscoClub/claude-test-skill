@@ -4,7 +4,7 @@ Detail, incidents and reasoning per section: `.claude/docs/rules-reference/vm-te
 
 ## Default Test VM
 
-The default test VM is the one named by `default.vm` in `~/.claude/config/project-vm-map.json`; its disk image and the install ISOs live where the installation says (`vms.<vm>.active_disk`, `paths.iso_dir`; real values only on the host, e.g. the gitignored `.claude/rules/local-vm-paths.md`). The skill has no built-in VM name. Phases 1, 10a and 10b choose the VM with `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection) and never pick a VM by matching names in `virsh list`.
+The default test VM is the one named by `default.vm` in `~/.claude/config/project-vm-map.json`; its disk image and the install ISOs live where the installation says (`vms.<vm>.active_disk`, `paths.iso_dir`; real values only on the host, e.g. the gitignored `.claude/rules/local-vm-paths.md`). The skill has no built-in VM name. Only a VM listed under the map's `vms` is ever used — a project's tracked manifest chooses among them, never adds one. Phases 1, 10a and 10b each source `skills/test-phases/lib/test-vm.sh` and choose the VM with its `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection); none picks a VM by matching names in `virsh list`.
 
 ## Manifest Template
 
@@ -25,8 +25,8 @@ Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a 
 | `<default-vm>` (`default.vm`) | *(none)* | Default for all other projects | — |
 
 - QA VMs receive only promoted releases — `/test` phases never run against them.
-- All other projects use the `default.vm` VM (or any non-exclusive VM for cross-distro testing).
-- Nothing configured, or the chosen VM exclusive to another project → the VM phases abort; there is no fallback VM.
+- All other projects use the `default.vm` VM (cross-distro testing: listed, non-exclusive VMs named in the manifest's `test_environments`).
+- Nothing configured, the chosen VM not listed under `vms`, or exclusive to another project → the VM phases abort; there is no fallback VM.
 
 ## When Phase 10a Runs
 
@@ -44,8 +44,7 @@ Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a 
 | **During testing** | Running | Install, deploy, test |
 | **Cleanup (Phase 11)** | Running (dirty) | Shut down, leave shut down (`post_test_restore=true` VMs: no revert here) |
 
-- Revert ALWAYS discards the overlay (never `qemu-img commit` — bakes test changes into the base)
-- Overlay files are deleted only under directories listed in `paths.vm_storage_dirs`; with that key absent the overlay steps are skipped and only snapshot reverts run
+- Reset is a snapshot revert only (never `qemu-img commit` — bakes test changes into the base). `/test` never deletes or recreates a pristine snapshot, never overwrites a disk and never undefines a VM; the only snapshot it deletes is its own `pre-test-YYYYMMDD-HHMMSS` (`delete_pretest_snapshot`). A failed pristine revert stops for manual recovery
 - Phase 11 shuts down `post_test_restore=true` VMs regardless of who started them (it does not revert; the revert happens at the next start); shared VMs are shut down only if `/test` started them
 
 ## VM Snapshot Workflow (Shared VMs)

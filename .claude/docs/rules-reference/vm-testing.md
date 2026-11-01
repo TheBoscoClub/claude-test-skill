@@ -29,6 +29,13 @@ Lines removed from the loaded rule because they disagreed with `~/.claude/skills
 
 | **Cleanup (Phase 11)** | Running (dirty) | ALWAYS: revert to pristine, shut down, leave shut down |
 
+## Superseded 2026-11-01 (destructive reset paths; bd `claude-test-skill-zy9`)
+
+*Superseded 2026-11-01: reset is revert-only and the only snapshot delete is `delete_pretest_snapshot` (pre-test names only); see bd `claude-test-skill-zy9`.*
+
+- Revert ALWAYS discards the overlay (never `qemu-img commit` — bakes test changes into the base)
+- Overlay files are deleted only under directories listed in `paths.vm_storage_dirs`; with that key absent the overlay steps are skipped and only snapshot reverts run
+
 ## Superseded 2026-11-01 (VM selection and lifecycle table; bd `claude-test-skill-zy9`)
 
 *Superseded 2026-11-01: VM selection is configured-only (`resolve_test_vm`, phase-10b-vm-lifecycle.md § Test VM Selection) and the startup row reverts a `post_test_restore=true` VM in either state; see bd `claude-test-skill-zy9`.*

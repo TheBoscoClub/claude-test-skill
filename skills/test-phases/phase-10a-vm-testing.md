@@ -26,7 +26,9 @@ Test VMs MUST NOT live-mount production storage (no NFS, CIFS, virtiofs, virtio-
 
 ## VM Configuration
 
-**Storage locations** come from the installation, never from this skill: `paths.iso_dir` (ISO library for new VMs) and `paths.vm_storage_dirs` (a list of directories holding VM disk images) in `~/.claude/config/project-vm-map.json`. Neither has a built-in default. Without `paths.iso_dir`, `create_test_vm` refuses; without `paths.vm_storage_dirs`, `create_test_vm` refuses and `reset_vm_to_pristine` skips its external-overlay branch (snapshot reverts still run). Example:
+**Storage locations** come from the installation, never from this skill: `paths.iso_dir` (ISO library for new VMs) and `paths.vm_storage_dirs` (a list of directories holding VM disk images) in `~/.claude/config/project-vm-map.json`. Neither has a built-in default, and only `create_test_vm` reads them: without either key it refuses before touching anything. `create_test_vm` also refuses a name libvirt already defines — it never destroys or undefines an existing VM.
+
+**Which VMs this phase may touch**: only VMs the map lists under `vms`, chosen by `resolve_test_vm` or validated by `check_test_vm` (`skills/test-phases/lib/test-vm.sh`, see `phase-10b-vm-lifecycle.md` § Test VM Selection). Each function below that acts on an existing VM sources that file itself. Snapshot deletes go only through `delete_pretest_snapshot`, which refuses anything but a `pre-test-YYYYMMDD-HHMMSS` name, so a pristine snapshot is never deleted. Example:
 
 ```json
 { "paths": { "iso_dir": "/srv/isos", "vm_storage_dirs": ["/srv/vm-images"] } }
@@ -78,6 +80,8 @@ detect_vm_environment() {
 ```bash
 create_test_vm() {
     local VM_NAME="$1" ISO_PATTERN="$2" MEMORY_MB="${3:-4096}" DISK_GB="${4:-40}" UEFI="${5:-false}"
+    [[ "$VM_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "ERROR: invalid VM name: '$VM_NAME'"; return 1; }
+    [[ "$MEMORY_MB" =~ ^[0-9]+$ && "$DISK_GB" =~ ^[0-9]+$ ]] || { echo "ERROR: memory_mb and disk_gb must be integers"; return 1; }
     # Locations from the installation (§ VM Configuration); no built-in default, refuse before touching anything
     local VM_MAP="$HOME/.claude/config/project-vm-map.json" ISO_DIR VM_STORAGE
     ISO_DIR=$(jq -r '.paths.iso_dir // empty | strings | select(startswith("/"))' "$VM_MAP" 2>/dev/null)
@@ -86,17 +90,22 @@ create_test_vm() {
     [[ -n "$VM_STORAGE" ]] || { echo "ERROR: set paths.vm_storage_dirs in $VM_MAP"; return 1; }
     local VM_DISK="${VM_STORAGE%/}/${VM_NAME}.qcow2"
 
+    # Never replace an existing VM: a name libvirt knows, or a disk image already on disk, is refused.
+    if virsh dominfo "$VM_NAME" &>/dev/null || sudo virsh dominfo "$VM_NAME" &>/dev/null; then
+        echo "ERROR: a VM named $VM_NAME already exists — refusing to replace it (choose another name)"
+        return 1
+    fi
+    [[ -e "$VM_DISK" ]] && { echo "ERROR: $VM_DISK already exists — refusing to overwrite it"; return 1; }
+
     local ISO_PATH=$(ls "$ISO_DIR"/$ISO_PATTERN 2>/dev/null | head -1)
     [[ -z "$ISO_PATH" ]] && { echo "No ISO matching: $ISO_PATTERN"; return 1; }
 
-    [[ $(virsh dominfo "$VM_NAME" 2>/dev/null) ]] && { virsh destroy "$VM_NAME" 2>/dev/null; virsh undefine "$VM_NAME" --remove-all-storage 2>/dev/null; }
+    local VIRT_CMD=(virt-install --name "$VM_NAME" --memory "$MEMORY_MB" --vcpus 4
+        --disk "path=$VM_DISK,size=$DISK_GB,format=qcow2" --cdrom "$ISO_PATH"
+        --os-variant detect=on --network network=default --graphics spice --video virtio --noautoconsole)
+    [[ "$UEFI" == "true" ]] && VIRT_CMD+=(--boot uefi)
 
-    local VIRT_CMD="virt-install --name $VM_NAME --memory $MEMORY_MB --vcpus 4 \
-        --disk path=$VM_DISK,size=$DISK_GB,format=qcow2 --cdrom $ISO_PATH \
-        --os-variant detect=on --network network=default --graphics spice --video virtio --noautoconsole"
-    [[ "$UEFI" == "true" ]] && VIRT_CMD="$VIRT_CMD --boot uefi"
-
-    eval $VIRT_CMD && echo "VM created: $VM_NAME" || { echo "Failed to create VM"; return 1; }
+    "${VIRT_CMD[@]}" && echo "VM created: $VM_NAME (add it under vms in $VM_MAP before /test may use it)" || { echo "Failed to create VM"; return 1; }
 }
 ```
 
@@ -116,43 +125,37 @@ manage_vm_snapshot() {
             virsh snapshot-revert "$VM_NAME" "$SNAPSHOT_NAME"
             ;;
         list)   virsh snapshot-list "$VM_NAME" ;;
-        delete) virsh snapshot-delete "$VM_NAME" "$SNAPSHOT_NAME" ;;
+        delete)
+            # Only pre-test snapshots are ever deleted (never a pristine one): lib/test-vm.sh refuses the rest
+            source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+                declare -F delete_pretest_snapshot >/dev/null ||
+                { echo "ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh)"; return 2; }
+            delete_pretest_snapshot "$VM_NAME" "$SNAPSHOT_NAME"
+            ;;
     esac
 }
 
-# Reset to pristine state — checks manifest for snapshot name, falls back to standard names
-# NEVER uses qemu-img commit (that bakes changes into the base image)
+# Reset to pristine state — checks manifest for snapshot name, falls back to standard names.
+# Revert only: never deletes, recreates or edits a snapshot or a disk, and never uses qemu-img commit
+# (that bakes changes into the base image). Only a VM the installation lists may be reset.
 reset_vm_to_pristine() {
     local VM_NAME="$1" PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
-    local PRISTINE_SNAP=""
+    local PRISTINE_SNAP="" SNAPS=""
+
+    source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+        declare -F check_test_vm >/dev/null ||
+        { echo "ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh)"; return 2; }
+    check_test_vm "$PROJECT_DIR" "$VM_NAME" || { echo "Refusing to reset $VM_NAME (reason above)"; return 1; }
 
     [[ -f "${PROJECT_DIR}/vm-test-manifest.json" ]] && \
         PRISTINE_SNAP=$(python3 -c "import json; d=json.load(open('${PROJECT_DIR}/vm-test-manifest.json')); print(d.get('vm_testing',{}).get('pristine_snapshot',''))" 2>/dev/null)
 
-    # External snapshot: discard overlay and recreate. Flat layout under the first directory in
-    # paths.vm_storage_dirs only; no default — with the key absent this branch is skipped.
-    local VM_STORAGE OVERLAY="" BASE=""
-    VM_STORAGE=$(jq -r '[.paths.vm_storage_dirs[]? | strings | select(startswith("/"))][0] // empty' \
-        "$HOME/.claude/config/project-vm-map.json" 2>/dev/null)
-    if [[ -n "$VM_STORAGE" ]]; then
-        OVERLAY="${VM_STORAGE%/}/${VM_NAME}.${PRISTINE_SNAP}"
-        BASE="${VM_STORAGE%/}/${VM_NAME}.qcow2"
-    elif [[ -n "$PRISTINE_SNAP" ]]; then
-        echo "paths.vm_storage_dirs not set — external-overlay reset skipped, trying snapshots"
-    fi
-
-    if [[ -n "$PRISTINE_SNAP" && -n "$OVERLAY" && -f "$OVERLAY" ]]; then
-        virsh destroy "$VM_NAME" 2>/dev/null
-        sudo virsh snapshot-delete "$VM_NAME" "$PRISTINE_SNAP" --metadata 2>/dev/null
-        sudo virt-xml "$VM_NAME" --edit target=vda --disk path="$BASE"
-        sudo rm -f "${OVERLAY:?}"
-        sudo virsh snapshot-create-as "$VM_NAME" "$PRISTINE_SNAP" \
-            "Pristine OS with dependencies. No application installed." --disk-only
-    elif [[ -n "$PRISTINE_SNAP" ]] && virsh snapshot-list "$VM_NAME" --name 2>/dev/null | grep -q "$PRISTINE_SNAP"; then
+    SNAPS=$(virsh snapshot-list "$VM_NAME" --name 2>/dev/null)
+    if [[ -n "$PRISTINE_SNAP" ]] && grep -qxF -- "$PRISTINE_SNAP" <<<"$SNAPS"; then
         manage_vm_snapshot "$VM_NAME" restore "$PRISTINE_SNAP"
-    elif virsh snapshot-list "$VM_NAME" --name 2>/dev/null | grep -q "^pristine$"; then
+    elif grep -qxF pristine <<<"$SNAPS"; then
         manage_vm_snapshot "$VM_NAME" restore "pristine"
-    elif virsh snapshot-list "$VM_NAME" --name 2>/dev/null | grep -q "clean-install"; then
+    elif grep -qxF clean-install <<<"$SNAPS"; then
         manage_vm_snapshot "$VM_NAME" restore "clean-install"
     else
         echo "No pristine or clean snapshot found for $VM_NAME"
@@ -238,12 +241,24 @@ run_vm_tests() {
 
 ```bash
 run_cross_distro_tests() {
-    local DISTROS=("${@:-cachyos-test ubuntu-test fedora-test}")
+    # VMs come from configuration only: the arguments, else the manifest's test_environments entries of
+    # type "existing" (their vm_name). No built-in names. Each must pass check_test_vm (listed under the
+    # map's vms, exclusivity respected) before it is reset, started or deployed to.
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}" MANIFEST="${PROJECT_DIR:-$(pwd)}/vm-test-manifest.json"
+    source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+        declare -F check_test_vm >/dev/null ||
+        { echo "ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh)"; return 2; }
+    local DISTROS=("$@")
+    if [[ ${#DISTROS[@]} -eq 0 && -f "$MANIFEST" ]]; then
+        mapfile -t DISTROS < <(jq -r '.vm_testing.test_environments[]? | select(.type == "existing") | .vm_name // empty | strings' "$MANIFEST" 2>/dev/null)
+    fi
+    [[ ${#DISTROS[@]} -gt 0 ]] || { echo "Cross-distro: no VMs configured (vm_testing.test_environments, type existing) — skipped"; return 0; }
     local RESULTS=()
 
     for distro in "${DISTROS[@]}"; do
+        check_test_vm "$PROJECT_DIR" "$distro" || { RESULTS+=("$distro: REFUSED (not a VM this project may use)"); continue; }
         virsh dominfo "$distro" &>/dev/null || { RESULTS+=("$distro: SKIPPED"); continue; }
-        reset_vm_to_clean "$distro"
+        reset_vm_to_clean "$distro" || { RESULTS+=("$distro: FAILED (reset)"); continue; }
         virsh start "$distro" 2>/dev/null; sleep 30
 
         if deploy_to_vm "$distro" && run_vm_tests "$distro" "install"; then
@@ -432,8 +447,12 @@ run_phase_V() {
     local VM_MAP="$HOME/.claude/config/project-vm-map.json"
     local PROJECT_NAME=$(basename "$PROJECT_DIR")
 
-    # The VM: resolve_test_vm (phase-10b-vm-lifecycle.md § Test VM Selection; Phase 10 loads 10a and
-    # 10b together). Configured VMs only — no name guessed from `virsh list`, no built-in default.
+    # The VM: resolve_test_vm from the shared helpers (phase-10b-vm-lifecycle.md § Test VM Selection). This
+    # phase's subagent reads only this file, so it loads them itself. Listed VMs only — no name guessed from
+    # `virsh list`, no built-in default.
+    source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+        declare -F resolve_test_vm >/dev/null ||
+        { echo "ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh)"; return 2; }
     DEFAULT_VM=$(resolve_test_vm "$PROJECT_DIR") || { echo "ERROR: no usable test VM is configured (reason above)"; return 1; }
 
     if [[ -f "$VM_MAP" ]]; then
@@ -516,7 +535,7 @@ run_phase_V() {
 
 ## Project-VM Routing
 
-Phase 10a chooses the VM with `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection), which reads `~/.claude/config/project-vm-map.json` and the project's `vm-test-manifest.json`:
+Phase 10a chooses the VM with `resolve_test_vm` (`skills/test-phases/lib/test-vm.sh`; `phase-10b-vm-lifecycle.md` § Test VM Selection), which reads `~/.claude/config/project-vm-map.json` and the project's `vm-test-manifest.json`. Whatever is chosen must be listed under the map's `vms`:
 
 | Scenario | VM Used |
 | --- | --- |
@@ -524,6 +543,7 @@ Phase 10a chooses the VM with `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § 
 | No map entry, manifest names one | manifest `vm_testing.default_vm` |
 | Neither | `default.vm` |
 | Nothing configured | ERROR (no built-in default, no name guessed from `virsh list`) |
+| Chosen VM not listed under the map's `vms` (or no map) | ERROR |
 | Chosen VM exclusive to another project | ERROR |
 
 **Exclusivity:** `exclusive_to` is bidirectional: only that project uses the VM, and it uses only that VM.

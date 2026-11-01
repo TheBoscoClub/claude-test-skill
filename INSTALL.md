@@ -110,8 +110,8 @@ After installation, verify everything is working:
 ls -la ~/.claude/commands/test.md
 
 # 2. Check that phase files are accessible
-ls ~/.claude/skills/test-phases/ | wc -l
-# Expected: 20 files
+ls ~/.claude/skills/test-phases/phase-*.md | wc -l
+# Expected: 20 phase files (plus the lib/ directory of shared helpers)
 
 # 3. Run the self-test (validates the framework)
 # In Claude Code:

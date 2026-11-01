@@ -24,7 +24,7 @@ Automatic VM startup/shutdown for isolated testing.
 
 ## Test VM Selection
 
-The test VM is always one the user configured, never one guessed from `virsh list` (a name match would pick a VM reserved for another project). `resolve_test_vm` below is the only place it is chosen; Phase 1 (pre-test snapshot sweep) and Phase 10a call the same function. There is no built-in default VM.
+The test VM is always one the installation lists, never one guessed from `virsh list` (a name match would pick a VM reserved for another project). `resolve_test_vm` is the only place it is chosen. It lives in the shared helpers file `skills/test-phases/lib/test-vm.sh`, which Phase 1 (pre-test snapshot sweep), Phase 10a and this phase each source themselves — each phase runs in its own subagent and reads only its own phase file. There is no built-in default VM.
 
 Precedence, first non-empty wins:
 
@@ -32,57 +32,17 @@ Precedence, first non-empty wins:
 2. the project's `vm-test-manifest.json` `vm_testing.default_vm`
 3. the map's `default.vm`
 
-It refuses (returns 1, reason on stderr) when nothing is configured, when the chosen VM is `exclusive_to` another project in the map's `vms` entry, or when the project has an exclusive VM of its own and the chosen VM is not one of them (`exclusive_to` is a bidirectional lock).
+It refuses (returns 1, reason on stderr) when nothing is configured; when the map is missing, unreadable, or not a JSON object; when the chosen VM is not a key of the map's `vms` (a tracked manifest can choose among the VMs the installation lists, never add one); when the chosen VM is `exclusive_to` another project; or when the project has an exclusive VM of its own and the chosen VM is not one of them (`exclusive_to` is a bidirectional lock). `check_test_vm PROJECT_DIR VM` applies the same `vms`/exclusivity checks to a VM named some other way (Phase 10a cross-distro testing).
+
+Load the helpers before calling any of them, and tell "not loaded" apart from "not configured":
 
 ```bash
-resolve_test_vm() {
-    local PROJECT_DIR="${1:-${PROJECT_DIR:-$(pwd)}}"
-    python3 - "$PROJECT_DIR" "$HOME/.claude/config/project-vm-map.json" <<'PYEOF'
-import json, os, sys
-
-proj_dir, map_path = sys.argv[1], sys.argv[2]
-project = os.path.basename(proj_dir.rstrip("/"))
-
-
-def load(path):
-    try:
-        with open(path) as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        return {}
-    except (OSError, ValueError) as e:
-        sys.exit(f"resolve_test_vm: cannot read {path}: {e}")
-    return data if isinstance(data, dict) else {}
-
-
-def sub(d, key):
-    v = d.get(key) if isinstance(d, dict) else None
-    return v if isinstance(v, dict) else {}
-
-
-def text(v):
-    return v.strip() if isinstance(v, str) else ""
-
-
-vm_map = load(map_path)
-manifest = load(os.path.join(proj_dir, "vm-test-manifest.json"))
-vm = (text(sub(sub(vm_map, "projects"), project).get("vm"))
-      or text(sub(manifest, "vm_testing").get("default_vm"))
-      or text(sub(vm_map, "default").get("vm")))
-if not vm:
-    sys.exit(f"resolve_test_vm: no test VM configured for {project} — set projects.<project>.vm "
-             f"or default.vm in {map_path}, or vm_testing.default_vm in vm-test-manifest.json")
-vms = sub(vm_map, "vms")
-owner = text(sub(vms, vm).get("exclusive_to"))
-if owner and owner != project:
-    sys.exit(f"resolve_test_vm: {vm} is exclusive_to {owner}; {project} may not use it")
-own = sorted(n for n in vms if text(sub(vms, n).get("exclusive_to")) == project)
-if own and vm not in own:
-    sys.exit(f"resolve_test_vm: {project} has exclusive VM(s) {', '.join(own)}; it may not use {vm}")
-print(vm)
-PYEOF
-}
+source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+    declare -F resolve_test_vm >/dev/null ||
+    { echo "ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh)"; return 2; }
 ```
+
+The only snapshot delete the skill issues is `delete_pretest_snapshot VM NAME [PROJECT_DIR]` from the same file: it refuses any name that is not `pre-test-YYYYMMDD-HHMMSS`, and the project's `pristine_snapshot`, so a pristine snapshot is never deleted.
 
 ## VM Lifecycle State File
 
@@ -133,8 +93,11 @@ start_test_vm() {
         sleep 2
     fi
 
-    # The test VM: only the one the user configured (resolve_test_vm, § Test VM Selection).
+    # The test VM: only one the installation lists (resolve_test_vm, § Test VM Selection).
     # No fallback to a name taken from `virsh list` — it could be another project's exclusive VM.
+    source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+        declare -F resolve_test_vm >/dev/null ||
+        { echo "  ⛔ ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh)"; return 2; }
     local VM_NAME=""
     if ! VM_NAME=$(resolve_test_vm "$PROJECT_DIR"); then
         echo "  ⛔ ABORT: no usable test VM is configured (reason above)"
@@ -198,7 +161,7 @@ if not p:
 print(p)" 2>/dev/null)
     fi
 
-    # ─── EXTERNAL QCOW2 VALIDATION (disaster recovery fallback) ────
+    # ─── EXTERNAL QCOW2 VALIDATION (manual-recovery source; /test never restores from it) ────
     if [[ "$PRISTINE_TYPE" == "external_qcow2" ]]; then
         if [[ ! -f "$PRISTINE_PATH" ]]; then
             echo "  ⛔ ABORT: External pristine qcow2 not found: $PRISTINE_PATH"
@@ -239,61 +202,16 @@ print(p)" 2>/dev/null)
         else
             echo "  ⚠️  virsh snapshot-revert failed — internal snapshot may be corrupted"
 
-            # ─── FALLBACK: external qcow2 disaster recovery ─────────
-            if [[ "$PRISTINE_TYPE" == "external_qcow2" && -n "$PRISTINE_PATH" && -n "$ACTIVE_DISK" ]]; then
-                echo "  🔧 Falling back to external qcow2 disaster recovery..."
-                if [[ ! -f "$PRISTINE_PATH" ]]; then
-                    echo "  ⛔ ABORT: External pristine qcow2 not found: $PRISTINE_PATH"
-                    return 1
-                fi
-
-                echo "  Overwriting active disk with pristine image..."
-                sudo cp "$PRISTINE_PATH" "$ACTIVE_DISK"
-                echo "  ✅ Active disk restored from pristine qcow2"
-
-                # Ensure VM XML points to the active disk (not some stale overlay)
-                sudo virt-xml "$VM_NAME" --edit target=vda --disk path="$ACTIVE_DISK" 2>/dev/null
-
-                # Clean up stale flat-layout overlay files, only under the storage roots the user
-                # listed in paths.vm_storage_dirs. No default: with the key absent nothing is deleted.
-                local STORAGE_DIRS=()
-                mapfile -t STORAGE_DIRS < <(jq -r '.paths.vm_storage_dirs[]? | strings | select(startswith("/"))' "$VM_MAP" 2>/dev/null)
-                if [[ ${#STORAGE_DIRS[@]} -eq 0 ]]; then
-                    echo "  ℹ️  paths.vm_storage_dirs not set in $VM_MAP — stale overlay cleanup skipped"
-                fi
-                local storage_dir overlay_candidate
-                for storage_dir in "${STORAGE_DIRS[@]}"; do
-                    overlay_candidate="${storage_dir%/}/${VM_NAME}.${PRISTINE_SNAP}"
-                    [[ -f "$overlay_candidate" ]] && sudo rm -f "${overlay_candidate:?}"
-                done
-
-                # Delete any stale libvirt snapshot metadata
-                for snap in $(sudo virsh snapshot-list "$VM_NAME" --name 2>/dev/null); do
-                    sudo virsh snapshot-delete "$VM_NAME" "$snap" --metadata 2>/dev/null || true
-                done
-
-                # Fix backingStore refs in VM XML
-                sudo virsh dumpxml "$VM_NAME" > /tmp/vm-fix.xml
-                python3 -c "
-import xml.etree.ElementTree as ET
-tree = ET.parse('/tmp/vm-fix.xml')
-for disk in tree.getroot().iter('disk'):
-    for bs in disk.findall('backingStore'):
-        disk.remove(bs)
-tree.write('/tmp/vm-fix.xml', xml_declaration=True)
-"
-                sudo virsh define /tmp/vm-fix.xml 2>/dev/null
-                rm -f /tmp/vm-fix.xml
-
-                # Recreate internal pristine snapshot from this restored state
-                sudo virsh snapshot-create-as "$VM_NAME" "$PRISTINE_SNAP" \
-                    "Pristine OS with dependencies. No application installed." --atomic 2>/dev/null
-                echo "  ✅ Pristine snapshot recreated from external qcow2 backup"
-            else
-                echo "  ⛔ ABORT: No external qcow2 fallback configured (pristine_type != external_qcow2)"
-                echo "     Manual recovery required"
-                return 1
+            # ─── NO AUTOMATIC FALLBACK ───────────────────────────────────
+            # Restoring from the external pristine image means overwriting the active disk (which holds
+            # the internal pristine snapshot) and dropping snapshot metadata. A pristine snapshot is never
+            # deleted, so /test never does this itself: it stops and names the manual recovery.
+            echo "  ⛔ ABORT: cannot revert $VM_NAME to $PRISTINE_SNAP — manual recovery required"
+            if [[ "$PRISTINE_TYPE" == "external_qcow2" && -n "$PRISTINE_PATH" ]]; then
+                echo "     External pristine image: $PRISTINE_PATH (active disk: ${ACTIVE_DISK:-not set})"
+                echo "     Restore it by hand following the pristine-restore procedure; /test does not overwrite disks"
             fi
+            return 1
         fi
 
         CURRENT_STATE="shutoff"
@@ -435,14 +353,15 @@ install_on_pristine_vm() {
         return 0
     fi
 
-    # SSH identity: the manifest's ssh_config, else the map's vms.<vm> entry. No built-in default.
+    # SSH identity: the map's vms.<vm> entry (the installation knows its VMs), else the manifest's
+    # ssh_config — the same order as Phase 10a run_phase_V. No built-in default.
     local VM_MAP="$HOME/.claude/config/project-vm-map.json"
-    local SSH_USER=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('ssh_config',{}).get('user',''))" 2>/dev/null)
-    local SSH_KEY=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('ssh_config',{}).get('key',''))" 2>/dev/null)
-    [[ -z "$SSH_USER" ]] && SSH_USER=$(jq -r --arg vm "$VM_NAME" '.vms[$vm].ssh_user // empty' "$VM_MAP" 2>/dev/null)
-    [[ -z "$SSH_KEY" ]] && SSH_KEY=$(jq -r --arg vm "$VM_NAME" '.vms[$vm].ssh_key // empty' "$VM_MAP" 2>/dev/null)
+    local SSH_USER=$(jq -r --arg vm "$VM_NAME" '.vms[$vm].ssh_user // empty | strings' "$VM_MAP" 2>/dev/null)
+    local SSH_KEY=$(jq -r --arg vm "$VM_NAME" '.vms[$vm].ssh_key // empty | strings' "$VM_MAP" 2>/dev/null)
+    [[ -z "$SSH_USER" ]] && SSH_USER=$(jq -r '.vm_testing.ssh_config.user // .ssh_config.user // empty | strings' "$MANIFEST" 2>/dev/null)
+    [[ -z "$SSH_KEY" ]] && SSH_KEY=$(jq -r '.vm_testing.ssh_config.key // .ssh_config.key // empty | strings' "$MANIFEST" 2>/dev/null)
     if [[ -z "$SSH_USER" || -z "$SSH_KEY" ]]; then
-        echo "  ❌ No SSH user/key for $VM_NAME: set ssh_config in vm-test-manifest.json, or vms.<vm>.ssh_user and ssh_key in $VM_MAP"
+        echo "  ❌ No SSH user/key for $VM_NAME: set vms.<vm>.ssh_user and ssh_key in $VM_MAP, or ssh_config in vm-test-manifest.json"
         return 1
     fi
     SSH_KEY="${SSH_KEY/#\~/$HOME}"
@@ -602,6 +521,18 @@ shutdown_test_vm() {
     local ORIGINAL_STATE=$(grep "^original_state=" "$STATE_FILE" | cut -d= -f2)
     local PRE_TEST_SNAPSHOT=$(grep "^pre_test_snapshot=" "$STATE_FILE" | cut -d= -f2)
 
+    # The state file is data, not authority: a snapshot it names is reverted to or deleted only when it is a
+    # pre-test name (delete_pretest_snapshot, lib/test-vm.sh). Anything else — "pristine", the manifest's
+    # pristine_snapshot, a hand edit — is reported and left alone.
+    source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+        declare -F delete_pretest_snapshot >/dev/null ||
+        { echo "  ⛔ ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh) — VM left as is"; return 2; }
+    if [[ -n "$PRE_TEST_SNAPSHOT" ]] && ! is_pretest_snapshot "$PRE_TEST_SNAPSHOT"; then
+        echo "  ⛔ $STATE_FILE names pre_test_snapshot=$PRE_TEST_SNAPSHOT, which is not a pre-test-YYYYMMDD-HHMMSS name"
+        echo "     Not reverting to it and not deleting it"
+        PRE_TEST_SNAPSHOT=""
+    fi
+
     echo "  VM: $VM_NAME"
     echo "  Started by /test: $STARTED_BY_TEST"
     echo "  Original State: $ORIGINAL_STATE"
@@ -664,7 +595,7 @@ shutdown_test_vm() {
 
             # Delete the temporary pre-test snapshot
             echo "  🗑️  Deleting temporary snapshot..."
-            if sudo virsh snapshot-delete "$VM_NAME" "$PRE_TEST_SNAPSHOT" 2>/dev/null; then
+            if delete_pretest_snapshot "$VM_NAME" "$PRE_TEST_SNAPSHOT" "$PROJECT_DIR"; then
                 echo "  ✅ Pre-test snapshot deleted"
             else
                 echo "  ⚠️ Failed to delete snapshot (the next /test Phase 1 sweep removes it)"
@@ -789,8 +720,11 @@ Keep the VM running after /test:
 ```bash
 # Before running /test:
 export TEST_KEEP_VM_RUNNING=true
+```
 
-# Or add to vm-test-manifest.json:
+Or add to `vm-test-manifest.json`:
+
+```json
 {
   "vm_testing": {
     "keep_running_after_test": true
