@@ -115,6 +115,12 @@ create_test_vm() {
 manage_vm_snapshot() {
     local VM_NAME="$1" ACTION="$2" SNAPSHOT_NAME="${3:-clean-install}"
 
+    # Every action, whoever calls it: only a VM this project may use; deletes only pre-test snapshots
+    source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+        declare -F check_test_vm delete_pretest_snapshot >/dev/null ||
+        { echo "ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh)"; return 2; }
+    check_test_vm "${PROJECT_DIR:-$(pwd)}" "$VM_NAME" || { echo "Refusing $ACTION on $VM_NAME (reason above)"; return 1; }
+
     case "$ACTION" in
         create)
             virsh domstate "$VM_NAME" 2>/dev/null | grep -q running && { virsh shutdown "$VM_NAME"; sleep 10; }
@@ -127,9 +133,6 @@ manage_vm_snapshot() {
         list)   virsh snapshot-list "$VM_NAME" ;;
         delete)
             # Only pre-test snapshots are ever deleted (never a pristine one): lib/test-vm.sh refuses the rest
-            source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
-                declare -F delete_pretest_snapshot >/dev/null ||
-                { echo "ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh)"; return 2; }
             delete_pretest_snapshot "$VM_NAME" "$SNAPSHOT_NAME"
             ;;
     esac
@@ -172,6 +175,12 @@ reset_vm_to_clean() { reset_vm_to_pristine "$@"; }
 deploy_to_vm() {
     local VM_NAME="$1" PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
     local SSH_USER="${VM_SSH_USER:-testuser}" SSH_KEY="${VM_SSH_KEY:-~/.ssh/vm_test_key}"
+
+    # It may start the VM: only a VM this project may use, whoever calls it
+    source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+        declare -F check_test_vm >/dev/null ||
+        { echo "ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh)"; return 2; }
+    check_test_vm "$PROJECT_DIR" "$VM_NAME" || { echo "Refusing to deploy to $VM_NAME (reason above)"; return 1; }
 
     # Start VM if needed
     virsh domstate "$VM_NAME" 2>/dev/null | grep -q running || { virsh start "$VM_NAME"; sleep 30; }

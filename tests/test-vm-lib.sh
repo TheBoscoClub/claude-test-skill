@@ -2,7 +2,8 @@
 # Regression guard for the test-VM helpers (skills/test-phases/lib/test-vm.sh) and the phase functions
 # that act on VMs: Phase 1 sweep, Phase 10a create/reset/snapshot/cross-distro/run_phase_V, Phase 10b
 # start/shutdown, Phase 11 shutdown (bd claude-test-skill-zy9). Also: QA VMs refused, exclusive_to as a
-# string or a list, VM names taken exactly, and no delete path ever removing a pristine snapshot.
+# string or a list, VM names taken exactly, no delete path ever removing a pristine snapshot, and
+# Phase 10a's manage_vm_snapshot / deploy_to_vm refusing a VM check_test_vm refuses.
 #
 # WHY THIS EXISTS
 # - Each phase runs in its own subagent and reads only its own phase file. When resolve_test_vm lived
@@ -354,6 +355,36 @@ out=$(run 10b 'shutdown_test_vm; echo "RC=$?"')
 case_env manage-map-pristine P1 "$PMAP" MISSING
 out=$(run 10a 'manage_vm_snapshot shared-vm delete pre-test-20990101-000000; echo "RC=$?"')
 ! logged 'snapshot-delete' && ok "manage_vm_snapshot delete of the map's pristine_snapshot is refused" || bad "manage map pristine: $out"
+
+echo "6. Phase 10a's direct VM actions check the VM themselves (manage_vm_snapshot, deploy_to_vm)"
+MUT10A='^virsh (start|shutdown|destroy|snapshot-create-as|snapshot-revert|snapshot-delete|domifaddr) '
+case_env manage-unlisted P1 "$MAP" MISSING
+out=$(run 10a 'manage_vm_snapshot unlisted-vm create pre-test-20260101-000000; echo "RC=$?"')
+[[ "$out" == *"RC=1"* ]] && ! logged "$MUT10A" && ok "manage_vm_snapshot create on an unlisted VM is refused before any virsh call" || bad "manage create unlisted: $out / $(tr '\n' ' ' <"$C/log")"
+case_env manage-qa P1 "$QAMAP" MISSING
+out=$(run 10a 'manage_vm_snapshot qa-vm restore clean-install; echo "RC=$?"')
+[[ "$out" == *"RC=1"* ]] && ! logged "$MUT10A" && ok "manage_vm_snapshot restore on a QA VM is refused (no destroy, no revert)" || bad "manage restore qa: $out / $(tr '\n' ' ' <"$C/log")"
+case_env manage-reserved P1 "$MAP" MISSING
+out=$(run 10a 'manage_vm_snapshot example-recovery-vm-A restore clean-install; echo "RC=$?"')
+[[ "$out" == *"RC=1"* ]] && ! logged "$MUT10A" && ok "manage_vm_snapshot restore on another owner's VM is refused" || bad "manage restore reserved: $out / $(tr '\n' ' ' <"$C/log")"
+case_env manage-listed P1 "$MAP" MISSING
+out=$(run 10a 'manage_vm_snapshot shared-vm restore clean-install; echo "RC=$?"')
+logged '^virsh snapshot-revert shared-vm clean-install$' && ok "manage_vm_snapshot restore on the listed shared VM still reverts" || bad "manage restore listed: $out / $(tr '\n' ' ' <"$C/log")"
+case_env manage-nolib P1 "$MAP" MISSING
+out=$(LIBDIR=$EMPTYLIB run 10a 'manage_vm_snapshot shared-vm create pre-test-20260101-000000; echo "RC=$?"')
+[[ "$out" == *"RC=2"* && "$out" == *"helpers not loaded"* ]] && ! logged "$MUT10A" && ok "manage_vm_snapshot without the helpers: exit 2, no virsh call" || bad "manage nolib: $out"
+case_env deploy-reserved P1 "$MAP" MISSING
+out=$(run 10a 'deploy_to_vm example-recovery-vm-A; echo "RC=$?"')
+[[ "$out" == *"RC=1"* ]] && ! logged "$MUT10A" && ok "deploy_to_vm to another owner's VM is refused before virsh start" || bad "deploy reserved: $out / $(tr '\n' ' ' <"$C/log")"
+case_env deploy-qa P1 "$QAMAP" MISSING
+out=$(run 10a 'deploy_to_vm qa-vm; echo "RC=$?"')
+[[ "$out" == *"RC=1"* ]] && ! logged "$MUT10A" && ok "deploy_to_vm to a QA VM is refused" || bad "deploy qa: $out / $(tr '\n' ' ' <"$C/log")"
+case_env deploy-nolib P1 "$MAP" MISSING
+out=$(LIBDIR=$EMPTYLIB run 10a 'deploy_to_vm shared-vm; echo "RC=$?"')
+[[ "$out" == *"RC=2"* ]] && ! logged "$MUT10A" && ok "deploy_to_vm without the helpers: exit 2, no virsh call" || bad "deploy nolib: $out"
+case_env deploy-listed P1 "$MAP" MISSING
+out=$(run 10a 'deploy_to_vm shared-vm; echo "RC=$?"')
+logged '^virsh (domstate|start|domifaddr) shared-vm' && ok "deploy_to_vm to the listed shared VM still proceeds" || bad "deploy listed: $out / $(tr '\n' ' ' <"$C/log")"
 
 echo
 echo "passed=$pass failed=$fail"
