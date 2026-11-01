@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Self-test Section 11 runs the regression tests** — `tests/test-*.sh` (the `dqi` and `pqy` guards) were run by nothing, so a regression would have gone unseen. Phase ST now runs every one and fails on a non-zero exit or an empty `tests/` directory
 - **`--budget` flag** — drops the Opus floor so judgement-tier phases run on the session model; a cheaper audit becomes an explicit choice rather than a side effect of the session
-- **Semgrep CI workflow** (`.github/workflows/semgrep.yml`): runs `semgrep ci` — Code (SAST), Secrets and Supply Chain — diff-aware on pull requests, full on pushes to `main`, weekly on schedule and on manual dispatch, reporting to the Semgrep AppSec Platform (deployment `semgrep-deployment`). Engine image pinned `tag@digest`; the sole credential is the Agent (CI) scoped `SEMGREP_APP_TOKEN` org secret — no GitHub App is installed and Semgrep is granted no code access
+- **Semgrep CI workflow** (`.github/workflows/semgrep.yml`): runs `semgrep ci` — Code (SAST), Secrets and Supply Chain — diff-aware on pull requests, full on pushes to `main`, weekly on schedule and on manual dispatch, reporting to the Semgrep AppSec Platform deployment. Engine image pinned `tag@digest`; the sole credential is the Agent (CI) scoped `SEMGREP_APP_TOKEN` org secret — no GitHub App is installed and Semgrep is granted no code access
 
 ### Removed
 
@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Test VM selection is configured-only** — `resolve_test_vm` (Phase 10b § Test VM Selection) is the one place a VM is chosen, and Phases 1, 10a and 10b all call it: `~/.claude/config/project-vm-map.json` `projects.<project>.vm`, then the manifest's `vm_testing.default_vm`, then the map's `default.vm`. It refuses when nothing is configured or the VM is `exclusive_to` another project (in either direction). The fallback that took the first `virsh list` name containing `test` or `dev` is gone — it could pick another project's exclusive VM. There is no built-in default VM
+- **Host locations are installation keys with no default**: the ISO library (`paths.iso_dir`), VM image directories (`paths.vm_storage_dirs`) and SSH identity (`vms.<vm>.ssh_user` / `ssh_key`, or the manifest's `ssh_config`) are read from `project-vm-map.json`. `create_test_vm` refuses without them; the overlay deletion in `reset_vm_to_pristine` and in Phase 10b's external-qcow2 fallback runs only under listed directories and is skipped when the key is absent
+- **Phase 1's pre-test snapshot sweep is part of the skill** (`sweep_pretest_snapshots`) instead of a call to a host-only script; it uses `resolve_test_vm`, so it sweeps exactly the VM Phase 10b snapshots
+- **Self-test finds the checkout** from the installed `commands/test.md` symlink, or `$TEST_SKILL_PROJECT`, instead of a fixed path
+- **Markdown lint lints the tracked list**: `git ls-files -z -- '*.md'`, refusing an empty list rather than passing vacuously; the job's checkout sets `persist-credentials: false`
 - **Markdown lint is a CI gate**: `.github/workflows/security.yml` runs markdownlint-cli 0.48.0 (pinned, same as local)
   over every tracked `*.md`, replacing a `markdownlint-cli2-action` step set to `continue-on-error: true` that could
   never fail; `.markdownlint.json` stays the tracked config and `.markdownlintignore` is new — 34 files reformatted
@@ -43,12 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The `post_test_restore` lifecycle table agrees with Phase 10b again** (`.claude/rules/vm-testing.md`) — the trim left the startup row saying "Shut down → start normally" beside a later row saying revert; restored as one startup row (force-stop if running, then revert to pristine in either state, then start), and the "Before" row no longer claims the VM is pristine. Phase 10b's own state table and Phase 1's recovery note (which still said Phase 11 restores pristine) are corrected the same way
 - **Phase 9d Step 8 can count orphaned bd issues again** — it grepped `bd preflight` output for "orphan", but on bd 1.0.3 that command prints a PR checklist for bd's own Go repository and exits 0, so the count was always zero. It now runs `bd orphans --json` through the parse-checked `json_count` (`null` is a real zero; a `bd` failure or non-JSON output is reported UNKNOWN, not clean), with `bd stale` and `bd lint` shown as information. Regression test `tests/test-bd-health.sh` extracts Step 8 from the skill and runs it in a throwaway bd repository: 9/9 against the fix, 8 of 9 failing against the old step
 - **Self-test 6.3 no longer reports success on failure** — its summary line printed `✅ Dispatcher declares 14/15 core allowed tools` even with a tool missing; it is now conditional, and the expected total is derived from `EXPECTED_TOOLS` instead of a hardcoded count
 
 ### Security
 
-- **Host paths out of `vm-testing.md`**: the operator's ISO and image paths moved to gitignored `.claude/rules/local-vm-paths.md` — remaining tracked copies tracked in bd
+- **Host paths out of `vm-testing.md`**: the operator's ISO and image paths moved to gitignored `.claude/rules/local-vm-paths.md`
+- **No installation values left in the tree** (bd `claude-test-skill-zy9`): host paths, VM names and hardware sizes, VM snapshot names, a username, a private-range address, the Semgrep deployment name, other projects' names and pointers to host-only scripts are replaced with placeholders, generic wording or installation keys — phases 1, 2, 8, 9b, 10a, 10b, 11 and ST, the template manifest, rules, design docs, `CLAUDE.md`, `test-menu.sh`, `.gitignore` and two older CHANGELOG entries
+- **Host-identifier guard map** `.claude/local-scrub-map.txt` is gitignored; the guard hooks that read it live in `.git/hooks`, installed per machine
 - **Every deletion target is a literal absolute path or a `"${VAR:?}"` expansion** (the `trap` cleanups in `tests/test-bd-health.sh`, `test-gh-json.sh`, `test-scan-count.sh`) — an empty or unset variable now aborts instead of deleting from `/` or the cwd
 - **Keep bd issues local**: `.beads/issues.jsonl` is now gitignored and
   untracked, and bd's `export.git-add` is off — the issue tracker stays on
@@ -98,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Phase 11 (Config) → merged into Phase 0 (Preflight)
   - Phase M (Mocking) → merged into Phase 0
 - **Bloat reduction** — Phase 1 (50→23 KB), Phase P (46→20 KB), Phase V (54→22 KB)
-- **Project-agnostic** — Removed all example-project hardcoded references; all phases now use manifest-driven detection
+- **Project-agnostic** — Removed all hardcoded references to one specific project; all phases now use manifest-driven detection
 
 ### Fixed
 
