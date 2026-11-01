@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Host locations are installation keys with no default**: the ISO library (`paths.iso_dir`), VM image directories (`paths.vm_storage_dirs`) and SSH identity (`vms.<vm>.ssh_user` / `ssh_key`, or the manifest's `ssh_config`) are read from `project-vm-map.json`. `create_test_vm` refuses without them and is the only code that writes under `paths.*`; Phase 2's `detect_vm_availability` reads them only to list ISOs
 - **Phase 1's pre-test snapshot sweep is part of the skill** (`sweep_pretest_snapshots`) instead of a call to a host-only script; it sources the shared helpers and uses `resolve_test_vm`, so it sweeps exactly the VM Phase 10b snapshots, and deletes through `delete_pretest_snapshot`
 - **Self-test finds the checkout** from the installed `commands/test.md` symlink, or `$TEST_SKILL_PROJECT`, instead of a fixed path
-- **Markdown lint lints the tracked list**: `git ls-files -z -- '*.md'`, refusing an empty list rather than passing vacuously; the job's checkout sets `persist-credentials: false`
+- **Markdown lint lints the tracked list**: `git ls-files -z -- '*.md'`, refusing an empty list rather than passing vacuously; every checkout in `security.yml` sets `persist-credentials: false`
 - **Markdown lint is a CI gate**: `.github/workflows/security.yml` runs markdownlint-cli 0.48.0 (pinned, same as local)
   over every tracked `*.md`, replacing a `markdownlint-cli2-action` step set to `continue-on-error: true` that could
   never fail; `.markdownlint.json` stays the tracked config and `.markdownlintignore` is new — 34 files reformatted
