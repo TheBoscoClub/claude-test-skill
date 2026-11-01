@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Always-loaded rules trimmed**: narrative, incidents and mechanism moved verbatim from `CLAUDE.md` and `.claude/rules/*.md` into `.claude/docs/rules-reference/` (not auto-loaded) — loaded size 6,114 → 6,521 chars, every binding rule kept (lossless check: each removed line found whole in a reference doc; independent review) — size rose slightly: host paths moved to a gitignored local rule and the review restored corrected Phase 11 text
 - **live-sync baseline**: an empty `live-sync.conf` and the live-sync pre-commit gate; host paths are never tracked
   in this public repository, so the `tm` launcher stays at the repository root
 - **`AGENTS.md` regenerated from the house template**: `bd doctor` entry (previously a local note pointing at `bd preflight`) now marked unsupported in embedded mode (bd 1.0.3 prints troubleshooting only); blank line added before the prompting-commands list and a spaced table separator (markdownlint MD032, MD060)
@@ -42,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Host paths out of `vm-testing.md`**: the operator's ISO and image paths moved to gitignored `.claude/rules/local-vm-paths.md` — remaining tracked copies tracked in bd
 - **Every deletion target is a literal absolute path or a `"${VAR:?}"` expansion** (the `trap` cleanups in `tests/test-bd-health.sh`, `test-gh-json.sh`, `test-scan-count.sh`) — an empty or unset variable now aborts instead of deleting from `/` or the cwd
 - **Keep bd issues local**: `.beads/issues.jsonl` is now gitignored and
   untracked, and bd's `export.git-add` is off — the issue tracker stays on

@@ -1,8 +1,10 @@
 # Phase 10a: VM Testing Configuration
 
+Detail, incidents and reasoning per section: `.claude/docs/rules-reference/vm-testing.md` (same headings).
+
 ## Default Test VM
 
-**example-test-vm**: an existing libvirt VM. Image `/var/lib/libvirt/images/example-test-vm.qcow2`; ISOs `/path/to/isos/`. Phase 10a auto-detects VMs with "test" or "dev" in the name.
+**example-test-vm**: an existing libvirt VM. Disk image and install ISOs: the host's libvirt image and ISO directories (real paths in the gitignored `.claude/rules/local-vm-paths.md`). Phase 10a auto-detects VMs with "test" or "dev" in the name.
 
 ## Manifest Template
 
@@ -10,14 +12,7 @@
 
 ## VM Management
 
-```bash
-sudo virsh list --all
-sudo virsh start example-test-vm
-virt-viewer example-test-vm
-sudo virsh snapshot-create-as example-test-vm clean-install --description "Fresh install"   # VM shut off (see below)
-sudo virsh snapshot-revert example-test-vm clean-install
-# Project pristine snapshots: each project's vm-test-manifest.json ("snapshot", "post_test_restore")
-```
+Basics: `sudo virsh list --all|start|snapshot-create-as|snapshot-revert`, `virt-viewer example-test-vm`. Project pristine snapshots: each project's `vm-test-manifest.json` (`"snapshot"`, `"post_test_restore"`).
 
 ## VM Exclusivity Rules
 
@@ -46,18 +41,17 @@ Assignments live in `~/.claude/config/project-vm-map.json`. `exclusive_to` is a 
 | **Before /test** | Shut down + pristine | — |
 | **Startup (Phase 2/3)** | Check state | Running → dirty from interrupted test → force revert to pristine, then start. Shut down → start normally. |
 | **During testing** | Running | Install, deploy, test |
-| **Cleanup (Phase 11)** | Running (dirty) | ALWAYS: revert to pristine, shut down, leave shut down |
+| **Cleanup (Phase 11)** | Running (dirty) | Shut down, leave shut down (`post_test_restore=true` VMs: no revert here) |
+| **Next /test start** | Shut down (dirty) | Revert to pristine at startup (Phase 2/3/10b), preserving post-test state until then |
 
 - Revert ALWAYS discards the overlay (never `qemu-img commit` — bakes test changes into the base)
-- Phase 11 reverts and shuts down regardless of who started the VM
+- Phase 11 shuts down `post_test_restore=true` VMs regardless of who started them (it does not revert; the revert happens at the next start); shared VMs are shut down only if `/test` started them
 
 ## VM Snapshot Workflow (Shared VMs)
 
 Shared VMs (no `post_test_restore`) use pre-test snapshots:
 
-**Internal snapshots need the VM SHUT OFF** (pflash firmware + raw NVRAM: a live
-`snapshot-create-as` fails with `require QCOW2 nvram format`; verified libvirt
-12.8.0, 2026-10-08, claude-test-skill-ijg). Snapshot first, then start.
+**Internal snapshots need the VM SHUT OFF** (a live `snapshot-create-as` fails with `require QCOW2 nvram format`). Snapshot first, then start.
 
 ```bash
 # 1. BEFORE tests — VM must be shut off
