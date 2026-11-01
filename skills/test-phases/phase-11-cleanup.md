@@ -73,7 +73,7 @@ shutdown_test_vm() {
     # post_test_restore: true. Such VMs must be shut down at end-of-/test
     # even if /test didn't write a state file (e.g. VM was already running
     # when Phase 10a connected to it). Without this fallback, exclusive
-    # test VMs (e.g. test-example-project) silently survive past
+    # test VMs (e.g. a project's own exclusive test VM) silently survive past
     # /test cleanup and waste host resources.
     if [[ ! -f "$STATE_FILE" ]]; then
         if [[ -f "$VM_MAP" ]] && command -v python3 >/dev/null 2>&1; then
@@ -150,7 +150,7 @@ except Exception:
     # exclusively for /test runs and have no other workload, so they must
     # always be shut down regardless of who started them. Without this
     # override, the "leave VMs we didn't start running" rule below would
-    # incorrectly preserve an exclusive test VM (e.g. test-example-project)
+    # incorrectly preserve an exclusive test VM (e.g. a project's own test VM)
     # across audit cycles, wasting host resources and risking state drift
     # before the next pristine revert.
     local POST_TEST_RESTORE="false"

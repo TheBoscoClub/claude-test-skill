@@ -8,7 +8,7 @@
   "vm_testing": {
     "enabled": true,
     "default_vm": "example-test-vm",
-    "description": "Default test VM for isolated testing (CachyOS with KDE)",
+    "description": "Test VM for isolated testing — must be a VM you defined; ~/.claude/config/project-vm-map.json projects.<project>.vm overrides it",
 
     "dangerous_operations": [
       "pam_modification",
@@ -23,7 +23,7 @@
         "type": "existing",
         "vm_name": "example-test-vm",
         "snapshot": "clean-install",
-        "description": "CachyOS KDE - primary test VM for isolation testing"
+        "description": "An existing libvirt VM used for isolation testing"
       },
       {
         "name": "ubuntu-lts",
@@ -69,7 +69,7 @@
   },
 
   "notes": {
-    "iso_location": "/path/to/isos",
+    "iso_location": "Set paths.iso_dir in ~/.claude/config/project-vm-map.json (no default)",
     "vm_images": "/var/lib/libvirt/images",
     "setup_instructions": "Copy this file to your project root and customize for project-specific VM testing needs"
   }

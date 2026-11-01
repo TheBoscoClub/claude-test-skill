@@ -27,9 +27,14 @@ TOTAL_CHECKS=0
 PASSED_CHECKS=0
 FAILED_CHECKS=0
 
-TEST_SKILL_PROJECT="/path/to/projects/claude-test-skill"
 SKILLS_DIR="$HOME/.claude/skills/test-phases"
 COMMANDS_DIR="$HOME/.claude/commands"
+# The test-skill checkout: $TEST_SKILL_PROJECT when set, else the checkout the installed
+# commands/test.md links into (symlink install, INSTALL.md Method 1). A copied install has none.
+if [[ -z "${TEST_SKILL_PROJECT:-}" && -L "$COMMANDS_DIR/test.md" ]]; then
+    TEST_SKILL_PROJECT="$(dirname "$(dirname "$(readlink -f "$COMMANDS_DIR/test.md")")")"
+fi
+TEST_SKILL_PROJECT="${TEST_SKILL_PROJECT:-}"
 
 # Detect execution context: are we in a project or the test-skill repo?
 PROJECT_DIR="$(pwd)"

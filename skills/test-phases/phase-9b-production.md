@@ -314,7 +314,8 @@ validate_prod_dev_separation() {
     local ISSUES_FILE="$PROJECT_DIR/production-issues.log"
     local issues=0
 
-    local DEV_PATTERNS=("/path/to/projects/" "/home/.*/ClaudeCodeProjects/" "/home/.*/Projects/" "/home/.*/dev/" "/home/.*/src/")
+    # The project's own checkout, plus common development roots
+    local DEV_PATTERNS=("${PROJECT_DIR%/}/" "/.*/ClaudeCodeProjects/" "/home/.*/Projects/" "/home/.*/dev/" "/home/.*/src/")
     local grep_pattern=$(printf "%s\\|" "${DEV_PATTERNS[@]}"); grep_pattern="${grep_pattern%\\|}"
 
     # Determine install dir (reuse from Step 5a or detect)

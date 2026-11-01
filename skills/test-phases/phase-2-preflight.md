@@ -665,8 +665,13 @@ detect_vm_availability() {
         fi
     done <<< "$ALL_VMS"
 
-    # Check for ISO library (for creating new VMs)
-    ISO_PATHS=("/path/to/isos" "$HOME/ISOs" "/path/to/vm-images")
+    # Check for ISO library (for creating new VMs): the directories the installation names in
+    # ~/.claude/config/project-vm-map.json (paths.iso_dir, paths.vm_storage_dirs), then ~/ISOs.
+    # No built-in host paths; without the map only ~/ISOs is checked.
+    ISO_PATHS=()
+    mapfile -t ISO_PATHS < <(jq -r '(.paths.iso_dir // empty), (.paths.vm_storage_dirs[]? // empty) | strings' \
+        "$HOME/.claude/config/project-vm-map.json" 2>/dev/null)
+    ISO_PATHS+=("$HOME/ISOs")
     for path in "${ISO_PATHS[@]}"; do
         if [[ -d "$path" ]]; then
             ISO_COUNT=$(find "$path" -name "*.iso" -type f 2>/dev/null | wc -l)

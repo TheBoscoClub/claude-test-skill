@@ -164,7 +164,7 @@ Enforcement: Phase 5c scans code/comments; Phase 8 scans and cleans all docs; bo
 3. **Documentation is Code**: docs stay synced with the codebase, VERSION file, and Docker image versions; obsolete references removed.
 4. **Autonomous Operation**: the only acceptable prompts are SAFETY (destructive operations on production), ARCHITECTURE (complete rewrites of core systems), EXTERNAL (credentials or external service access).
 5. **Iterative Until Clean (FVP Enforced)**: Phases 6 and 7 loop within each pass; every fix emits an FVP proof block, including fixes for issues introduced by fixes. After fixes are committed, the whole audit of the same kind re-runs until a pass finds zero issues.
-6. **Production Data Isolation**: no test VM, QA VM, or test/QA Docker container may have LIVE ACCESS (mounts) to production storage — NFS, CIFS, virtiofs, virtio-9p, and Docker `-v` bind-mounts of host production paths are forbidden. Copying production data *into* the environment is allowed (isolated once on the VM's own disk). Test VM data libraries must fit on the VM's own disk. Enforced across all phases (A, D, V, VM-lifecycle).
+6. **Production Data Isolation**: no test VM, QA VM, or test/QA Docker container may have LIVE ACCESS (mounts) to production storage — NFS, CIFS, virtiofs, virtio-9p, and Docker `-v` bind-mounts of host production paths are forbidden. Copying production data *into* the environment is allowed (isolated once on the VM's own disk). Test VM data libraries live on the VM's own disk and must fit within it. Enforced across all phases (A, D, V, VM-lifecycle).
 
 ---
 

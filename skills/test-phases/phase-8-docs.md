@@ -69,8 +69,9 @@ grep -rn "version.*[0-9]\+\.[0-9]\+\.[0-9]\+" --include="*.md" --include="*.json
 ### 2. Path References
 
 ```bash
-# Find hardcoded development paths
-grep -rn "/path/to/projects" --include="*.md" --include="*.sh"
+# Find hardcoded development paths: the checkout's own parent directory, and home directories
+grep -rnF "$(dirname "$(pwd)")/" --include="*.md" --include="*.sh" .
+grep -rnE "/home/[^/[:space:]]+/" --include="*.md" --include="*.sh" .
 
 # Find obsolete paths (old repo names, deleted directories)
 # Compare documented paths against actual filesystem

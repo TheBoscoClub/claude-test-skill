@@ -1,6 +1,6 @@
 #!/bin/bash
 # Interactive launcher for /test skill
-# Install: ln -s /path/to/projects/claude-test-skill/test-menu.sh ~/.local/bin/tm
+# Install: ln -s /path/to/claude-test-skill/test-menu.sh ~/.local/bin/tm
 
 # High-contrast dark theme for whiptail
 export NEWT_COLORS='
