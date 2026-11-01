@@ -91,7 +91,7 @@ active_work: "Redesigning auth middleware — session token storage"
 
 **Lifecycle rules:**
 
-- **Created**: By SessionStart hook (frontmatter with process identity) on every session launch — both `claude` CLI and `project-launcher` menu. This is code, not a behavioral rule.
+- **Created**: By SessionStart hook (frontmatter with process identity) on every session launch — both `claude` CLI and a project-launcher menu. This is code, not a behavioral rule.
 - **Updated**: Claude writes a visible context checkpoint, then persists it to this file. Updates happen after meaningful exchanges, at transition points, or when either party triggers it.
 - **Purged**: When a chunk of work is completed (committed, tested, done), its entries are removed. Only the active reasoning chain remains.
 - **At session end (`/close`)**: File is cleared or deleted.

@@ -182,8 +182,8 @@ Complete rewrite. 148 lines → ~30 lines.
 | `~/.claude/commands/close.md` | **Update** | Simplify session record finalization: remove flock coordination (no longer needed — milestone-only writes eliminate concurrent write races). Add wallet card cleanup: write `## Current Work\nSession closed normally.\n## Next Step\nNo pending work.` to wallet card before finalizing. |
 | `~/.claude/customization-manifest.md` | **Update** | Add entries for `context-monitor.sh` (graduated observe-only transcript monitor) and `pre-compact.sh` (compaction recovery hook pointing to wallet card). Update session-workflow.md entry to reflect milestone-only audit trail role. |
 | `~/.claude/projects/-path-to-projects-example-project/memory/feedback_session_record_frequency.md` | **Delete** | Contains "update after every tool call round" — exact opposite of new design |
-| example-project memory: `MEMORY.md` lines 36-37 | **Update** | Remove "ALWAYS update SESSION_RECORD before calling ExitPlanMode" and "Session record update cadence: every tool call round" — contradicts milestone-only design |
-| example-project memory: `feedback_btrfs_snapshots.md` | **Check** | Remove "Log the snapshot in the session record" if present — reinforces old write-everything pattern |
+| Other project's memory: `MEMORY.md` lines 36-37 | **Update** | Remove "ALWAYS update SESSION_RECORD before calling ExitPlanMode" and "Session record update cadence: every tool call round" — contradicts milestone-only design |
+| Other project's memory: `feedback_btrfs_snapshots.md` | **Check** | Remove "Log the snapshot in the session record" if present — reinforces old write-everything pattern |
 | `~/.claude/plans/mutable-churning-allen.md` | **Check** | Update if it references old session workflow |
 | `~/.claude/plans/calm-hopping-thunder.md` | **Check** | Contains `fcntl.flock` reference — verify it's unrelated Python flock, not bash session record flock |
 

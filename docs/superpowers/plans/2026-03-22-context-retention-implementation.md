@@ -374,9 +374,9 @@ Once inside a project directory, never change cwd unless explicitly asked or ope
 ## MCP Plugin Limitations
 
 MCP servers connect at startup and cannot be hot-swapped mid-session.
-- **"open \<project\>" in-session**: Updates settings for NEXT session. Suggest `project-launcher <project>` if MCPs matter.
+- **"open \<project\>" in-session**: Updates settings for NEXT session. Suggest relaunching through the project launcher if MCPs matter.
 - **cd-ing between projects**: Has no MCP management. Always use "open \<project\>".
-- **`project-launcher` launcher**: Toggles MCPs BEFORE launching Claude.
+- **Project launcher**: Toggles MCPs BEFORE launching Claude.
 
 ## Claude.ai Skill Upload
 
@@ -562,7 +562,7 @@ rm ~/.claude/projects/-path-to-projects-example-project/memory/feedback_session_
 
 - [ ] **Step 2: Remove the MEMORY.md index entry for deleted file**
 
-In the example-project `MEMORY.md`, find and remove the line referencing `feedback_session_record_frequency.md`.
+In the other project's `MEMORY.md`, find and remove the line referencing `feedback_session_record_frequency.md`.
 
 - [ ] **Step 3: Update MEMORY.md lines 36-37 — remove old cadence rules**
 
