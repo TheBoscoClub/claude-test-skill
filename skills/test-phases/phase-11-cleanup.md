@@ -73,7 +73,7 @@ shutdown_test_vm() {
     # must pass check_test_vm (lib/test-vm.sh): listed under vms in project-vm-map.json, exclusivity
     # honoured. The state file is data, not authority; a VM that fails the check is left alone.
     source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
-        declare -F check_test_vm >/dev/null ||
+        declare -F check_test_vm test_vm_state_get >/dev/null ||
         { echo "  ⛔ ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh) — VM left as is"; return 2; }
 
     # No state file? Check project-vm-map.json for an exclusive VM with
@@ -134,8 +134,14 @@ except Exception:
         return 1
     fi
 
-    # Read state file with validation
-    local VM_NAME=$(grep "^vm_name=" "$STATE_FILE" 2>/dev/null | cut -d= -f2)
+    # Read state file with validation. vm_name is read exactly as stored (test_vm_state_get: no trimming),
+    # so the name check_test_vm validates is the name acted on; a vm_name given twice names no VM.
+    local VM_NAME VM_NAME_RC=0
+    VM_NAME=$(test_vm_state_get "$STATE_FILE" vm_name) || VM_NAME_RC=$?
+    if [[ $VM_NAME_RC -eq 2 ]]; then
+        echo "  ⛔ $STATE_FILE has an unreadable or repeated vm_name — VM left alone (state file kept)"
+        return 1
+    fi
     local STARTED_BY_TEST=$(grep "^started_by_test=" "$STATE_FILE" 2>/dev/null | cut -d= -f2)
     local ORIGINAL_STATE=$(grep "^original_state=" "$STATE_FILE" 2>/dev/null | cut -d= -f2)
 

@@ -102,11 +102,11 @@ fi
 
 ### Step 3: Sweep Leftover VM Pre-Test Snapshots (MANDATORY)
 
-The sweep resolves the VM exactly as Phase 10b does — it sources the shared helpers `skills/test-phases/lib/test-vm.sh` and calls the same `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection) — deletes every snapshot of that VM named `pre-test-YYYYMMDD-HHMMSS` through `delete_pretest_snapshot` (which refuses any other name), and touches no other name and no other VM. No VM configured, a VM the map's `vms` does not list, or the configured VM exclusive to another project: nothing is swept (exit 0). Helpers not loaded is an error (exit 2), never reported as "nothing configured". A pre-test snapshot protects nothing once its run has ended, so none is ever kept. Internal snapshots of a pflash VM delete only while it is shut off; a running VM is reported and left for the next sweep.
+The sweep resolves the VM exactly as Phase 10b does — it sources the shared helpers `skills/test-phases/lib/test-vm.sh` and calls the same `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection) — deletes every snapshot of that VM named `pre-test-YYYYMMDD-HHMMSS` through `delete_pretest_snapshot` (which refuses any other name, any name containing `pristine`, and a configured `pristine_snapshot` — such a snapshot is reported as kept), and touches no other name and no other VM. No VM configured, a VM the map's `vms` does not list, the configured VM exclusive to another project, or a QA VM (`role: "qa"`): nothing is swept (exit 0). Helpers not loaded is an error (exit 2), never reported as "nothing configured". A pre-test snapshot protects nothing once its run has ended, so none is kept unless the delete guard protects it. Internal snapshots of a pflash VM delete only while it is shut off; a running VM is reported and left for the next sweep.
 
 ```bash
 sweep_pretest_snapshots() {
-    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}" vm state s left=0
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}" vm state s rc left=0
     local snaps=()
     command -v virsh >/dev/null 2>&1 || { echo "  virsh not installed — no VM sweep"; return 0; }
     source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
@@ -123,12 +123,13 @@ sweep_pretest_snapshots() {
         return 1
     fi
     for s in "${snaps[@]}"; do
-        if delete_pretest_snapshot "$vm" "$s" "$PROJECT_DIR"; then
-            echo "  $vm: deleted $s"
-        else
-            echo "  $vm: FAILED to delete $s"
-            left=$((left + 1))
-        fi
+        rc=0
+        delete_pretest_snapshot "$vm" "$s" "$PROJECT_DIR" || rc=$?
+        case $rc in
+            0) echo "  $vm: deleted $s" ;;
+            2) echo "  $vm: kept $s — protected, delete refused (reason above)" ;;
+            *) echo "  $vm: FAILED to delete $s"; left=$((left + 1)) ;;
+        esac
     done
     ((left == 0))
 }
@@ -156,9 +157,10 @@ The pre-test snapshot for the current run is created by Phase 10b and named in `
 
 ```bash
 # VM must be shut off (pflash + raw NVRAM). Both names come from the state file: check them first.
-VM_NAME=$(grep ^vm_name= .test-vm-state | cut -d= -f2)
-SNAP=$(grep ^pre_test_snapshot= .test-vm-state | cut -d= -f2)
+# Read exactly as stored (no trimming); the names checked are the names used.
 source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
+    VM_NAME=$(test_vm_state_get .test-vm-state vm_name) &&
+    SNAP=$(test_vm_state_get .test-vm-state pre_test_snapshot) &&
     check_test_vm "$PWD" "$VM_NAME" && is_pretest_snapshot "$SNAP" &&
     sudo virsh snapshot-revert "$VM_NAME" "$SNAP"
 

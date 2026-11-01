@@ -1,7 +1,8 @@
 #!/bin/bash
 # Regression guard for the test-VM helpers (skills/test-phases/lib/test-vm.sh) and the phase functions
 # that act on VMs: Phase 1 sweep, Phase 10a create/reset/snapshot/cross-distro/run_phase_V, Phase 10b
-# start/shutdown, Phase 11 shutdown (bd claude-test-skill-zy9).
+# start/shutdown, Phase 11 shutdown (bd claude-test-skill-zy9). Also: QA VMs refused, exclusive_to as a
+# string or a list, VM names taken exactly, and no delete path ever removing a pristine snapshot.
 #
 # WHY THIS EXISTS
 # - Each phase runs in its own subagent and reads only its own phase file. When resolve_test_vm lived
@@ -172,7 +173,7 @@ resolve manifest-names-other-exclusive P1 "$MAP" '{"vm_testing":{"default_vm":"e
 resolve exclusive-project-other-vm "Excl Proj" '{"default":{"vm":"shared-vm"},"vms":{"shared-vm":{},"excl-vm":{"exclusive_to":"Excl Proj"}}}' '{"vm_testing":{"default_vm":"shared-vm"}}' FAIL
 resolve manifest-names-listed P1 "$MAP" '{"vm_testing":{"default_vm":"shared-vm"}}' shared-vm
 resolve nothing-configured P1 '{"vms":{"shared-vm":{}}}' MISSING FAIL
-resolve exclusive-to-a-list P1 '{"default":{"vm":"excl-vm"},"vms":{"excl-vm":{"exclusive_to":["Excl Proj"]}}}' MISSING FAIL
+resolve exclusive-to-a-list-locks-out P1 '{"default":{"vm":"excl-vm"},"vms":{"excl-vm":{"exclusive_to":["Excl Proj"]}}}' MISSING FAIL
 resolve other-vm-exclusive-to-a-number P1 '{"default":{"vm":"shared-vm"},"vms":{"shared-vm":{},"excl-vm":{"exclusive_to":7}}}' MISSING FAIL
 resolve exclusive-to-null P1 '{"default":{"vm":"shared-vm"},"vms":{"shared-vm":{"exclusive_to":null}}}' MISSING shared-vm
 
@@ -273,6 +274,86 @@ case_env shutdown-11-fallback-own "Excl Proj" '{"projects":{"Excl Proj":{"vm":"e
 echo running >"$C/fix/state-excl-vm"
 out=$(run 11 'shutdown_test_vm; echo "RC=$?"')
 logged '^sudo virsh shutdown excl-vm$' && ok "Phase 11 no-state fallback still stops the project's own exclusive VM" || bad "Phase 11 fallback own: $(tr '\n' ' ' <"$C/log") / ${out: -160}"
+
+echo "5. QA VMs, exclusive_to lists, exact VM names, pristine protection"
+QAMAP='{"default":{"vm":"shared-vm"},"vms":{"shared-vm":{},"qa-vm":{"role":"qa"},"qa-own":{"role":"QA","exclusive_to":"Excl Proj"},"excl-vm":{"exclusive_to":"Excl Proj"}}}'
+resolve qa-by-default P1 '{"default":{"vm":"qa-vm"},"vms":{"qa-vm":{"role":"qa"}}}' MISSING FAIL
+resolve qa-by-manifest P1 "$QAMAP" '{"vm_testing":{"default_vm":"qa-vm"}}' FAIL
+resolve qa-by-project-map P1 '{"projects":{"P1":{"vm":"qa-vm"}},"default":{"vm":"shared-vm"},"vms":{"shared-vm":{},"qa-vm":{"role":"qa"}}}' MISSING FAIL
+resolve qa-own-exclusive "Excl Proj" '{"projects":{"Excl Proj":{"vm":"qa-own"}},"vms":{"qa-own":{"role":"QA","exclusive_to":"Excl Proj"}}}' MISSING FAIL
+resolve role-not-a-string P1 '{"default":{"vm":"shared-vm"},"vms":{"shared-vm":{"role":["qa"]}}}' MISSING FAIL
+resolve role-test-is-usable P1 '{"default":{"vm":"shared-vm"},"vms":{"shared-vm":{"role":"test"}}}' MISSING shared-vm
+case_env qa-check P1 "$QAMAP" MISSING
+out=$(run 10a 'source "$TEST_PHASES_DIR/lib/test-vm.sh"; for v in qa-vm shared-vm; do check_test_vm "$PROJECT_DIR" "$v" 2>/dev/null; echo "RC[$v]=$?"; done')
+[[ "$out" == *"RC[qa-vm]=1"* && "$out" == *"RC[shared-vm]=0"* ]] && ok "check_test_vm refuses a QA VM, accepts a listed test VM" || bad "check_test_vm QA: $out"
+case_env qa-cross P1 "$QAMAP" '{"vm_testing":{"test_environments":[{"type":"existing","vm_name":"qa-vm"},{"type":"existing","vm_name":"shared-vm"}]}}'
+printf '%s\n' qa-vm >>"$C/fix/virsh-list"; printf '%s\n' pristine >"$C/fix/snaps-shared-vm"
+out=$(run 10a 'run_cross_distro_tests')
+[[ "$out" == *"qa-vm: REFUSED"* ]] && ! logged '^virsh [a-z-]+ qa-vm( |$)' && ok "cross-distro refuses a QA VM named in test_environments and never touches it" || bad "cross-distro QA: $out / $(grep qa-vm "$C/log" | tr '\n' ' ')"
+
+LISTMAP='{"default":{"vm":"shared-vm"},"projects":{"Excl Proj":{"vm":"list-vm"},"Other":{"vm":"shared-vm"}},"vms":{"shared-vm":{},"list-vm":{"exclusive_to":["Excl Proj","Other"]}}}'
+resolve list-lock-member "Excl Proj" "$LISTMAP" MISSING list-vm
+resolve list-lock-outsider P1 "$LISTMAP" '{"vm_testing":{"default_vm":"list-vm"}}' FAIL
+resolve list-lock-member-other-vm Other "$LISTMAP" MISSING FAIL
+resolve list-lock-second-member Other '{"projects":{"Other":{"vm":"list-vm"}},"vms":{"list-vm":{"exclusive_to":["Excl Proj","Other"]}}}' MISSING list-vm
+for lock in '{}' '[]' '""' '[1]' '["Excl Proj",3]' '[""]' 'true'; do
+    resolve "lock-malformed-$lock" P1 "{\"default\":{\"vm\":\"shared-vm\"},\"vms\":{\"shared-vm\":{},\"x-vm\":{\"exclusive_to\":$lock}}}" MISSING FAIL
+done
+
+case_env names P1 "$MAP" MISSING
+out=$(run 10a 'source "$TEST_PHASES_DIR/lib/test-vm.sh"; for v in "shared-vm " " shared-vm" "shared vm" $'"'"'shared-vm\n'"'"' "shared-vm;x" "-shared-vm" "../shared-vm" "shared-vm/x" shared-vm; do check_test_vm "$PROJECT_DIR" "$v" 2>/dev/null; echo "RC[$v]=$?"; done')
+[[ "$(grep -c '\]=1$' <<<"$out")" == 8 && "$out" == *"RC[shared-vm]=0"* ]] && ok "check_test_vm takes the name exactly: whitespace, metacharacters, a leading dash refused; the exact name accepted" || bad "check_test_vm names: $out"
+# The same names when the map itself lists them as keys: only the name rule stands between them and virsh
+case_env names-listed P1 '{"default":{"vm":"shared-vm"},"vms":{"shared-vm":{},"shared-vm ":{},"shared vm":{},"-x":{},"a;b":{}}}' MISSING
+out=$(run 10a 'source "$TEST_PHASES_DIR/lib/test-vm.sh"; for v in "shared-vm " "shared vm" "-x" "a;b"; do check_test_vm "$PROJECT_DIR" "$v" 2>/dev/null; echo "RC[$v]=$?"; done')
+[[ "$(grep -c '\]=1$' <<<"$out")" == 4 ]] && ok "a malformed name is refused even when the map lists it" || bad "listed malformed names: $out"
+resolve map-key-trailing-space P1 '{"default":{"vm":"shared-vm "},"vms":{"shared-vm ":{}}}' MISSING FAIL
+resolve manifest-name-trailing-space P1 "$MAP" '{"vm_testing":{"default_vm":"shared-vm "}}' FAIL
+resolve map-default-leading-space P1 '{"default":{"vm":" shared-vm"},"vms":{"shared-vm":{}}}' MISSING FAIL
+resolve map-default-not-a-string P1 '{"default":{"vm":5},"vms":{"shared-vm":{}}}' MISSING FAIL
+for ph in 10b 11; do
+    for line in 'vm_name=shared-vm ' $'vm_name=shared-vm\nvm_name=excl-vm' 'vm_name=shared-vm=x'; do
+        case_env "state-name-$ph-${#line}" P1 "$MAP" MISSING
+        echo running >"$C/fix/state-shared-vm"
+        printf '%s\nstarted_by_test=true\noriginal_state=shutoff\npre_test_snapshot=pre-test-20260101-000000\n' "$line" >"$P/.test-vm-state"
+        out=$(run "$ph" 'shutdown_test_vm; echo "RC=$?"')
+        [[ "$out" == *"RC=1"* ]] && ! logged "$MUT" && [[ -f "$P/.test-vm-state" ]] &&
+            ok "Phase $ph shutdown refuses state-file ${line//$'\n'/ + } (no VM call, state file kept)" ||
+            bad "Phase $ph shutdown ${line//$'\n'/ + }: $(grep -E "$MUT" "$C/log" | tr '\n' ' ') / ${out: -160}"
+    done
+done
+
+case_env state-get P1 "$MAP" MISSING
+printf 'vm_name=shared-vm\nvm_name=shared-vm\npre_test_snapshot=a=b \n' >"$P/st"
+out=$(run 1 'source "$TEST_PHASES_DIR/lib/test-vm.sh"; v=$(test_vm_state_get st vm_name 2>/dev/null); echo "DUP=$?[$v]"; v=$(test_vm_state_get st pre_test_snapshot); echo "ONE=$?[$v]"; v=$(test_vm_state_get st nokey); echo "NONE=$?[$v]"')
+[[ "$out" == *"DUP=2[]"* && "$out" == *"ONE=0[a=b ]"* && "$out" == *"NONE=1[]"* ]] &&
+    ok "test_vm_state_get: a repeated key reads as unset (2), a value is returned exactly as stored, an absent key is 1" || bad "test_vm_state_get: $out"
+
+PMAP='{"default":{"vm":"shared-vm"},"vms":{"shared-vm":{"pristine_snapshot":"pre-test-20990101-000000"}}}'
+case_env del-map-pristine P1 "$PMAP" MISSING
+out=$(run 1 'source "$TEST_PHASES_DIR/lib/test-vm.sh"; delete_pretest_snapshot shared-vm pre-test-20990101-000000 "$PROJECT_DIR"; echo "RC=$?"')
+[[ "$out" == *"RC=2"* && "$out" == *"configured pristine_snapshot"* ]] && ! logged 'snapshot-delete' && ok "delete_pretest_snapshot refuses the map's vms.<vm>.pristine_snapshot even when it is pre-test-shaped" || bad "map pristine_snapshot: $out"
+case_env del-pristine-word P1 "$MAP" MISSING
+# The "contains pristine" guard on its own: loosen is_pretest_snapshot as a careless edit would, and
+# the pristine name must still be refused (the strict pattern alone can never pass such a name).
+out=$(run 1 'source "$TEST_PHASES_DIR/lib/test-vm.sh"; is_pretest_snapshot() { [[ "$1" == pre-test-* ]]; }; for n in pre-test-pristine-1 pre-test-PRISTINE pre-test-20260101-000000; do delete_pretest_snapshot shared-vm "$n" "$PROJECT_DIR" 2>/dev/null; echo "RC[$n]=$?"; done')
+[[ "$out" == *"RC[pre-test-pristine-1]=2"* && "$out" == *"RC[pre-test-PRISTINE]=2"* && "$out" == *"RC[pre-test-20260101-000000]=0"* ]] &&
+    [[ "$(grep -c '^virsh snapshot-delete' "$C/log")" == 1 ]] && ok "a name containing 'pristine' (any case) is refused even when it passes the pre-test test" || bad "pristine-word guard: $out / $(grep snapshot-delete "$C/log" | tr '\n' ' ')"
+case_env del-map-unreadable P1 '{bad' MISSING
+out=$(run 1 'source "$TEST_PHASES_DIR/lib/test-vm.sh"; delete_pretest_snapshot shared-vm pre-test-20260101-000000 "$PROJECT_DIR"; echo "RC=$?"')
+[[ "$out" == *"RC=2"* ]] && ! logged 'snapshot-delete' && ok "delete_pretest_snapshot refuses when the map cannot be read" || bad "unreadable map delete: $out"
+case_env sweep-protected P1 "$PMAP" MISSING
+printf '%s\n' pre-test-20990101-000000 pre-test-20260101-000000 >"$C/fix/snaps-shared-vm"
+out=$(run 1 'sweep_pretest_snapshots; echo "RC=$?"')
+[[ "$out" == *"kept pre-test-20990101-000000"* && "$out" == *"deleted pre-test-20260101-000000"* && "$out" == *"RC=0"* ]] &&
+    ! logged 'snapshot-delete shared-vm pre-test-20990101-000000' && ok "Phase 1 sweep keeps a pre-test-shaped pristine snapshot, deletes the leftover" || bad "sweep protected: $out"
+case_env shutdown-map-pristine P1 "$PMAP" MISSING
+printf 'vm_name=shared-vm\nstarted_by_test=true\noriginal_state=shutoff\npre_test_snapshot=pre-test-20990101-000000\n' >"$P/.test-vm-state"
+out=$(run 10b 'shutdown_test_vm; echo "RC=$?"')
+! logged 'snapshot-delete' && ok "Phase 10b shutdown never deletes a state-file snapshot that is the map's pristine_snapshot" || bad "shutdown map pristine: $(grep snapshot "$C/log" | tr '\n' ' ')"
+case_env manage-map-pristine P1 "$PMAP" MISSING
+out=$(run 10a 'manage_vm_snapshot shared-vm delete pre-test-20990101-000000; echo "RC=$?"')
+! logged 'snapshot-delete' && ok "manage_vm_snapshot delete of the map's pristine_snapshot is refused" || bad "manage map pristine: $out"
 
 echo
 echo "passed=$pass failed=$fail"

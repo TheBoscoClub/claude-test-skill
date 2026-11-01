@@ -24,7 +24,7 @@ Automatic VM startup/shutdown for isolated testing.
 
 ## Test VM Selection
 
-The test VM is always one the installation lists, never one guessed from `virsh list` (a name match would pick a VM reserved for another project). `resolve_test_vm` is the only place it is chosen. It lives in the shared helpers file `skills/test-phases/lib/test-vm.sh`, which Phase 1 (pre-test snapshot sweep), Phase 10a and this phase each source themselves — each phase runs in its own subagent and reads only its own phase file. There is no built-in default VM.
+The test VM is always one the installation lists, never one guessed from `virsh list` (a name match would pick a VM reserved for another project). `resolve_test_vm` is the only place it is chosen. It lives in the shared helpers file `skills/test-phases/lib/test-vm.sh`, which Phase 1 (pre-test snapshot sweep), Phase 10a, this phase and Phase 11 (shutdown) each source themselves — each phase runs in its own subagent and reads only its own phase file. There is no built-in default VM.
 
 Precedence, first non-empty wins:
 
@@ -32,7 +32,7 @@ Precedence, first non-empty wins:
 2. the project's `vm-test-manifest.json` `vm_testing.default_vm`
 3. the map's `default.vm`
 
-It refuses (returns 1, reason on stderr) when nothing is configured; when the map is missing, unreadable, or not a JSON object; when any VM's `exclusive_to` is neither a string nor null (an unreadable lock never reads as "no lock"); when the chosen VM is not a key of the map's `vms` (a tracked manifest can choose among the VMs the installation lists, never add one); when the chosen VM is `exclusive_to` another project; or when the project has an exclusive VM of its own and the chosen VM is not one of them (`exclusive_to` is a bidirectional lock). `check_test_vm PROJECT_DIR VM` applies the same `vms`/exclusivity checks to a VM named some other way (Phase 10a cross-distro testing).
+It refuses (returns 1, reason on stderr) when nothing is configured; when the map is missing, unreadable, or not a JSON object; when any VM's `exclusive_to` is not null, a project name or a non-empty list of project names (an unreadable lock never reads as "no lock"); when a configured name is not a well-formed VM name (`[A-Za-z0-9][A-Za-z0-9._-]*`, taken exactly as written — never trimmed); when the chosen VM's map entry has `"role": "qa"` (QA VMs receive only released versions; `/test` never runs against them); when the chosen VM is not a key of the map's `vms` (a tracked manifest can choose among the VMs the installation lists, never add one); when the chosen VM is `exclusive_to` other projects only; or when the project has an exclusive VM of its own and the chosen VM is not one of them (`exclusive_to` is a bidirectional lock). `check_test_vm PROJECT_DIR VM` applies the same name, `vms`, QA and exclusivity checks to a VM named some other way (Phase 10a cross-distro testing, the `.test-vm-state` read by both shutdowns), on exactly the string it is given. State-file values are read with `test_vm_state_get FILE KEY` (the value as stored; a repeated key reads as unset), so the name checked is the name every `virsh` call then receives.
 
 Load the helpers before calling any of them, and tell "not loaded" apart from "not configured":
 
@@ -42,7 +42,7 @@ source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
     { echo "ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh)"; return 2; }
 ```
 
-The only snapshot delete the skill issues is `delete_pretest_snapshot VM NAME [PROJECT_DIR]` from the same file: it refuses any name that is not `pre-test-YYYYMMDD-HHMMSS`, and the project's `pristine_snapshot`, so a pristine snapshot is never deleted.
+The only snapshot delete the skill issues is `delete_pretest_snapshot VM NAME [PROJECT_DIR]` from the same file: it refuses any name that is not `pre-test-YYYYMMDD-HHMMSS`, any name containing `pristine` (any case), and a configured pristine snapshot (the manifest's `vm_testing.pristine_snapshot` or the map's `vms.<vm>.pristine_snapshot`; an unreadable manifest or map refuses), each check on its own, so a pristine snapshot is never deleted.
 
 ## VM Lifecycle State File
 
@@ -515,18 +515,20 @@ shutdown_test_vm() {
         return 0
     fi
 
-    # Read state file
-    local VM_NAME=$(grep "^vm_name=" "$STATE_FILE" | cut -d= -f2)
-    local STARTED_BY_TEST=$(grep "^started_by_test=" "$STATE_FILE" | cut -d= -f2)
-    local ORIGINAL_STATE=$(grep "^original_state=" "$STATE_FILE" | cut -d= -f2)
-    local PRE_TEST_SNAPSHOT=$(grep "^pre_test_snapshot=" "$STATE_FILE" | cut -d= -f2)
-
     # The state file is data, not authority: a snapshot it names is reverted to or deleted only when it is a
     # pre-test name (delete_pretest_snapshot, lib/test-vm.sh). Anything else — "pristine", the manifest's
     # pristine_snapshot, a hand edit — is reported and left alone.
     source "${TEST_PHASES_DIR:-$HOME/.claude/skills/test-phases}/lib/test-vm.sh" &&
-        declare -F delete_pretest_snapshot check_test_vm >/dev/null ||
+        declare -F delete_pretest_snapshot check_test_vm test_vm_state_get is_pretest_snapshot >/dev/null ||
         { echo "  ⛔ ERROR: test-VM helpers not loaded (skills/test-phases/lib/test-vm.sh) — VM left as is"; return 2; }
+
+    # Read the state file. vm_name and pre_test_snapshot are read exactly as stored (test_vm_state_get: no
+    # trimming, a duplicated key reads as unset), so the name check_test_vm validates is the name acted on.
+    local VM_NAME STARTED_BY_TEST ORIGINAL_STATE PRE_TEST_SNAPSHOT
+    VM_NAME=$(test_vm_state_get "$STATE_FILE" vm_name)
+    STARTED_BY_TEST=$(grep "^started_by_test=" "$STATE_FILE" | cut -d= -f2)
+    ORIGINAL_STATE=$(grep "^original_state=" "$STATE_FILE" | cut -d= -f2)
+    PRE_TEST_SNAPSHOT=$(test_vm_state_get "$STATE_FILE" pre_test_snapshot)
     # The VM it names gets the same check: only a VM this project may use (listed under vms, exclusivity
     # honoured) is stopped, reverted or has a snapshot deleted. A stale or foreign state file is left in place.
     check_test_vm "$PROJECT_DIR" "$VM_NAME" ||
@@ -691,7 +693,7 @@ fi
 
 Phase 11 runs its own `shutdown_test_vm` (`phase-11-cleanup.md` § 3a); the function above is this phase's
 copy. Both call `check_test_vm` on the VM `.test-vm-state` names before any `virsh` call: a VM that fails the
-check (not listed under `vms`, or exclusive to another project) is left alone, the state file stays in place
+check (malformed name, not listed under `vms`, a QA VM, or exclusive to another project) is left alone, the state file stays in place
 and the function returns 1.
 
 ## State File Format
