@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.0.0
@@ -31,7 +33,12 @@ jobs:
         run: |
           npm install -g --ignore-scripts markdownlint-cli@0.48.0
           markdownlint --version
-          markdownlint '**/*.md'
+          # Lint exactly the tracked files: a glob skips dot-directories without --dot, reaches .git/
+          # with it, and markdownlint exits 0 when handed no files at all, so an empty list must fail.
+          mapfile -d '' files < <(git ls-files -z -- '*.md')
+          [ "${#files[@]}" -gt 0 ] || { echo "no tracked *.md found — refusing a vacuous pass" >&2; exit 1; }
+          echo "linting ${#files[@]} tracked *.md files"
+          markdownlint "${files[@]}"
 
   yaml-lint:
     name: YAML Lint
