@@ -346,7 +346,7 @@ Phase 1 cleans audit/pre-test snapshots (before creating new ones); Phase 11 doe
 
 ## Output Format
 
-```
+```text
 CLEANUP COMPLETE
 ────────────────
 

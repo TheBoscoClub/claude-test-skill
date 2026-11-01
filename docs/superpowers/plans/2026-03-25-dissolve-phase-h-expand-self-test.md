@@ -13,9 +13,11 @@
 ## File Structure
 
 ### Files to Delete
+
 - `skills/test-phases/phase-H-holistic.md` — dissolved; content distributed to 5, 6, 7, I
 
 ### Files to Modify
+
 - `skills/test-phases/phase-5-security.md` — add Phase H Step 3 (data flow tracing) and Step 3d (unvalidated flows)
 - `skills/test-phases/phase-6-dependencies.md` — add Phase H Step 1 (import/dependency mapping, circular imports, unused exports)
 - `skills/test-phases/phase-7-quality.md` — add Phase H Step 2 (config sprawl), Step 4a (hardcoded paths), Step 4b (version mismatches), Step 4c (dead code cross-component)
@@ -36,6 +38,7 @@
 ## Task 1: Merge Phase H Step 1 (Import/Dependency Mapping) into Phase 6
 
 **Files:**
+
 - Modify: `skills/test-phases/phase-6-dependencies.md` (append after existing content)
 - Reference: `skills/test-phases/phase-H-holistic.md:12-88` (Step 1 content)
 
@@ -72,7 +75,8 @@ Update the description line in the configuration header blockquote to mention cr
 - [ ] **Step 4: Update Phase 6 checklist (if present)**
 
 Add to any existing checklist:
-```
+
+```text
 [ ] Import/dependency map built for all source files
 [ ] Circular imports checked and flagged
 [ ] Unused exports identified
@@ -95,6 +99,7 @@ git commit -m "feat: merge Phase H import/dependency mapping into Phase 6"
 ## Task 2: Merge Phase H Step 3 (Data Flow Tracing) into Phase 5
 
 **Files:**
+
 - Modify: `skills/test-phases/phase-5-security.md` (append before Output Format)
 - Reference: `skills/test-phases/phase-H-holistic.md:156-234` (Step 3 content)
 
@@ -123,7 +128,8 @@ Add to the Key Tools line: `Includes cross-component data flow tracing and unval
 - [ ] **Step 4: Update Phase 5 checklist (if present)**
 
 Add:
-```
+
+```text
 [ ] Data entry points mapped (API, CLI, file reads)
 [ ] Data storage points mapped (DB, file writes)
 [ ] Data exit points mapped (API responses, logs, file writes)
@@ -142,6 +148,7 @@ git commit -m "feat: merge Phase H data flow tracing into Phase 5"
 ## Task 3: Merge Phase H Steps 2, 4a, 4b, 4c (Config/Quality) into Phase 7
 
 **Files:**
+
 - Modify: `skills/test-phases/phase-7-quality.md` (append after existing content)
 - Reference: `skills/test-phases/phase-H-holistic.md:92-299` (Steps 2 and 4)
 
@@ -182,7 +189,8 @@ Add to the Key Tools line: `Includes cross-component config sprawl detection, ve
 - [ ] **Step 4: Update Phase 7 checklist (if present)**
 
 Add:
-```
+
+```text
 [ ] Config files enumerated and cross-referenced
 [ ] Config sprawl (duplicate settings) detected
 [ ] Cross-language config consistency verified (ports, paths, DB)
@@ -203,6 +211,7 @@ git commit -m "feat: merge Phase H config sprawl and quality checks into Phase 7
 ## Task 4: Merge Phase H Step 5 (Integration Surface Audit) into Phase I
 
 **Files:**
+
 - Modify: `skills/test-phases/phase-I-infrastructure.md` (append after existing content)
 - Reference: `skills/test-phases/phase-H-holistic.md:302-369` (Step 5)
 
@@ -233,7 +242,8 @@ Add to the Key Tools line: `Includes cross-component integration surface audit: 
 - [ ] **Step 4: Update Phase I checklist (if present)**
 
 Add:
-```
+
+```text
 [ ] API contracts verified (backend routes vs frontend calls)
 [ ] Script dependencies verified (called scripts exist)
 [ ] Shared file interfaces audited
@@ -251,6 +261,7 @@ git commit -m "feat: merge Phase H integration surface audit into Phase I"
 ## Task 5: Delete Phase H File
 
 **Files:**
+
 - Delete: `skills/test-phases/phase-H-holistic.md`
 
 - [ ] **Step 1: Verify all Phase H content has been distributed**
@@ -300,6 +311,7 @@ git commit -m "refactor: delete Phase H — content fully distributed to phases 
 ## Task 6: Update Dispatcher (commands/test.md)
 
 **Files:**
+
 - Modify: `commands/test.md`
 
 This is the largest and most critical task. Every reference to Phase H must be removed or updated.
@@ -311,6 +323,7 @@ Read `commands/test.md` completely (all 1333 lines).
 - [ ] **Step 2: Update "All Audits Are Holistic" section (lines ~51-53)**
 
 Replace:
+
 ```markdown
 ### All Audits Are Holistic
 
@@ -318,6 +331,7 @@ Every /test audit includes full-stack cross-component analysis (Phase H). There 
 ```
 
 With:
+
 ```markdown
 ### All Audits Are Holistic
 
@@ -339,14 +353,16 @@ Project-specific test modules, rules, configurations, and definitions may streng
 - [ ] **Step 3: Remove Phase H from Available Phases table (line ~139)**
 
 Delete the row:
-```
+
+```text
 | **H** | **Cross-Component** | **Full-stack cross-component analysis (always included)** |
 ```
 
 - [ ] **Step 4: Update Quick Dependency Reference table**
 
 Remove the Phase H row:
-```
+
+```text
 | **H** | **3** | **1** | **No (read-only analysis)** | **7, 5, I (after Discovery)** |
 ```
 
@@ -357,22 +373,28 @@ Update the `5,6,7,H,I` row to `5,6,7,I`.
 - [ ] **Step 5: Update the dependency graph ASCII art**
 
 In the TIER 3 section, change:
-```
+
+```text
 │  │ [5, 6, 7, H, I]  ← Note: 13 moved to Tier 6                        │   │
 ```
+
 To:
-```
+
+```text
 │  │ [5, 6, 7, I]  ← Note: 13 moved to Tier 6                           │   │
 ```
 
 - [ ] **Step 6: Update Parallel Execution Rules table**
 
 Change:
-```
+
+```text
 | 3 | 5,6,7,H,I | ✅ Yes | All analysis complete |
 ```
+
 To:
-```
+
+```text
 | 3 | 5,6,7,I | ✅ Yes | All analysis complete |
 ```
 
@@ -387,11 +409,14 @@ Change `✅ 5, 6, 7, H, I run parallel (read-only) → safe` to `✅ 5, 6, 7, I 
 - [ ] **Step 9: Update Subagent Model Selection table**
 
 Change:
-```
+
+```text
 | **opus** | 1, 5, 7, 10, A, P, D, G, H, ST | Complex analysis, multi-step fixes, security audit, cross-component reasoning |
 ```
+
 To:
-```
+
+```text
 | **opus** | 1, 5, 7, 10, A, P, D, G, ST | Complex analysis, multi-step fixes, security audit, cross-component reasoning |
 ```
 
@@ -400,16 +425,20 @@ Update the opus count from 10 to 9. Update total phase count references from 21 
 - [ ] **Step 10: Update canonical help block**
 
 Remove the Phase H line from the `ALL PHASES` section:
-```
+
+```text
 │    H   Cross-Component   Full-stack cross-component analysis (always runs) │
 ```
 
 Update the notes section. Change:
-```
+
+```text
 │  • All audits are holistic — Phase H always runs (no separate shortcut)    │
 ```
+
 To:
-```
+
+```text
 │  • All audits are holistic — every analysis phase includes cross-component │
 ```
 
@@ -418,42 +447,54 @@ Update the header from "21 phases" to "20 phases".
 - [ ] **Step 11: Update tier execution instructions**
 
 Change:
-```
+
+```text
    TIER 3: Analysis [5,6,7,H,I] - Run in PARALLEL
 ```
+
 To:
-```
+
+```text
    TIER 3: Analysis [5,6,7,I] - Run in PARALLEL
 ```
 
 Update model selection references:
-```
+
+```text
      - `opus`: Phases 1, 5, 7, 10, A, P, D, G, H, ST
 ```
+
 To:
-```
+
+```text
      - `opus`: Phases 1, 5, 7, 10, A, P, D, G, ST
 ```
 
 - [ ] **Step 12: Update document version footer**
 
 Change:
-```
+
+```text
 *Document Version: 4.0.0 — Phase consolidation (27→21), project-agnostic refactor, bloat reduction*
 ```
+
 To:
-```
+
+```text
 *Document Version: 4.1.0 — Phase H dissolved into analysis phases, self-test expanded*
 ```
 
 - [ ] **Step 13: Update description in frontmatter**
 
 Change:
-```
+
+```text
 description: Modular project audit - testing, security, debugging, fixing (phase-based loading for context efficiency) (user)
 ```
+
 To:
-```
+
+```text
 description: Modular project audit - testing, security, debugging, fixing (phase-based loading for context efficiency, holistic by design) (user)
 ```
 
@@ -476,6 +517,7 @@ git commit -m "refactor: remove all Phase H references from dispatcher — 21→
 ## Task 7: Update Phase ST Self-Test
 
 **Files:**
+
 - Modify: `skills/test-phases/phase-ST-self-test.md`
 
 Two changes: (a) update Phase H references to reflect its deletion, (b) add new validation sections.
@@ -495,6 +537,7 @@ In Section 1.4, add `"phase-H-holistic.md"` to the `DELETED_PHASES` array (along
 - [ ] **Step 4: Update EXPECTED_MODELS map (remove phase-H-holistic.md)**
 
 In Section 6.2, remove the line:
+
 ```bash
     ["phase-H-holistic.md"]="opus"
 ```
@@ -820,6 +863,7 @@ git commit -m "feat: expand Phase ST with Governing Law, directive compliance, t
 ## Task 8: Update Documentation Files
 
 **Files:**
+
 - Modify: `README.md`, `SKILL.md`, `INSTALL.md`, `docs/ARCHITECTURE.md`, `CHANGELOG.md`, `VERSION`
 
 - [ ] **Step 1: Update VERSION**
@@ -909,6 +953,7 @@ git commit -m "docs: update all documentation for Phase H dissolution — 21→2
 ## Task 9: Update Project Rules
 
 **Files:**
+
 - Modify: `.claude/rules/design.md` — if it references Phase H
 
 - [ ] **Step 1: Check for Phase H references in rules**
@@ -933,6 +978,7 @@ git commit -m "docs: update project rules for Phase H dissolution"
 ## Task 10: Run Phase ST to Verify Everything
 
 **Files:**
+
 - None (read-only verification)
 
 - [ ] **Step 1: Run the updated self-test**
@@ -944,6 +990,7 @@ Execute the full Phase ST self-test script from `phase-ST-self-test.md` (all 10 
 All checks must pass. If any fail, fix the issue and re-run.
 
 Expected new checks:
+
 - Section 7: 6 Governing Law checks (all pass, including One-Way Ratchet)
 - Section 8: 9+ prohibited language checks (all pass), 4 cross-component checks (all pass), 1 Phase H absence check (pass)
 - Section 9: 2 Tier 3 composition checks (pass), 1 gate count check (pass), 4 conditional logic checks (pass)

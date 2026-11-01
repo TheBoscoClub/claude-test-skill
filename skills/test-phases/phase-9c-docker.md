@@ -383,7 +383,8 @@ validate_compose
 ## Output
 
 Report in this format:
-```
+
+```text
 ═══════════════════════════════════════════════════════════════════
   PHASE D: DOCKER VALIDATION
 ═══════════════════════════════════════════════════════════════════
@@ -421,7 +422,7 @@ Issues: [count]
 ## Issue Categories
 
 | Category | Severity | Description |
-|----------|----------|-------------|
+| --- | --- | --- |
 | Buildx unavailable | ❌ FAIL | buildx not installed |
 | Build failure | ❌ FAIL | image won't build |
 | Missing registry tag | ⚠️ ISSUE | version tag missing |
@@ -518,7 +519,7 @@ cleanup_docker_phase
 ### Why Cleanup Matters
 
 | Resource | Cleanup Action |
-|----------|----------------|
+| --- | --- |
 | Test containers | `docker stop --time 10` |
 | Compose services | `docker compose down --timeout 10` |
 | Buildx containers | `docker stop buildx_buildkit*` |

@@ -15,7 +15,7 @@ Fix ALL issues found by prior phases. Three categories, executed in order: auto-
 The **Governing Law** applies unconditionally in both modes: all errors, warnings, and issues must be fixed. None may be skipped or deferred.
 
 | Mode | Behavior |
-|------|----------|
+| --- | --- |
 | **Autonomous** (default) | Fix ALL issues. No prompts except safety/architecture/external. |
 | **Interactive** (`--interactive`) | Fix ALL issues. May use `AskUserQuestion` for ambiguous logic or architectural decisions. |
 
@@ -45,7 +45,7 @@ These are deterministic fixes handled entirely by formatting and linting tools. 
 Guard every tool with `command -v` (or check for `node_modules/.bin/TOOL`). Only run tools that exist. Run formatters first — they never change semantics.
 
 | Language | Formatter | Command | Notes |
-|----------|-----------|---------|-------|
+| --- | --- | --- | --- |
 | Python | ruff format (preferred) or black | `ruff format .` / `black . --quiet` | Run one, not both |
 | Python imports | ruff or isort | `ruff check --fix --select I .` / `isort . --quiet` | Run after formatter |
 | JS/TS | prettier | `npx prettier --write "**/*.{js,ts,tsx,jsx,json,css,scss}"` | Only if `package.json` exists |
@@ -58,7 +58,7 @@ Guard every tool with `command -v` (or check for `node_modules/.bin/TOOL`). Only
 These fix simple lint violations (unused imports, trailing whitespace, basic code patterns). They CAN change semantics, so they run after formatters.
 
 | Language | Tool | Command | Notes |
-|----------|------|---------|-------|
+| --- | --- | --- | --- |
 | Python | ruff | `ruff check --fix .` | Do NOT use `--unsafe-fixes` unless you've reviewed the specific rules |
 | JS/TS | eslint | `npx eslint --fix . --ext .js,.ts,.tsx,.jsx` | Only if `package.json` exists |
 | Go | golangci-lint | `golangci-lint run --fix` | Guard with `command -v` |
@@ -161,12 +161,14 @@ Use `Read` to examine the module/function being tested. Understand what the code
 **C. Determine the root cause — is the test wrong or the code wrong?**
 
 The test is wrong if:
+
 - It references an old API that was intentionally changed
 - It asserts a value that was never correct (copy-paste error)
 - It tests behavior that was deliberately changed in a recent commit
 - The test setup is missing or incomplete (missing fixtures, wrong mock)
 
 The code is wrong if:
+
 - The test describes the correct/intended behavior and the code doesn't match
 - Multiple tests for the same function fail in consistent ways
 - The docstring/comments describe behavior the code doesn't implement
@@ -205,7 +207,7 @@ If a previously passing test now fails, your fix introduced a regression. Revert
 
 **G. Emit FVP proof block (MANDATORY after every fix):**
 
-```
+```text
 ┌─ FVP PROOF ────────────────────────────────────────────┐
 │ Fix:      [file:line — what was changed]               │
 │ Issue:    [test_name — original failure message]       │
@@ -245,7 +247,7 @@ Security issues take priority. Common patterns and how to fix them:
 Common security fix patterns:
 
 | Finding | Fix |
-|---------|-----|
+| --- | --- |
 | SQL injection (string formatting in queries) | Use parameterized queries with the project's DB library |
 | Hardcoded secrets | Move to environment variable or config file; add config to `.gitignore`; note in output if secret was committed (user must rotate) |
 | Insecure defaults (`debug=True`, `verify=False`) | Change to secure default; gate dev-only settings behind env vars |
@@ -259,7 +261,7 @@ After each security fix, run the relevant test(s). If no test covers the fixed c
 Use the language-appropriate audit-fix tool:
 
 | Language | Auto-fix command | Manual fallback | Notes |
-|----------|-----------------|-----------------|-------|
+| --- | --- | --- | --- |
 | Python | `pip-audit --fix` | `pip install --upgrade PKG` then update requirements.txt | Guard with `command -v` |
 | Node.js | `npm audit fix` | `npm install PKG@version` | NEVER use `--force` (major version bumps break things) |
 | Go | `go get -u PKG && go mod tidy` | — | — |
@@ -327,7 +329,7 @@ Per the **Governing Law** (see test.md): all errors, warnings, and issues must b
 
 Produce this structured output at the end of the phase:
 
-```
+```text
 FIXES_APPLIED:
 - file: path/to/file.py
   category: auto-format|test-fix|security|quality|dependency|ai-self-promotion
@@ -339,7 +341,7 @@ FIXES_APPLIED:
 
 Then produce the summary block:
 
-```
+```text
 ═══════════════════════════════════════════════════════════════════
   PHASE 6: FIX ALL ISSUES
 ═══════════════════════════════════════════════════════════════════

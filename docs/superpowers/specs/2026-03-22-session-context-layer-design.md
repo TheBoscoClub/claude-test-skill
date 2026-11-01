@@ -79,7 +79,7 @@ active_work: "Redesigning auth middleware — session token storage"
 **Frontmatter fields:**
 
 | Field | Source | Purpose |
-|-------|--------|---------|
+| --- | --- | --- |
 | `updated` | Claude (at each checkpoint) | Staleness detection |
 | `session` | SessionStart hook | Session identity — detect crashed sessions |
 | `branch` | SessionStart hook / Claude | Git branch context |
@@ -107,7 +107,7 @@ Claude produces brief "here's where we are" summaries as **visible conversation 
 
 **Format:**
 
-```
+```text
 ⟡ Context checkpoint ─────────────────────────
 We're building [X]. Approach: [Y] because [Z]. Ruled out [W]
 because [reason]. Current step: [step]. Key constraint from
@@ -120,7 +120,7 @@ The `⟡` delimited block is the canonical format — visually distinct from nor
 **Trigger conditions (any of these):**
 
 | Trigger | Example |
-|---------|---------|
+| --- | --- |
 | Claude's understanding shifts | User clarifies a constraint, Claude realizes a different approach is needed |
 | Decision reached | "Let's go with approach B" — capture what was decided and why |
 | Transition point | Finishing one task, starting the next |
@@ -160,7 +160,7 @@ tail -c 131072 "$transcript_path" > "$ring_file"   # 128 KB
 **Lifecycle:**
 
 | Event | Ring buffer action |
-|-------|-------------------|
+| --- | --- |
 | Session start | Created empty (or existing one from crashed session is recovery source) |
 | Every tool call | Updated via `tail -c 131072` — always current |
 | `/close` | Deleted alongside context file |
@@ -175,7 +175,7 @@ Post-compaction recovery is **structurally enforced** via hook-based gating, not
 
 **Mechanism: Flag-based compaction detection with belt-and-suspenders injection.**
 
-```
+```text
 Step 1: PreCompact fires (documented, supported hook)
   → Writes flag file: ~/.claude/cache/compaction-pending-{session_id}
   → Logs transcript size to calibration file
@@ -209,7 +209,7 @@ Step 6: User confirms or corrects
 
 **The `additionalContext` injection (exact text):**
 
-```
+```text
 COMPACTION JUST OCCURRED. Before doing anything else:
 1. Read .claude-session-context.md (your curated reasoning chain — decisions, approach, preferences)
 2. Read .claude-task-state.md (task skeleton — current work, files, next step)
@@ -239,7 +239,7 @@ The session context file is created at the start of every session, regardless of
 **Enforcement layers:**
 
 | Layer | Mechanism | Guarantee level |
-|-------|-----------|----------------|
+| --- | --- | --- |
 | SessionStart hook | Creates file with frontmatter (PIDs, TTY, session ID) | Code — always runs |
 | Workflow rules | Instructs Claude that context file is mandatory | Behavioral — reinforcement |
 | CLAUDE.md | Lists context file alongside session record and wallet card | Behavioral — reinforcement |
@@ -257,6 +257,7 @@ The session context file is created at the start of every session, regardless of
 **First checkpoint obligation:**
 
 After session initialization, Claude must produce a visible context checkpoint within its first substantive response:
+
 - **New session**: Confirms what the user wants to work on
 - **Resumed session** (context file has content): Recovery checkpoint confirming what was recovered
 - **Crashed session detected** (context file from different session, not closed): Recovery checkpoint from previous session's state + check if old PID/TTY is still alive
@@ -304,7 +305,7 @@ Existing behavior (audit entry to session record, calibration logging, minimal w
 
 **Gitignore template (`~/.claude/templates/gitignore-claude`)** — add:
 
-```
+```text
 # Session context — conversation memory for context recovery
 .claude-session-context.md
 # Ring buffer — trailing I/O window for crash/compaction recovery
@@ -318,7 +319,7 @@ The session context file carries only the **active reasoning chain**. Completed 
 **Purge triggers:**
 
 | Trigger | What gets purged | What remains |
-|---------|-----------------|--------------|
+| --- | --- | --- |
 | Commit | Entries for the committed work | Active chain for uncommitted/in-progress work |
 | Task completion | Completed task's reasoning chain | Next task's emerging chain |
 | User says "that's done" | Everything for the finished topic | Fresh slate |
@@ -326,7 +327,7 @@ The session context file carries only the **active reasoning chain**. Completed 
 
 **Purging is accompanied by a visible checkpoint:**
 
-```
+```text
 ⟡ Context checkpoint ─────────────────────────
 Auth middleware done and committed (abc1234). Purging that context.
 Starting fresh: next up is CSRF protection. No decisions made yet.
@@ -381,7 +382,7 @@ Same as kill, with BTRFS copy-on-write protecting file integrity. Files may be s
 ## Complete File Inventory
 
 | File | Max Size | Updated by | Survives crash? | Purpose |
-|------|----------|-----------|----------------|---------|
+| --- | --- | --- | --- | --- |
 | `.claude-session-context.md` | ~60 lines | Claude (visible checkpoints) + SessionStart hook (frontmatter) | Yes | Curated reasoning chain — the thinking |
 | `.claude-task-state.md` | ~30 lines | Claude (milestones) + hooks (git state) | Yes | Emergency skeleton — the what |
 | `.claude-session-ring.jsonl` | 128 KB | PostToolUse hook (automated, every call) | Yes | Raw recent conversation — the reality |
@@ -391,7 +392,7 @@ Same as kill, with BTRFS copy-on-write protecting file integrity. Files may be s
 ## Files Modified by This Spec
 
 | File | Action | Detail |
-|------|--------|--------|
+| --- | --- | --- |
 | `~/.claude/hooks/context-monitor.sh` | **Update** | Add ring buffer update + compaction flag detection with `additionalContext` injection |
 | `~/.claude/hooks/pre-compact.sh` | **Update** | Add compaction flag file write. Keep existing `systemMessage` for user display. |
 | `~/.claude/hooks/session-start.sh` | **Update** | Add session context file creation with frontmatter (PIDs, TTY). Add ring buffer creation. Detect crashed sessions. |

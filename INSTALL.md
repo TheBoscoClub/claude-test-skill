@@ -16,7 +16,7 @@ These tools are detected automatically by Phase 3 (Discovery) and used when avai
 **Code Quality:**
 
 | Tool | Install | Used By |
-|------|---------|---------|
+| --- | --- | --- |
 | [ruff](https://docs.astral.sh/ruff/) | `pip install ruff` | Phase 7 (lint), Phase 10 (auto-fix) |
 | [markdownlint-cli](https://github.com/igorshubovych/markdownlint-cli) | `npm install -g markdownlint-cli` | Phase 7, Phase 13 |
 | [codespell](https://github.com/codespell-project/codespell) | `pip install codespell` | Phase 7, Phase 10 |
@@ -24,7 +24,7 @@ These tools are detected automatically by Phase 3 (Discovery) and used when avai
 **Security:**
 
 | Tool | Install | Used By |
-|------|---------|---------|
+| --- | --- | --- |
 | [bandit](https://bandit.readthedocs.io/) | `pip install bandit` | Phase 5 (Python SAST) |
 | [pip-audit](https://pypi.org/project/pip-audit/) | `pip install pip-audit` | Phase 5 (Python CVE) |
 | [trivy](https://trivy.dev/) | OS package manager | Phase 5 (filesystem scan) |
@@ -35,7 +35,7 @@ These tools are detected automatically by Phase 3 (Discovery) and used when avai
 **GitHub Integration:**
 
 | Tool | Install | Used By |
-|------|---------|---------|
+| --- | --- | --- |
 | [gh](https://cli.github.com/) | OS package manager | Phase 9d (GitHub audit) |
 
 > **Note:** You don't need ALL of these. The skill gracefully skips tools that aren't installed and reports what it found. Start with `ruff` and `bandit` for the best coverage-to-effort ratio.
@@ -119,6 +119,7 @@ ls ~/.claude/skills/test-phases/ | wc -l
 ```
 
 Phase ST checks:
+
 - All 20 phase files exist and are readable
 - Symlinks point to correct targets
 - Dispatcher references all phases
@@ -130,7 +131,7 @@ Phase ST checks:
 
 ## Updating
 
-### If installed via symlinks (Method 1):
+### If installed via symlinks (Method 1)
 
 ```bash
 cd ~/claude-test-skill
@@ -139,7 +140,7 @@ git pull
 
 That's it — symlinks automatically pick up the new files.
 
-### If installed via copy (Method 2):
+### If installed via copy (Method 2)
 
 ```bash
 # Re-clone and overwrite
@@ -189,7 +190,7 @@ tools:
 
 ## File Structure After Installation
 
-```
+```text
 ~/.claude/
 ├── commands/
 │   └── test.md              → ~/claude-test-skill/commands/test.md (symlink)

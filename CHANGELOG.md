@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Markdown lint is a CI gate**: `.github/workflows/security.yml` runs markdownlint-cli 0.48.0 (pinned, same as local)
+  over every tracked `*.md`, replacing a `markdownlint-cli2-action` step set to `continue-on-error: true` that could
+  never fail; `.markdownlint.json` stays the tracked config and `.markdownlintignore` is new — 34 files reformatted
+  (delimiter rows, fence languages, blank lines, one nested-fence repair in `docs/ARCHITECTURE.md` and
+  `agents/test-analyzer.md`), three per-line or per-block disables with reasons in the comment
 - **Always-loaded rules trimmed**: narrative, incidents and mechanism moved verbatim from `CLAUDE.md` and `.claude/rules/*.md` into `.claude/docs/rules-reference/` (not auto-loaded) — loaded size 6,114 → 6,521 chars, every binding rule kept (lossless check: each removed line found whole in a reference doc; independent review) — size rose slightly: host paths moved to a gitignored local rule and the review restored corrected Phase 11 text
 - **live-sync baseline**: an empty `live-sync.conf` and the live-sync pre-commit gate; host paths are never tracked
   in this public repository, so the `tm` launcher stays at the repository root

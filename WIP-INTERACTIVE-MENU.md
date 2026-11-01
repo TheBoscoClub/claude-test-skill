@@ -9,7 +9,7 @@ Demonstrating options for making `/test` a cursor-navigable interactive menu.
 ### Available Tools on System
 
 | Tool | Status | Notes |
-|------|--------|-------|
+| --- | --- | --- |
 | fzf 0.67.0 | ✅ Installed | Multi-select, fuzzy search, fast |
 | whiptail | ✅ Installed | Classic ncurses dialog boxes |
 | gum | ❌ Not installed | Modern Charm-style TUI (optional) |

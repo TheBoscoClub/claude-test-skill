@@ -9,7 +9,7 @@ Test apps, releases, system-level changes in isolated VMs.
 ## When to Use
 
 | Scenario | Phase 10a? |
-|----------|----------|
+| --- | --- |
 | PAM/auth modifications | Yes |
 | systemd service changes | Yes |
 | Kernel parameters / boot changes | Yes |
@@ -27,6 +27,7 @@ Test VMs MUST NOT live-mount production storage (no NFS, CIFS, virtiofs, virtio-
 ## VM Configuration
 
 **Storage locations:**
+
 - `/path/to/vm-images/` — primary VM storage
 - `~/.local/share/libvirt/images/` — user libvirt
 - `/path/to/isos/` — ISO library for new VMs
@@ -507,7 +508,7 @@ run_phase_V() {
 Phase 10a reads `~/.claude/config/project-vm-map.json`:
 
 | Scenario | VM Used |
-|----------|---------|
+| --- | --- |
 | Project has dedicated VM | `projects.<name>.vm` |
 | No entry | `default.vm` (example-test-vm) |
 | Default VM exclusive to another project | ERROR |

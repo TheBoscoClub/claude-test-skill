@@ -270,7 +270,7 @@ Run only if `go` is in `$ECOSYSTEMS`.
 echo "=== Go dependency analysis ==="
 if [ -f go.mod ]; then
   # Inventory
-  echo "Direct dependencies: $(grep -c '^	' go.mod 2>/dev/null || echo 'unknown')"
+  echo "Direct dependencies: $(grep -c '^ ' go.mod 2>/dev/null || echo 'unknown')"
   [ ! -f go.sum ] && echo "FINDING [MEDIUM]: go.sum missing -- run 'go mod tidy'"
 
   # Outdated
@@ -495,7 +495,7 @@ Report: List all import relationships, flag circular imports and unused exports.
 ## Severity Classification Reference
 
 | Severity | Criteria | Examples |
-|----------|----------|---------|
+| --- | --- | --- |
 | **CRITICAL** | Known CVE with public exploit or active exploitation | RCE, auth bypass with PoC |
 | **HIGH** | Known CVE, no known exploit yet | pip-audit/npm audit/cargo audit findings |
 | **MEDIUM** | Outdated major version, missing lock file, unpinned deps | Major version behind, no Gemfile.lock |
@@ -511,7 +511,7 @@ Report: List all import relationships, flag circular imports and unused exports.
 
 Produce a structured summary. Use `FINDING [SEVERITY]:` prefix for all issues so Phase 6 can parse them.
 
-```
+```text
 DEPENDENCY HEALTH
 ─────────────────
 Ecosystems Detected: python, node

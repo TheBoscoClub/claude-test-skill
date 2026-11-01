@@ -6,6 +6,7 @@
 > **Rate Limiting**: Use `gh api --cache 60s`; check `gh api rate_limit` before bulk API operations.
 
 Tests and mitigates all security issues across:
+
 - **GitHub** - repo security settings, alerts, workflows
 - **Local Project** - code vulns, secrets, dependencies, SAST
 - **Installed App** - production security (when applicable)
@@ -656,7 +657,7 @@ Report each data flow (entry -> storage -> exit); flag unvalidated paths.
 
 ### Data Flow Checklist
 
-```
+```text
 [ ] Data entry points mapped (API, CLI, file reads)
 [ ] Data storage points mapped (DB, file writes)
 [ ] Data exit points mapped (API responses, logs, file writes)
@@ -706,19 +707,22 @@ echo "════════════════════════�
 
 ## Integration Notes
 
-### Invocation:
+### Invocation
+
 - `/test` - analysis group
 - `/test --phase=5` or `--phase=SEC` - standalone
 - `/test --phase=5 --audit-only` - no auto-fixes
 
-### Auto-Mitigation:
+### Auto-Mitigation
+
 - Enables GitHub Dependabot/security features
 - `pip-audit --fix`, `npm audit fix`
 - Fixes file permissions
 
-### Tool Requirements:
+### Tool Requirements
+
 | Tool | Install |
-|------|---------|
+| --- | --- |
 | bandit | `pipx install bandit` |
 | semgrep | `pipx install semgrep` |
 | codeql | `yay -S codeql` |

@@ -21,7 +21,7 @@ If you discover a security vulnerability in this project, please report it respo
 ## GitHub Security Features
 
 | Feature | Status |
-|---------|--------|
+| --- | --- |
 | Dependabot vulnerability alerts | ✅ Enabled |
 | Dependabot security updates | ✅ Enabled |
 | Secret scanning | ✅ Enabled |
@@ -33,13 +33,13 @@ This project uses the following tools for security auditing:
 ### Shell Scripts (3 files)
 
 | Tool | Purpose | Command |
-|------|---------|---------|
+| --- | --- | --- |
 | **shfmt** | Shell script formatting | `shfmt -d *.sh` |
 
 ### Markdown Documentation (45 files)
 
 | Tool | Purpose | Command |
-|------|---------|---------|
+| --- | --- | --- |
 | **markdownlint** | Markdown linting | `markdownlint '**/*.md'` |
 | **codespell** | Spell checking | `codespell --skip='.git'` |
 

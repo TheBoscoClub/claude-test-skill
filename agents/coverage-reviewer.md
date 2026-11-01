@@ -35,6 +35,7 @@ You are a specialized agent for analyzing test coverage and recommending improve
 ## Your Mission
 
 Analyze coverage data and provide:
+
 1. **Coverage gaps** - What's not tested
 2. **Critical paths** - High-risk untested code
 3. **Test recommendations** - Specific tests to add
@@ -59,6 +60,7 @@ go tool cover -func=coverage.out
 ### 2. Identify Low Coverage Files
 
 Focus on files with:
+
 - < 50% coverage (critical)
 - < 80% coverage (needs attention)
 - 0% coverage (completely untested)
@@ -66,6 +68,7 @@ Focus on files with:
 ### 3. Analyze Untested Code
 
 For each gap, determine:
+
 - Is it business logic? (high priority)
 - Is it error handling? (medium priority)
 - Is it boilerplate? (low priority)
@@ -73,6 +76,7 @@ For each gap, determine:
 ### 4. Check Critical Paths
 
 Prioritize testing for:
+
 - Authentication/authorization
 - Payment processing
 - Data validation

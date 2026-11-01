@@ -178,6 +178,7 @@ echo "Unverified fixes: N"
 **Subagent**: parse Phase 6 output; count fixes and `FVP PROOF` blocks. Report each fix lacking a proof block as `UNVERIFIED_FIX: [description]`. Unverified fixes FAIL the audit; Phase 6 must re-run for them.
 
 **If unverified fixes found:**
+
 1. Report each as `UNVERIFIED_FIX`
 2. Set Phase 7 result to `FAIL — FVP Protocol violation`
 3. Dispatcher loops back to Phase 6
@@ -412,7 +413,7 @@ fi
 **Result classification:**
 
 | Result | Criteria |
-|--------|----------|
+| --- | --- |
 | **PASS** | All 5 criteria met |
 | **WARN** | Tests pass but coverage decreased slightly, or smoke test unavailable |
 | **FAIL** | Any test regression, build failure, or Phase 6 fix not verified |
@@ -428,7 +429,7 @@ If tests still fail after Phase 6:
 
 ## Output Format
 
-```
+```text
 FINAL VERIFICATION
 ──────────────────
 

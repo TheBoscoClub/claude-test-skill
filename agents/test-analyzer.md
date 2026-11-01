@@ -35,6 +35,7 @@ You are a specialized agent for analyzing test failures and identifying root cau
 ## Your Mission
 
 Investigate test failures and provide:
+
 1. **Root cause analysis** - Why the test is failing
 2. **Affected code paths** - What code is involved
 3. **Fix recommendations** - How to resolve the issue
@@ -55,6 +56,7 @@ pytest -v --tb=long <test_file>::<test_name> 2>&1
 ### 2. Parse the Error
 
 Extract:
+
 - Test name and location
 - Error type (AssertionError, TypeError, etc.)
 - Expected vs actual values
@@ -69,7 +71,7 @@ Extract:
 ### 4. Categorize the Failure
 
 | Type | Description | Common Causes |
-|------|-------------|---------------|
+| --- | --- | --- |
 | Assertion | Expected ≠ actual | Logic error, outdated test |
 | Exception | Unhandled error | Missing null check, bad input |
 | Timeout | Too slow | Infinite loop, network issue |
@@ -85,7 +87,7 @@ for i in {1..5}; do pytest <test> -x && echo "Pass $i" || echo "Fail $i"; done
 
 ## Output Format
 
-```markdown
+````markdown
 ## Test Failure Analysis
 
 ### Failed Test
@@ -94,7 +96,7 @@ for i in {1..5}; do pytest <test> -x && echo "Pass $i" || echo "Fail $i"; done
 - **Type:** AssertionError
 
 ### Error Details
-```
+```text
 Expected: 200
 Actual: 401
 Message: Authentication failed for valid credentials
@@ -118,7 +120,7 @@ token = create_token(user_id=1, scope="read:user")
 
 ### Flakiness Assessment
 ✅ Deterministic - fails consistently
-```
+````
 
 ## Important Notes
 

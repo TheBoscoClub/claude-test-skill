@@ -1557,27 +1557,30 @@ echo "════════════════════════�
 ### Dual Mode Operation
 
 | Context | Mode | What It Validates |
-|---------|------|-------------------|
+| --- | --- | --- |
 | `claude-test-skill` project | Framework Self-Test | Phase files, symlinks, dispatcher, tools, model tiers, governing law |
 | Any other project | Project Test Validation | Discoverability, redundancy, fixture conflicts, isolation risks, version-gating, phase duplication |
 
-### When to Use:
+### When to Use
 
 **Framework mode** (in claude-test-skill): after modifying phase files, updating symlinks, installing tools.
 
 **Project mode** (any project):
+
 - After adding test modules
 - Verify pytest discoverability
 - Check fixture conflicts / order-dependent failures
 - Validate version-gated markers (v8, v9, etc.)
 - Ensure tests don't duplicate /test phase functionality
 
-### What This Phase Does NOT Do:
+### What This Phase Does NOT Do
+
 - Modify files (reports only)
 - Run the test suite (`--collect-only` only)
 - Auto-fix
 
-### This Phase is EXCLUDED From:
+### This Phase is EXCLUDED From
+
 - Normal `/test` runs
 - Full audit cycles
 - Any tier-based execution

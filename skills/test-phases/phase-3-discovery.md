@@ -10,7 +10,7 @@ Identify project type, test framework, and testable components.
 
 Phase 1 MUST output all these key-value pairs (parsed downstream):
 
-```
+```text
 Project Type: [type]
 Test Framework: [framework]
 Test Files Found: [count]
@@ -48,7 +48,7 @@ Project Version: [version or N/A]
 ### 1. Detect Project Type
 
 | File | Type | Test Command |
-|------|------|--------------|
+| --- | --- | --- |
 | `package.json` | Node.js | `npm test` |
 | `pyproject.toml` | Python (modern) | `pytest` |
 | `setup.py` / `requirements.txt` | Python | `pytest` |
@@ -172,6 +172,7 @@ detect_isolation_level
 ```
 
 **Dispatcher Integration:**
+
 - `vm-required` + no VM available: ABORT
 - `vm-required` or `vm-recommended` + VM available: Phase 10a
 - `sandbox-warn`: Standard test execution (Phase 2) with extra monitoring
@@ -495,7 +496,7 @@ check_docker_status
 ## Gate Decisions (for dispatcher)
 
 | Phase | Condition | Action |
-|-------|-----------|--------|
+| --- | --- | --- |
 | **P** | `Installable App: none` | SKIP |
 | **P** | `Production Status: installed` | RUN |
 | **P** | `Production Status: not-installed` | PROMPT user |

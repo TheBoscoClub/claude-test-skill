@@ -7,6 +7,7 @@
 ## Purpose
 
 Detect common infrastructure, permission, and runtime configuration issues that cause silent failures in production applications. These issues often manifest as:
+
 - Operations that "fail silently" or report misleading errors
 - Services that start but don't function correctly
 - Intermittent failures under specific conditions
@@ -18,11 +19,13 @@ Detect common infrastructure, permission, and runtime configuration issues that 
 **Problem**: Reverse proxies that forward ALL headers from upstream, including hop-by-hop headers forbidden by HTTP/1.1 and WSGI (PEP 3333).
 
 **Symptoms**:
+
 - WSGI/Waitress errors: `AssertionError: Connection is a "hop-by-hop" header`
 - Responses dropped silently
 - Intermittent API failures through proxy
 
 **Detection**:
+
 ```bash
 echo "=== Checking for hop-by-hop header issues ==="
 
@@ -38,6 +41,7 @@ done
 ```
 
 **Fix Pattern**:
+
 ```python
 HOP_BY_HOP_HEADERS = frozenset({
     'connection', 'keep-alive', 'proxy-authenticate',
@@ -57,11 +61,13 @@ for header, value in response.headers.items():
 **Problem**: Services run as a dedicated user but data directories are owned by a different user.
 
 **Symptoms**:
+
 - "Permission denied" errors only when running as service
 - Operations work via CLI but fail through service
 - Downloads/writes appear to "fail silently"
 
 **Detection**:
+
 ```bash
 echo "=== Checking service user permissions ==="
 
@@ -88,11 +94,13 @@ done
 **Problem**: Missing `$` in variable references, especially in redirections.
 
 **Symptoms**:
+
 - Scripts create files named literally (e.g., `temp_file` instead of the variable value)
 - "Read-only file system" errors
 - Scripts work in some directories but not others
 
 **Detection**:
+
 ```bash
 echo "=== Checking for shell variable typos ==="
 
@@ -112,11 +120,13 @@ done
 **Problem**: Service uses `ProtectSystem=strict` but `ReadWritePaths` doesn't include all needed directories.
 
 **Symptoms**:
+
 - "Read-only file system" errors
 - Service starts but can't write data
 - Works manually but not as service
 
 **Detection**:
+
 ```bash
 echo "=== Checking systemd sandboxing ==="
 
@@ -138,11 +148,13 @@ done
 **Problem**: SQLite database or indexes on HDD instead of SSD/NVMe.
 
 **Symptoms**:
+
 - Slow queries despite small database
 - Timeouts on write operations
 - Scanner hangs on metadata extraction
 
 **Detection**:
+
 ```bash
 echo "=== Checking storage tier placement ==="
 
@@ -367,7 +379,7 @@ fi
 
 ### Integration Surface Checklist
 
-```
+```text
 [ ] API contracts verified (backend routes vs frontend calls)
 [ ] Script dependencies verified (called scripts exist)
 [ ] Shared file interfaces audited

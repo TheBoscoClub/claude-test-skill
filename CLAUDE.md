@@ -11,6 +11,7 @@
 The `/test` skill plugin for Claude Code — modular, context-efficient project audit. Location: `/path/to/projects/claude-test-skill/`
 
 **Symlinks**:
+
 - `~/.claude/commands/test.md` -> `commands/test.md`
 - `~/.claude/skills/test-phases/` -> `skills/test-phases/`
 

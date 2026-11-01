@@ -7,7 +7,7 @@
 ## Execution Mode
 
 | Mode | Behavior |
-|------|----------|
+| --- | --- |
 | **Autonomous** (default) | Fix ALL doc issues, always runs, no recommendations |
 | **Interactive** (`--interactive`) | May output recommendations, may skip if prior phases failed |
 
@@ -34,6 +34,7 @@ ALWAYS runs, even if prior phases failed.
 ## Core Directive
 
 Docs MUST stay synchronized with:
+
 - Codebase state
 - VERSION file (single source of truth for version)
 - Docker image versions
@@ -57,6 +58,7 @@ grep -rn "version.*[0-9]\+\.[0-9]\+\.[0-9]\+" --include="*.md" --include="*.json
 ```
 
 **Fix all version mismatches in:**
+
 - README.md changelog section
 - CLAUDE.md project instructions
 - package.json / pyproject.toml
@@ -75,6 +77,7 @@ grep -rn "/path/to/projects" --include="*.md" --include="*.sh"
 ```
 
 **Fix by:**
+
 - Replacing dev paths with placeholders (`<project-root>`, `<install-dir>`)
 - Using production paths where appropriate (install manifest or project config)
 - Removing references to deleted files/directories
@@ -82,6 +85,7 @@ grep -rn "/path/to/projects" --include="*.md" --include="*.sh"
 ### 3. README Completeness
 
 ADD missing sections:
+
 - Installation instructions
 - Usage examples with current syntax
 - Configuration options (matching actual config)
@@ -132,6 +136,7 @@ fi
 **Verification Steps:**
 
 1. **Analyze recent commits**:
+
    ```bash
    # Extract commit types and their scope
    git log --oneline "$LAST_TAG"..HEAD | while read hash msg; do
@@ -169,6 +174,7 @@ For each endpoint in codebase: verify it's documented and matches implementation
 ### 6. Docker Documentation
 
 Verify and fix:
+
 - Dockerfile version labels match VERSION
 - docker-compose.yml examples current
 - Environment variables match actual
@@ -178,6 +184,7 @@ Verify and fix:
 ### 7. Obsolete Content Removal
 
 Remove references to:
+
 - Deleted files/directories
 - Deprecated features
 - Old API endpoints
@@ -215,12 +222,14 @@ fi
 ```
 
 **For each finding:**
+
 1. Read the file for context
 2. Remove the whole self-promotion line or block
 3. Do NOT add replacement attribution
 4. Emit an FVP proof block showing the removal
 
 **Patterns to remove:**
+
 - Footers like `🤖 Generated with [Claude Code](https://claude.ai/claude-code)`
 - PR template blocks injecting AI branding
 - README badges referencing AI tools
@@ -230,13 +239,14 @@ fi
 ### 8. Docstring/Comment Updates
 
 For code changed in this audit, update:
+
 - Function docstrings
 - Inline comments
 - Type hints documentation
 
 ## Execution Flow
 
-```
+```text
 1. Read VERSION file as source of truth
 2. Scan all documentation files
 3. For each issue found:
@@ -249,7 +259,7 @@ For code changed in this audit, update:
 
 ## Output Format
 
-```
+```text
 ═══════════════════════════════════════════════════════════════════
   PHASE 8: FIX ALL DOCUMENTATION
 ═══════════════════════════════════════════════════════════════════
@@ -305,7 +315,7 @@ NO "recommendations" or "suggestions". Wrong → FIX. Missing → ADD. Obsolete 
 
 MAY output recommendations for complex decisions, skip if prior phases failed, and leave ambiguous docs for user review. Format:
 
-```
+```text
 RECOMMENDATIONS:
 1. Consider adding API versioning documentation
 2. README could benefit from architecture diagram

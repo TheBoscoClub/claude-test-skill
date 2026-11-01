@@ -15,6 +15,7 @@ The safety net swung too far: the context-monitor hook fires on every tool call,
 This is not a unique problem. Issue [#17428](https://github.com/anthropics/claude-code/issues/17428) (104 reactions, 39 comments, assigned to Anthropic engineer `rboyce-ant` but no response in 70+ days) is the community focal point. At least 16 independent tools/scripts have been built by users to work around the same gap. Anthropic has not acknowledged, committed to, or shipped any solution.
 
 Key community tools referenced in this design:
+
 - **Cozempic** (Ruya-AI): session bloat pruning before compaction
 - **Mnemon** (mnemon-dev): SQLite graph memory with lifecycle hooks
 - **yurukusa's graduated thresholds**: 40/25/20/15% warnings with mission.md pattern
@@ -25,7 +26,7 @@ Key community tools referenced in this design:
 A person at risk of stroke doesn't write a journal entry every 15 seconds. The brain protects itself through:
 
 | Brain Mechanism | System Equivalent |
-|---|---|
+| --- | --- |
 | Distributed memory (hippocampus, cortex, cerebellum) | Multiple independent recovery sources, not one monolithic file |
 | Consolidation during idle, not under pressure | Update at milestones, not on timers or under context pressure |
 | Small emergency card (name, meds, contacts) | Wallet card: ~20 lines of structured recovery state |
@@ -40,6 +41,7 @@ A person at risk of stroke doesn't write a journal entry every 15 seconds. The b
 The primary recovery target. Small, structured, machine-readable. Updated at milestones only.
 
 **Format:**
+
 ```markdown
 ---
 updated: 2026-03-22T14:52:00
@@ -65,6 +67,7 @@ branch: main
 ```
 
 **Rules:**
+
 - Maximum 30 lines (including frontmatter and headers). Longer = wrong.
 - **Creation**: Claude creates the wallet card as part of session initialization, immediately after the session record. If the project already has a wallet card from a previous session, Claude overwrites it with fresh state.
 - Updated by Claude at milestones: task completion, commit, error, decision point, phase boundary.
@@ -85,18 +88,20 @@ Observes transcript size. Graduated response. Goes silent under extreme pressure
 All thresholds are measured on raw transcript JSONL file size via `stat -c%s`, the same mechanism the current hook uses. The current thresholds (600 KB / 800 KB) were set before calibration data existed and are 5-10x too low — they trigger panic mode at ~10% of actual compaction distance. The new thresholds are intentionally higher, based on observed compaction behavior:
 
 | Level | Transcript File Size | Action |
-|---|---|---|
+| --- | --- | --- |
 | Normal | < 3 MB | Nothing |
 | Elevated | 3–5 MB | One-time stderr note: "Context at ~50%." No file writes. Cooldown: never repeats. |
 | High | 5–7 MB | Updates wallet card git-state fields once (branch, uncommitted files, recent commits). Does NOT populate semantic fields (Current Work, Next Step) — those are Claude's responsibility. Does NOT write to session record. Cooldown: never repeats. |
 | Critical | > 7 MB | **Silent.** No writes, no injection, no additionalContext. Trusts PreCompact hook. |
 
 **Eliminated behaviors:**
+
 - `additionalContext` injection at any level (feedback loop source)
 - Session record writes at any level (bloat source)
 - No-cooldown CRITICAL mode (spam source)
 
 **Retained behaviors:**
+
 - Transcript size measurement via `stat`
 - Cooldown state tracking per session
 - Compaction calibration logging (append to `~/.claude/cache/context-monitor/compaction-sizes.log`)
@@ -106,6 +111,7 @@ All thresholds are measured on raw transcript JSONL file size via `stat -c%s`, t
 Fires once when compaction is imminent. Captures git state and injects recovery instructions.
 
 **Changes from current:**
+
 - Recovery target changes from session record to wallet card
 - `systemMessage` updated: tells Claude to read `$PROJECT/.claude-task-state.md`, then check `git diff` and `git log`
 - Still writes a one-time snapshot to session record (audit trail, not recovery)
@@ -113,12 +119,14 @@ Fires once when compaction is imminent. Captures git state and injects recovery 
 - **If no wallet card exists**, creates a minimal one from git state before injecting the systemMessage
 
 **Wallet card path resolution** (same logic for context-monitor and pre-compact hooks):
+
 1. If `$cwd` is a git repo: `$cwd/.claude-task-state.md`
 2. Else if `$cwd` is under `/path/to/projects/`: `$cwd/.claude-task-state.md` (catches projects before `git init`)
 3. Else: `~/.claude/task-state.md`
 
 **Updated systemMessage:**
-```
+
+```text
 CONTEXT COMPACTION JUST OCCURRED. Read your task state file at: {wallet_card_path}
 Then run: git diff --stat && git log --oneline -5
 These three sources (task state + git diff + git log) reconstruct your working context.
@@ -132,6 +140,7 @@ Resume work unless the user's last message indicates otherwise.
 Complete rewrite. 148 lines → ~30 lines.
 
 **New content:**
+
 ```markdown
 # Session Workflow
 
@@ -165,7 +174,7 @@ Complete rewrite. 148 lines → ~30 lines.
 ### Component 5: Cleanup — Contaminated Files
 
 | File | Action | Detail |
-|---|---|---|
+| --- | --- | --- |
 | `~/.claude/hooks/context-monitor.sh` | **Rewrite** | Graduated observe-only model per Component 2 |
 | `~/.claude/hooks/pre-compact.sh` | **Update** | Point recovery at wallet card per Component 3 |
 | `~/.claude/rules/session-workflow.md` | **Rewrite** | Per Component 4 |
@@ -188,6 +197,7 @@ Complete rewrite. 148 lines → ~30 lines.
 ## Recovery Scenarios
 
 ### After Auto-Compaction
+
 1. PreCompact hook fires, captures git state, writes audit entry to session record
 2. Compaction occurs
 3. PreCompact's `systemMessage` injected into post-compaction context
@@ -196,6 +206,7 @@ Complete rewrite. 148 lines → ~30 lines.
 6. Claude resumes work
 
 ### After Crash (No Hook Fires)
+
 1. New session starts
 2. Claude checks for wallet card in project directory
 3. Wallet card shows last milestone state (may be minutes old, not seconds — that's OK)
@@ -204,11 +215,13 @@ Complete rewrite. 148 lines → ~30 lines.
 6. Session record exists as additional audit trail if needed
 
 ### After `/close`
+
 1. Close skill updates wallet card with "session closed" state
 2. Session record gets closing summary (simplified)
 3. Next session sees clean wallet card, knows previous session ended normally
 
 ### After Crash (No Wallet Card Exists)
+
 1. New session starts
 2. Claude checks for wallet card — not found
 3. Claude falls back to `git diff --stat` and `git log --oneline -10`
@@ -219,10 +232,13 @@ Complete rewrite. 148 lines → ~30 lines.
 ## Migration
 
 ### Existing Bloated Session Records
+
 No migration needed. Existing `SESSION_RECORD_*.md` files are left as-is — they're `.gitignore`'d and will naturally age out. New sessions create new records under the new rules. The old records serve as historical audit trail if ever needed.
 
 ### Rollback Plan
+
 If the new system proves inadequate:
+
 1. `git revert` the implementation commits to restore old hook/rules files
 2. Delete any `.claude-task-state.md` wallet cards from project directories
 3. The old session-workflow.md and context-monitor.sh are recoverable from git history

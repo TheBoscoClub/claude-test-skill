@@ -10,7 +10,7 @@ This document describes the architecture of the claude-test-skill plugin for Cla
 
 The test-skill follows a **dispatcher + subagent** architecture that achieves ~93% context reduction compared to a monolithic approach. Instead of loading all 20 phases into context, only the dispatcher (~1,000 lines) is loaded, and individual phases are invoked on-demand via Task tool subagents with per-phase model selection.
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      TEST-SKILL ARCHITECTURE                        │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -43,7 +43,7 @@ The test-skill follows a **dispatcher + subagent** architecture that achieves ~9
 
 ## Directory Structure
 
-```
+```text
 claude-test-skill/
 ├── commands/
 │   └── test.md                 # Main dispatcher (~1,000 lines)
@@ -132,6 +132,7 @@ The dispatcher is the entry point for `/test` commands. It:
 7. **Generates summary** — Aggregates results from all phases
 
 **Key sections:**
+
 - Quick Reference and argument parsing
 - Available Phases table
 - Subagent Model Selection table (judgement/sonnet/haiku) and the `JUDGEMENT_MODEL` resolution table
@@ -143,7 +144,7 @@ The dispatcher is the entry point for `/test` commands. It:
 
 Each phase file contains a standardized structure (v2.0.1+):
 
-```markdown
+````markdown
 # Phase X: Name
 
 > **Model**: `judgement` | **Phase**: 3 | **Modifies Files**: No
@@ -154,19 +155,19 @@ Each phase file contains a standardized structure (v2.0.1+):
 [Description]
 
 ## Section 1: [Category]
-```​bash
+```bash
 # Executable code
 ```
 
 ## Output Format
 Status: PASS / ISSUES / FAIL
 Issues: [count]
-```
+````
 
 **Configuration header fields (added in v2.0.1):**
 
 | Field | Purpose |
-|-------|---------|
+| --- | --- |
 | **Model** | Which model tier the subagent runs on (judgement/sonnet/haiku) |
 | **Phase** | Phase identifier (matches the file name — e.g., `3`, `5a`, `10b`, `ST`) |
 | **Modifies Files** | Whether the phase writes to the project |
@@ -178,7 +179,7 @@ Issues: [count]
 Specialized subagents that are now integrated into their respective phases. The agent files remain as reference documentation:
 
 | Agent | Purpose | Integrated Into |
-|-------|---------|-----------------|
+| --- | --- | --- |
 | coverage-reviewer.md | Deep coverage analysis | Phase 2 |
 | security-scanner.md | Security pattern matching | Phase 5 |
 | test-analyzer.md | Test failure root cause | Phase 2 |
@@ -189,7 +190,7 @@ Specialized subagents that are now integrated into their respective phases. The 
 
 Each phase is assigned to an optimal model based on task complexity:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      MODEL TIER ASSIGNMENTS                         │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -242,7 +243,7 @@ model, and self-test 6.4 fails if a pin or a hard-coded `opus` spawn returns.
 
 Phases execute in **9 tiers** with strict dependencies:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         EXECUTION FLOW                              │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -283,7 +284,7 @@ Phases execute in **9 tiers** with strict dependencies:
 ### Parallel vs Sequential Execution
 
 | Tier | Phases | Mode | Model(s) | Rationale |
-|------|--------|------|----------|-----------|
+| --- | --- | --- | --- | --- |
 | 0 | S, 0 | Parallel | haiku, sonnet | Independent safety setup |
 | 1 | 1 | Sequential | judgement | Everything depends on discovery |
 | 2 | 2, 2a | Parallel | sonnet, sonnet | Independent test execution |
@@ -300,7 +301,7 @@ Phases execute in **9 tiers** with strict dependencies:
 
 The dispatcher creates a task for each phase at the start of an audit:
 
-```
+```text
 TaskCreate("Run Phase S: Snapshot", status="pending")
 TaskCreate("Run Phase 0: Pre-Flight", status="pending")
 TaskCreate("Run Phase 1: Discovery", status="pending", blockedBy=["S", "0"])
@@ -309,14 +310,14 @@ TaskCreate("Run Phase 1: Discovery", status="pending", blockedBy=["S", "0"])
 
 As phases execute, subagents update their own task status:
 
-```
+```text
 TaskUpdate(taskId, status="in_progress")   # Phase starting
 TaskUpdate(taskId, status="completed")     # Phase done
 ```
 
 This gives the user real-time visibility:
 
-```
+```text
 Phase S: Snapshot                 (completed)
 Phase 0: Pre-Flight               (completed)
 Phase 1: Discovery               (in_progress) — Detecting project type...
@@ -331,7 +332,7 @@ Phase 5: Security                 (pending, blocked by Phase 1)
 The dispatcher declares 15 tools available to all subagents:
 
 | Category | Tools | Purpose |
-|----------|-------|---------|
+| --- | --- | --- |
 | **File I/O** | Bash, Read, Write, Edit, Glob, Grep | Core file operations |
 | **Subagents** | TaskGet, TaskStop | Inspecting and stopping subagents |
 | **Progress** | TaskCreate, TaskUpdate, TaskList | Real-time phase tracking |
@@ -350,7 +351,7 @@ Phase 5 integrates **7 security tools** in a comprehensive audit:
 ### Static Analysis (SAST)
 
 | Tool | Languages | Purpose |
-|------|-----------|---------|
+| --- | --- | --- |
 | bandit | Python | Security vulnerability detection |
 | semgrep | Multi | Pattern-based security scanning |
 | CodeQL | Multi | Deep semantic analysis |
@@ -358,7 +359,7 @@ Phase 5 integrates **7 security tools** in a comprehensive audit:
 ### Dependency Scanning
 
 | Tool | Ecosystem | Purpose |
-|------|-----------|---------|
+| --- | --- | --- |
 | pip-audit | Python | CVE detection in packages |
 | trivy | Filesystem | Container/filesystem vulnerabilities |
 | grype | Filesystem | SBOM-based vulnerability scanning |
@@ -383,6 +384,7 @@ Phase ST is a **meta-testing** phase that validates the test-skill framework its
 - **No dependencies** — runs completely standalone
 
 **Validates (10 sections):**
+
 1. All 20 phase files exist and are readable
 2. Symlinks point to correct targets
 3. Dispatcher contains all phase references and shortcuts
@@ -403,7 +405,7 @@ Manages automatic VM startup and shutdown for Phase V. Tracks which VMs were sta
 These phases skip automatically based on Discovery (Phase 3) results:
 
 | Phase | Condition to RUN | Condition to SKIP |
-|-------|------------------|-------------------|
+| --- | --- | --- |
 | 9b | App installed on system | No installable app or not installed |
 | 9c | Dockerfile + registry package | No Dockerfile or no registry |
 | 9d | GitHub remote + gh authenticated | No remote or gh not authenticated |
@@ -414,7 +416,7 @@ These phases skip automatically based on Discovery (Phase 3) results:
 
 ### Before (Monolithic)
 
-```
+```text
 Total skill size: ~3,652 lines
 Loaded every invocation: 3,652 lines
 Context consumed: HIGH
@@ -422,7 +424,7 @@ Context consumed: HIGH
 
 ### After (Modular)
 
-```
+```text
 Dispatcher: ~1,000 lines (always loaded)
 Per phase: 50-400 lines (on-demand)
 Typical audit (10 phases): ~2,500 lines
@@ -434,7 +436,7 @@ Context consumed: ~93% reduction for single-phase runs
 
 By assigning cheaper models to simpler phases:
 
-```
+```text
 Without tiering: 20 phases x judgement model
 With tiering:    9 x judgement + 9 x sonnet + 2 x haiku
                  (saving depends on the session model; with --budget on a
@@ -445,7 +447,7 @@ With tiering:    9 x judgement + 9 x sonnet + 2 x haiku
 
 ## Data Flow
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────────┐
 │                         DATA FLOW                                    │
 ├──────────────────────────────────────────────────────────────────────┤
@@ -496,11 +498,13 @@ With tiering:    9 x judgement + 9 x sonnet + 2 x haiku
 ### Adding a New Phase
 
 1. Create `skills/test-phases/phase-X-name.md` with configuration header:
+
    ```markdown
    > **Model**: `sonnet` | **Phase**: X | **Modifies Files**: No
    > **Task Tracking**: Call `TaskUpdate(taskId, status="in_progress")` at start...
    > **Key Tools**: `Bash`, `Read`, `Grep`...
    ```
+
 2. Add to Available Phases table in `commands/test.md`
 3. Add to Quick Dependency Reference with tier and model assignment
 4. Add to Subagent Model Selection table
@@ -512,6 +516,7 @@ With tiering:    9 x judgement + 9 x sonnet + 2 x haiku
 ### Adding a New Shortcut
 
 In `commands/test.md`, add to the shortcuts parsing section:
+
 ```markdown
 - `shortcut` → `--phase=X` (description)
 ```
@@ -523,8 +528,9 @@ In `commands/test.md`, add to the shortcuts parsing section:
 The v4.0.0 release consolidated the phase inventory from 27 to 21 phases:
 
 ### Phases Merged
+
 | Deleted Phase | Merged Into | Rationale |
-|---------------|-------------|-----------|
+| --- | --- | --- |
 | Phase 3 (Report) | Phase 2 (Execute) | Test result analysis belongs with test execution |
 | Phase 4 (Cleanup) | Phase 7 (Quality) | Dead code removal is a quality concern |
 | Phase 8 (Coverage) | Phase 2 (Execute) | Coverage measurement belongs with test execution |
@@ -533,6 +539,7 @@ The v4.0.0 release consolidated the phase inventory from 27 to 21 phases:
 | Phase M (Mocking) | Phase 0 (Preflight) | Sandbox setup belongs with preflight checks |
 
 ### Other Changes
+
 - **Bloat reduction** — Phase 1 (50 to 23 KB), Phase P (46 to 20 KB), Phase V (54 to 22 KB)
 - **Project-agnostic** — All hardcoded project references removed; manifest-driven detection only
 - **Orphaned agents** — coverage-reviewer, security-scanner, and test-analyzer agent files integrated into Phases 2 and 5
@@ -544,7 +551,7 @@ The v4.0.0 release consolidated the phase inventory from 27 to 21 phases:
 ## Version History
 
 | Version | Key Changes |
-|---------|-------------|
+| --- | --- |
 | 4.1.0 | Phase H dissolved (21 to 20 phases), cross-component analysis distributed to Phases 5, 6, 7, I |
 | 4.0.0 | Phase consolidation (27 to 21), bloat reduction, project-agnostic, agents integrated |
 | 3.0.1 | Canonical help block, Phase ST grep fix, argument-hint update |

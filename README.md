@@ -5,10 +5,10 @@ A comprehensive 20-phase autonomous project audit system for Claude Code with fu
 [![Security Scan](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml/badge.svg)](https://github.com/TheBoscoClub/claude-test-skill/actions/workflows/security.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/TheBoscoClub/claude-test-skill)](https://github.com/TheBoscoClub/claude-test-skill/releases)
 
-### Version History
+## Version History
 
 | Version | Status | Release |
-|---------|--------|---------|
+| --- | --- | --- |
 | ![4](https://img.shields.io/badge/4-brightgreen)![1](https://img.shields.io/badge/1-darkgreen)![1](https://img.shields.io/badge/1-green) | Latest patch | [v4.1.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v4.1.1) |
 | ![4](https://img.shields.io/badge/4-brightred)![0](https://img.shields.io/badge/0-darkred)![0](https://img.shields.io/badge/0-red) | Prior major (untagged) | [commit aa888d9](https://github.com/TheBoscoClub/claude-test-skill/commit/aa888d9) |
 | ![3](https://img.shields.io/badge/3-brightred)![0](https://img.shields.io/badge/0-darkred)![1](https://img.shields.io/badge/1-red) | Prior patch | [v3.0.1](https://github.com/TheBoscoClub/claude-test-skill/releases/tag/v3.0.1) |
@@ -23,29 +23,33 @@ A comprehensive 20-phase autonomous project audit system for Claude Code with fu
 > in `4.1.0` (21 → 20 phases), and the `4.1.1` patch additions. The "Prior major" entry
 > above links to the commit where `4.0.0` was cut, since no tag exists for it.
 
+<!-- markdownlint-disable MD033 -->
 <details>
 <summary>Badge Color Convention</summary>
 
 Each version segment gets its own badge. The number of badges indicates version depth:
 
 | Level | Current | Prior | Example |
-|-------|---------|-------|---------|
+| --- | --- | --- | --- |
 | Major (`W.0.0`) | ![W](https://img.shields.io/badge/W-brightgreen) | ![W](https://img.shields.io/badge/W-brightred) | v1.0.0, v2.0.0 |
 | Minor (`W.X.0`) | ![W](https://img.shields.io/badge/W-brightgreen)![X](https://img.shields.io/badge/X-darkgreen) | ![W](https://img.shields.io/badge/W-brightred)![X](https://img.shields.io/badge/X-darkred) | v1.1.0, v1.2.0 |
 | Patch (`W.X.Y`) | ![W](https://img.shields.io/badge/W-brightgreen)![X](https://img.shields.io/badge/X-darkgreen)![Y](https://img.shields.io/badge/Y-green) | ![W](https://img.shields.io/badge/W-brightred)![X](https://img.shields.io/badge/X-darkred)![Y](https://img.shields.io/badge/Y-red) | v1.0.3, v1.2.1 |
 | Tweak (`W.X.Y.Z`) | ![W](https://img.shields.io/badge/W-brightgreen)![X](https://img.shields.io/badge/X-darkgreen)![Y](https://img.shields.io/badge/Y-green)![Z](https://img.shields.io/badge/Z-yellow) | ![W](https://img.shields.io/badge/W-brightred)![X](https://img.shields.io/badge/X-darkred)![Y](https://img.shields.io/badge/Y-red)![Z](https://img.shields.io/badge/Z-orange) | v1.0.3.1 |
 
 **Color Scheme:**
+
 - **Current**: brightgreen → darkgreen → green → yellow
 - **Prior**: brightred → darkred → red → orange
 
 </details>
+<!-- markdownlint-enable MD033 -->
 
 ## Overview
 
 The `/test` skill performs a complete autonomous audit of any software project - running tests, scanning for vulnerabilities, checking code quality, validating production deployments, and auditing GitHub repository security settings. It fixes ALL issues automatically and loops until the codebase is clean.
 
 **Key Features:**
+
 - 🔄 **Autonomous**: Fixes all issues without prompting (no "manual items" lists)
 - 🧩 **Modular**: 93% context reduction via on-demand phase loading
 - 🔒 **Security-First**: Integrated CVE scanning, secret detection, GitHub security auditing
@@ -74,31 +78,31 @@ The `/test` skill performs a complete autonomous audit of any software project -
 ## Phase Overview
 
 | Phase | Name | Description |
-|-------|------|-------------|
-| **Safety & Setup** |||
+| --- | --- | --- |
+| **Safety & Setup** | | |
 | S | Snapshot | BTRFS safety snapshot before modifications |
 | 0 | Pre-Flight | Environment validation, config audit, sandbox setup |
 | 1 | Discovery | Detect project type, test frameworks, tools, GitHub remote |
-| **Testing** |||
+| **Testing** | | |
 | 2 | Execute | Run tests, analyze results, measure coverage |
 | 2a | Runtime | Service health checks, stuck process detection |
-| **Analysis** |||
+| **Analysis** | | |
 | 5 | Security | Comprehensive security (7 tools: bandit, semgrep, CodeQL, pip-audit, trivy, grype, checkov) |
 | 6 | Dependencies | Package health, outdated/unused/vulnerable packages |
 | 7 | Quality | Linting, complexity analysis, dead code cleanup |
 | I | Infrastructure | Infrastructure and runtime issue detection |
-| **Remediation** |||
+| **Remediation** | | |
 | 10 | Fix | Auto-fix issues (ruff --fix, black, isort, shfmt, codespell) |
-| **Validation** |||
+| **Validation** | | |
 | A | App Test | Deployable application testing in sandbox |
 | P | Production | Validate live installed application |
 | D | Docker | Validate Docker image and registry package |
 | G | GitHub | Audit GitHub repo security (Dependabot, CodeQL, branch protection) |
 | 12 | Verify | Re-run tests, confirm no regressions |
-| **Finalization** |||
+| **Finalization** | | |
 | 13 | Docs | Update documentation to match codebase |
 | C | Restore | Cleanup temp files, restore environment |
-| **Special** |||
+| **Special** | | |
 | V | VM Testing | Heavy isolation testing in libvirt/QEMU VMs |
 | VM | Lifecycle | VM startup/shutdown management |
 | ST | Self-Test | Validate test-skill framework (explicit only: `--phase=ST`) |
@@ -108,17 +112,19 @@ The `/test` skill performs a complete autonomous audit of any software project -
 ## Execution Modes
 
 | Mode | Flag | Behavior |
-|------|------|----------|
+| --- | --- | --- |
 | **Autonomous** (default) | (none) | Fixes ALL issues, no prompts, loops until clean |
 | **Interactive** | `--interactive` | May prompt for decisions, single pass |
 
 ### Autonomous Mode (Default)
+
 - Fixes every issue regardless of priority/severity
 - No user prompts except for safety/architecture/external blocks
 - Loops between Fix (Phase 10) and Verify (Phase 12) until all tests pass
 - Documentation automatically synchronized
 
 ### Interactive Mode
+
 - May prompt for decisions (e.g., Phase P/D conditional execution)
 - Still fixes ALL issues — interactive mode changes prompting behavior, not the fix mandate
 - Loops until all tests pass and all issues resolved
@@ -130,7 +136,7 @@ Each phase runs in a subagent on one of three tiers (shown as `[tier]` in the tr
 under [Architecture](#architecture)):
 
 | Tier | Phases | Model |
-| ---- | ------ | ----- |
+| --- | --- | --- |
 | **judgement** | 3, 5a, 5c, 6, 9a–9d, ST | The more capable of the session model and Opus (`fable` > `opus` > `sonnet` > `haiku`) |
 | **sonnet** | 2, 4a, 4b, 5b, 5d, 7, 8, 10a, 10b | Sonnet |
 | **haiku** | 1, 11 | Haiku |
@@ -183,7 +189,7 @@ Phase 3 (Discovery) automatically detects which tools are installed on your syst
 ### Code Quality Tools
 
 | Tool | Languages | Purpose | Install |
-|------|-----------|---------|---------|
+| --- | --- | --- | --- |
 | ruff | Python | Fast linter + formatter | `pip install ruff` |
 | pylint | Python | Deep static analysis | `pip install pylint` |
 | mypy | Python | Type checking | `pip install mypy` |
@@ -200,7 +206,7 @@ Phase 3 (Discovery) automatically detects which tools are installed on your syst
 ### Security Tools
 
 | Tool | Purpose | Install |
-|------|---------|---------|
+| --- | --- | --- |
 | pip-audit | Python CVE scanning | `pip install pip-audit` |
 | bandit | Python security analysis | `pip install bandit` |
 | semgrep | Multi-language SAST | `pipx install semgrep` |
@@ -214,7 +220,7 @@ Phase 3 (Discovery) automatically detects which tools are installed on your syst
 ### GitHub Tools
 
 | Tool | Purpose | Install |
-|------|---------|---------|
+| --- | --- | --- |
 | gh | GitHub CLI for repo auditing | OS package manager |
 
 ---
@@ -253,7 +259,7 @@ tools:
 
 Phases execute in tiers with strict dependencies:
 
-```
+```text
 TIER 0: Safety [S, 0] ─────────────────── Can run in parallel
            │
            ▼
@@ -286,14 +292,17 @@ TIER 8: Cleanup [C] ────────────────────
 ### Conditional Phases
 
 **Phase 9b (Production)** - Skipped if:
+
 - No installable app detected
 - App not installed on this system
 
 **Phase 9c (Docker)** - Skipped if:
+
 - No Dockerfile in project
 - No registry package found
 
 **Phase 9d (GitHub)** - Skipped if:
+
 - No GitHub remote configured
 - `gh` CLI not authenticated
 
@@ -304,6 +313,7 @@ TIER 8: Cleanup [C] ────────────────────
 Phase G performs a comprehensive GitHub repository audit:
 
 ### Security Features Audited
+
 - ✅ Dependabot vulnerability alerts
 - ✅ Dependabot security updates
 - ✅ Secret scanning (if available)
@@ -311,11 +321,13 @@ Phase G performs a comprehensive GitHub repository audit:
 - ✅ Branch protection rules
 
 ### Automatic Remediation
+
 - Enables Dependabot alerts if missing
 - Enables automated security updates if missing
 - Reports open security alerts for manual review
 
 ### Requirements
+
 - `gh` CLI installed and authenticated (`gh auth login`)
 - Push access to the repository (for enabling security features)
 
@@ -323,7 +335,7 @@ Phase G performs a comprehensive GitHub repository audit:
 
 ## Architecture
 
-```
+```text
 claude-test-skill/
 ├── commands/
 │   └── test.md              # Main dispatcher (~1,000 lines)
@@ -369,7 +381,7 @@ claude-test-skill/
 The modular architecture significantly reduces context consumption:
 
 | Component | Lines | When Loaded |
-|-----------|-------|-------------|
+| --- | --- | --- |
 | Dispatcher | ~1,000 | Always |
 | Each Phase | 50-300 | On-demand via subagent |
 | **Typical audit** | ~1,500 | vs 3,652 monolithic |
@@ -381,40 +393,52 @@ The modular architecture significantly reduces context consumption:
 ## Examples
 
 ### Full Audit
+
 ```bash
 /test
 ```
+
 Runs all phases autonomously, fixes all issues, loops until clean.
 
 ### Security-Only Audit
+
 ```bash
 /test security
 # or: /test --phase=5
 ```
+
 Runs comprehensive security audit with 8 tools (GitHub + local + installed app).
 
 ### Pre-Commit Check
+
 ```bash
 /test --phase=0-2,7
 ```
+
 Quick validation: Pre-flight, Discovery, Execute, and Quality.
 
 ### Production Validation
+
 ```bash
 /test prodapp
 ```
+
 Validates the installed production application against `install-manifest.json`.
 
 ### GitHub Repository Audit
+
 ```bash
 /test github
 ```
+
 Audits GitHub security settings and enables missing protections.
 
 ### Framework Self-Test (Meta-Testing)
+
 ```bash
 /test --phase=ST
 ```
+
 Validates the test-skill framework itself (phase files, symlinks, tools).
 **Note:** Phase ST is never included in normal `/test` runs - explicit only.
 
@@ -457,15 +481,19 @@ Key Findings:
 ## Troubleshooting
 
 ### "Phase G skipped: gh not authenticated"
+
 Run `gh auth login` to authenticate with GitHub.
 
 ### "No security tools detected"
+
 Install the recommended tools for your language. Phase 1 will detect them automatically.
 
 ### "BTRFS snapshot failed"
+
 Ensure you have sudo access or run on a BTRFS filesystem. Snapshots are optional - the skill continues without them on other filesystems.
 
 ### "Phase P skipped: App not installed"
+
 Phase P validates production installations. If the app isn't installed on this system, Phase P correctly skips.
 
 ---
@@ -480,6 +508,7 @@ Phase P validates production installations. If the app isn't installed on this s
 6. Submit a pull request
 
 ### Code Quality Standards
+
 - All markdown must pass markdownlint
 - All YAML must pass yamllint
 - No hardcoded secrets or credentials
@@ -514,7 +543,7 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
 Human cognition can be modeled as an I/O system where each modality (language, vision, motor) can handle multiple **read-only input streams** concurrently, but has only a **single process table for output**. When a read-only process suddenly needs to write, other read processes can insert data into the write process's I/O register—resulting in cross-talk.
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │ HUMAN COGNITION: I/O MODEL                                  │
 ├─────────────────────────────────────────────────────────────┤
@@ -555,7 +584,7 @@ if (predator_detected) {
 
 ### Evolution v2.0.0-LTS
 
-```
+```text
 EVOLUTION v2.0.0-LTS (Homo sapiens)
 ├── Release: ~300,000 years ago
 ├── Support Status: ACTIVE (no EOL planned)

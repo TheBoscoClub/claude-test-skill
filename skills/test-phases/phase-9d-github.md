@@ -11,7 +11,7 @@ Audit the GitHub repo: security features, alerts, workflows, compliance.
 ## Execution Mode
 
 | Mode | Behavior |
-|------|----------|
+| --- | --- |
 | **Autonomous** (default) | Enable missing security features, fix alerts where possible |
 | **Interactive** (`--interactive`) | Report issues, prompt before making changes |
 
@@ -662,7 +662,7 @@ create_security_workflow() {
 ## Phase 9d Gate Decision
 
 | GitHub Status | Action |
-|---------------|--------|
+| --- | --- |
 | `not-a-repo` | **SKIP** Phase 9d |
 | `no-remote` | **SKIP** Phase 9d |
 | `not-github` | **SKIP** Phase 9d |

@@ -9,7 +9,7 @@ A comprehensive 20-phase autonomous project audit system with full GitHub integr
 
 ## Quick Reference
 
-```
+```text
 /test                    # Full audit (autonomous - fixes everything)
 /test prodapp            # Validate installed production app (Phase P)
 /test docker             # Validate Docker image and registry (Phase D)
@@ -33,7 +33,7 @@ A comprehensive 20-phase autonomous project audit system with full GitHub integr
 ## Available Phases
 
 | Phase | Name | Description |
-|-------|------|-------------|
+| --- | --- | --- |
 | S | Snapshot | BTRFS safety snapshot |
 | 0 | Pre-Flight | Environment validation + config audit + sandbox setup |
 | 1 | Discovery | Detect project type, tools, GitHub |
@@ -80,6 +80,7 @@ Phase 1 automatically detects installed tools:
 ### Claude.ai (Web)
 
 Upload this `SKILL.md` file directly to your Claude.ai account:
+
 1. Go to [claude.ai](https://claude.ai) → Settings → Skills
 2. Click "Upload skill" and select this file
 3. The skill reference will be available in your projects
@@ -97,6 +98,6 @@ ln -s ~/claude-test-skill/skills/test-phases ~/.claude/skills/test-phases
 
 ## More Information
 
-- **Repository**: https://github.com/TheBoscoClub/claude-test-skill
+- **Repository**: <https://github.com/TheBoscoClub/claude-test-skill>
 - **Full Documentation**: See README.md and INSTALL.md
 - **Version**: 4.1.1

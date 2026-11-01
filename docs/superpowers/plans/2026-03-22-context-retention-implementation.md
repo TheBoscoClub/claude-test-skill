@@ -12,9 +12,11 @@
 
 ---
 
+<!-- markdownlint-disable-next-line MD001 -->
 ### Task 1: Add Wallet Card to Gitignore Template
 
 **Files:**
+
 - Modify: `~/.claude/templates/gitignore-claude:148-155` (Claude Code workflow section)
 
 This must happen first — before any wallet card files get created, the gitignore template must exclude them.
@@ -23,7 +25,7 @@ This must happen first — before any wallet card files get created, the gitigno
 
 In `~/.claude/templates/gitignore-claude`, after the `.claude-recovery-plan.md` line (line 151), add:
 
-```
+```text
 # Wallet card — ephemeral task state for context recovery
 .claude-task-state.md
 ```
@@ -52,6 +54,7 @@ The gitignore template lives at `~/.claude/templates/` which is outside any proj
 ### Task 2: Rewrite Context Monitor Hook
 
 **Files:**
+
 - Rewrite: `~/.claude/hooks/context-monitor.sh` (117 lines → ~80 lines)
 
 The current hook fires on every PostToolUse, writes to the session record at CRITICAL with no cooldown, and injects `additionalContext` creating a feedback loop. The new hook observes transcript size with graduated thresholds (3/5/7 MB), goes silent at Critical, and never writes to the session record.
@@ -208,6 +211,7 @@ grep -c 'flock' ~/.claude/hooks/context-monitor.sh
 ### Task 3: Update PreCompact Hook
 
 **Files:**
+
 - Modify: `~/.claude/hooks/pre-compact.sh` (lines 73-110)
 
 Changes: (1) resolve wallet card path, (2) create minimal wallet card from git state if none exists, (3) update systemMessage to point at wallet card instead of session record.
@@ -298,6 +302,7 @@ grep -c 'task-state' ~/.claude/hooks/pre-compact.sh
 ### Task 4: Rewrite Session Workflow Rules
 
 **Files:**
+
 - Rewrite: `~/.claude/rules/session-workflow.md` (148 lines → ~60 lines)
 
 The current file mandates 15-second update cycles, PID tracking, flock coordination, and "after EVERY tool call round" cadence. The new version keeps useful parts (project transitions, lifecycle, MCP limitations) and replaces the panic-driven update model with milestone-only.
@@ -419,17 +424,20 @@ grep -ci 'wallet card' ~/.claude/rules/session-workflow.md
 ### Task 5: Update CLAUDE.md Line 5
 
 **Files:**
+
 - Modify: `~/.claude/CLAUDE.md:5` (one line change)
 
 - [ ] **Step 1: Update the session records principle**
 
 Change line 5 from:
-```
+
+```text
 3. **SESSION RECORDS** — The FIRST action on project open: create/update `SESSION_RECORD_YYYY-MM-DD.md` with PIDs, then maintain every ~3 minutes. Before any other work. See `rules/session-workflow.md`.
 ```
 
 To:
-```
+
+```text
 3. **SESSION RECORDS** — On session start: create `SESSION_RECORD_YYYY-MM-DD.md` and wallet card (`.claude-task-state.md`). Update both at milestones. See `rules/session-workflow.md`.
 ```
 
@@ -449,6 +457,7 @@ grep 'SESSION RECORDS' ~/.claude/CLAUDE.md
 ### Task 6: Update Close Command — Wallet Card Cleanup
 
 **Files:**
+
 - Modify: `~/.claude/commands/close.md` (Step 6, lines 166-217)
 
 Two changes: (1) remove flock from session record finalization, (2) add wallet card cleanup before the closing entry.
@@ -512,6 +521,7 @@ grep -c 'flock' ~/.claude/commands/close.md
 ### Task 7: Update Customization Manifest
 
 **Files:**
+
 - Modify: `~/.claude/customization-manifest.md` (lines 36-41, Hooks section)
 
 - [ ] **Step 1: Add context-monitor and pre-compact entries to Hooks table**
@@ -540,6 +550,7 @@ Change the session records row (line 17) to reflect milestone-only:
 ### Task 8: Delete Contaminated Memory Files
 
 **Files:**
+
 - Delete: `~/.claude/projects/-path-to-projects-example-project/memory/feedback_session_record_frequency.md`
 - Modify: `~/.claude/projects/-path-to-projects-example-project/memory/MEMORY.md` (lines 36-37)
 
@@ -556,12 +567,14 @@ In the example-project `MEMORY.md`, find and remove the line referencing `feedba
 - [ ] **Step 3: Update MEMORY.md lines 36-37 — remove old cadence rules**
 
 Replace:
+
 ```markdown
 - **ALWAYS update SESSION_RECORD before calling ExitPlanMode** — user requires this every time, no exceptions
 - **Session record update cadence: every tool call round (~30-60s)** — NOT every 3 minutes. Crashes (GPU VRAM, OOM, power) kill without warning. 2026-02-25 incident lost all post-commit context because updates stopped after milestone.
 ```
 
 With:
+
 ```markdown
 - **Session records**: milestone-only audit trail. Wallet card (`.claude-task-state.md`) is the primary recovery target.
 ```
@@ -590,6 +603,7 @@ This is outside the test-skill repo, so no git commit here. The changes are to `
 ### Task 9: Check Plan Files for Old References
 
 **Files:**
+
 - Check: `~/.claude/plans/mutable-churning-allen.md`
 - Check: `~/.claude/plans/calm-hopping-thunder.md`
 
@@ -694,7 +708,7 @@ architecture."
 After all tasks complete, verify against spec success criteria:
 
 | # | Criterion | How to verify |
-|---|-----------|---------------|
+| --- | --- | --- |
 | 1 | Session records < 200 lines for normal session | Run a session, check line count |
 | 2 | No context monitor entries in session records | `grep -c 'CONTEXT MONITOR' SESSION_RECORD_*.md` = 0 |
 | 3 | No feedback loops | `grep -c 'additionalContext' ~/.claude/hooks/context-monitor.sh` = 0 |

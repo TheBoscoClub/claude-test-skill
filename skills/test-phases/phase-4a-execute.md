@@ -13,7 +13,7 @@ Run the test suite with coverage, parse results, analyze failures, produce a str
 Detect from root files, in order; use the FIRST match as primary framework.
 
 | Marker File | Project Type | Test Runner | Coverage Tool |
-|-------------|-------------|-------------|---------------|
+| --- | --- | --- | --- |
 | `pyproject.toml` or `setup.py` or `requirements.txt` | Python | `pytest` (fallback: `python -m unittest`) | `pytest --cov` |
 | `package.json` | Node.js | `npm test` / `jest` / `vitest` | `nyc` / `jest --coverage` / `vitest --coverage` |
 | `go.mod` | Go | `go test` | `go test -coverprofile` |
@@ -233,7 +233,7 @@ grep -B 20 "^FAILED " test-output.log
 ### 4b. Categorize Each Failure
 
 | Category | Signal | Likely Root Cause |
-|----------|--------|-------------------|
+| --- | --- | --- |
 | **Assertion** | `AssertionError`, `AssertionFailure` | Behavior changed: code bug or outdated expectation |
 | **Exception** | `TypeError`, `KeyError`, `ValueError`, `NullPointerException` | Missing null check, wrong type, broken API contract |
 | **Timeout** | `TimeoutError`, exit code 124 | Infinite loop, deadlock, slow dependency |
@@ -261,7 +261,7 @@ File modified in last 5 commits = likely **regression**; flag higher priority.
 ### 4d. Determine Fix Complexity
 
 | Complexity | Criteria | Examples |
-|------------|----------|----------|
+| --- | --- | --- |
 | **Trivial** | Typo, wrong constant/value | Wrong expected value |
 | **Low** | One-line logic fix | Add `if x is not None` guard |
 | **Medium** | Multi-line, refactoring | Missing edge case, API contract change |
@@ -296,6 +296,7 @@ for fname, data in sorted(files.items(), key=lambda x: x[1].get('summary',{}).ge
 ```
 
 Priority:
+
 1. **Files < 50%**: Critical (core logic untested)
 2. **Files 50-79%**: Low (error handling/edge cases untested)
 3. **Files >= 80%**: Acceptable
@@ -398,7 +399,7 @@ fi
 
 MUST produce this exact format (Phase 6 Fix depends on it).
 
-```
+```text
 ===============================================================
   PHASE 2: TEST EXECUTION & ANALYSIS
 ===============================================================
@@ -464,7 +465,7 @@ Coverage Gap: 5.8% below target
 Consumed by Phase 6 (Fix) and the final report:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| --- | --- | --- |
 | `PROJECT_TYPE` | string | python, node, go, rust, make, php, unknown |
 | `TEST_RUNNER` | string | runner used (pytest, jest, go test, cargo test, etc.) |
 | `TEST_EXIT_CODE` | int | runner exit code (0=pass, 1=fail, 124=timeout) |
@@ -487,7 +488,7 @@ Consumed by Phase 6 (Fix) and the final report:
 ### Exit Criteria
 
 | Verdict | Condition |
-|---------|-----------|
+| --- | --- |
 | **PASS** | All tests pass AND coverage >= target |
 | **PASS (with warnings)** | All tests pass AND coverage < target |
 | **FAIL** | Any non-flaky test failures |

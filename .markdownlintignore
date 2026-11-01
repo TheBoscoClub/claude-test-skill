@@ -1,0 +1,9 @@
+node_modules/
+.snapshots/
+.btrbk-snapshots/
+SESSION_RECORD_*.md
+.claude-checkpoint*.md
+.claude-task-state.md
+.claude-si-gate-log.md
+# bd generates .beads/README.md and may regenerate it at any time; a gate on it would go red on its own
+.beads

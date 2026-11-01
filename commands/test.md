@@ -18,6 +18,7 @@ allowed-tools:
   - WebFetch
 argument-hint: "[help] [prodapp] [docker] [qaapp] [qadocker] [qaall] [security] [github] [--phase=X] [--list-phases] [--skip-snapshot] [--interactive] [--budget]"
 ---
+<!-- markdownlint-disable-file MD029 -- steps 3-8 continue the numbering across code fences; renumbering would change the step numbers readers see -->
 
 # Modular Project Audit (/test)
 
@@ -30,6 +31,7 @@ Context-efficient audit: this dispatcher loads phase instructions on demand in s
 Supreme law of /test. No project test module, project rule, phase instruction, execution mode, flag or other mechanism may supersede, dilute, narrow, or circumvent it. Any project-level source of ambiguity or conflict with it must be eliminated at the project level.
 
 **Prohibited:**
+
 - Labeling any issue "pre-existing", "cosmetic", "non-blocking", "low priority", "advisory", "won't fix", "not our changes", or any equivalent that results in not fixing it
 - Deferring any issue to a future session, task, or release cycle
 - Narrowing what "all" means by context, judgment, or interpretation
@@ -56,7 +58,7 @@ All audits except `--interactive` iterate: if any issue was found and fixed, run
 
 FVP loop per fix:
 
-```
+```text
 1. IDENTIFY the issue (with file, line, specific symptom)
 2. APPLY the fix (edit the code)
 3. VERIFY the fix works (execute the affected functionality)
@@ -67,7 +69,7 @@ FVP loop per fix:
 
 Proof block — MUST follow EVERY fix:
 
-```
+```text
 ┌─ FVP PROOF ────────────────────────────────────────────┐
 │ Fix:      [what was changed, file:line]                │
 │ Issue:    [original symptom]                           │
@@ -80,6 +82,7 @@ Proof block — MUST follow EVERY fix:
 ```
 
 Rules:
+
 - `Verify`: an **actually executed command** — never "should work", "the code looks correct", "verified by inspection"
 - `Before`/`After`: **observable output differences**, not descriptions of the code
 - `Proof`: `PASS` + specific evidence, or `FAIL` + what went wrong; `FAIL` → fix incomplete, back to step 2
@@ -87,12 +90,14 @@ Rules:
 - N fixes ⇒ N proof blocks; "15 issues fixed" with zero proof blocks is a **protocol violation**
 
 Phase-boundary enforcement:
+
 - Phase 6 (Fix): output MUST contain one proof block per fix applied
 - Phase 7 (Verify): re-runs ALL checks; any Phase 6 fix lacking a proof block MUST be flagged `UNVERIFIED_FIX` and the audit cannot pass
 - Phase 9a-9d (Validation): each finding and fix emits its own proof block
 - QA modules and all project-specific test modules: same protocol; every step emits observable proof (command output, HTTP response); "step passed" without output is not proof
 
 When Phase 7 finds failures introduced by Phase 6:
+
 1. Loop back to Phase 6 with the new failures; each fix emits an FVP proof block
 2. Phase 7 re-verifies with its own proof; repeat until Phase 7 passes clean WITH proof
 3. Then the ENTIRE audit re-runs from Phase 4a
@@ -101,6 +106,7 @@ When Phase 7 finds failures introduced by Phase 6:
 ### All Audits Are Holistic
 
 Cross-component analysis is a structural property of **every** phase; there is no separate holistic mode or phase. Every phase that examines or modifies code MUST consider how its scope interacts with the rest of the system:
+
 - **Phase 4a**: tests cover cross-component interactions, not just unit boundaries
 - **Phase 5a-5d**: mandatory cross-component sections (security across boundaries, dependency chains, quality across modules, infrastructure integration surfaces)
 - **Phase 6**: fixes verified against cross-component impact — fixing one module must not break another
@@ -112,6 +118,7 @@ One-way ratchet applies: projects may strengthen cross-component requirements (e
 ### Verified Proof Required
 
 **No phase may be marked complete or successful without verifiable proof** — command output, test results, tool output, or observable behavior. "Looks correct" / "should work" is not proof. Per phase:
+
 - **Phase 4a**: pass/fail counts, coverage percentages, actual command output
 - **Phase 5a-5d**: scanner output with findings (or clean scan output)
 - **Phase 6**: FVP proof block per fix — before/after with executed commands
@@ -127,6 +134,7 @@ If proof cannot be produced (e.g. no browser for UI verification), state exactly
 **Every /test audit MUST find and remove AI-injected self-promotion, advertising, branding, and attribution** (a code-quality and doc-hygiene issue).
 
 Scan for:
+
 - `Co-Authored-By:` naming Claude, Anthropic, GPT, OpenAI, Copilot, or any AI assistant — commits, code comments, docs
 - "Generated with [AI tool]", "Built with Claude", "Powered by Anthropic", "Created by Claude Code"
 - Attribution URLs (`claude.ai`, `anthropic.com`) in code, docs, templates, PR bodies
@@ -136,6 +144,7 @@ Scan for:
 Where: docs (`*.md`, `*.txt`, `*.rst`); all code comments; commit messages (`git log --all --format='%H %s' | grep -iE 'co-authored|claude|anthropic|generated.with'`); PR/issue templates (`.github/`); package metadata descriptions (`package.json`, `pyproject.toml`, `Cargo.toml`); Dockerfile labels/comments; CI/CD workflows.
 
 Fix:
+
 - Remove the line/block entirely — no replacement attribution
 - Published commits with `Co-Authored-By`: cannot rewrite; flag it and ensure no new commit includes it
 - Templates that auto-inject AI branding: remove the injection
@@ -162,7 +171,7 @@ Enforcement: Phase 5c scans code/comments; Phase 8 scans and cleans all docs; bo
 ### Execution Modes
 
 | Mode | Flag | Behavior |
-|------|------|----------|
+| --- | --- | --- |
 | **Autonomous** (default) | (none) | Fixes ALL issues; no prompts except SAFETY/ARCHITECTURE/EXTERNAL; loops until all tests pass and all issues resolved; docs synced automatically |
 | **Interactive** | `--interactive` | May prompt (e.g. Phase 9b/9c decisions); still fixes ALL issues and loops — changes prompting, never the fix mandate |
 
@@ -173,7 +182,7 @@ The Governing Law applies unconditionally in both modes. Usage, flags, and short
 Phase number = execution order. Same-number sub-phases (a/b/c/d) run in parallel or are conditional.
 
 | Phase | Name | Description | Modifies Files? |
-|-------|------|-------------|-----------------|
+| --- | --- | --- | --- |
 | 1 | Snapshot | Clean up old snapshots, then create BTRFS safety snapshot | No (creates snapshot) |
 | 2 | Pre-Flight | Environment validation, config audit, sandbox setup | No |
 | 3 | Discovery | Find testable components, set conditional phase flags | No (GATE) |
@@ -204,7 +213,7 @@ Phase number = execution order. Same-number sub-phases (a/b/c/d) run in parallel
 ### Phase 9b Conditional Execution
 
 | Discovery: Installable App | Discovery: Production Status | Phase 9b Action |
-|---------------------------|------------------------------|----------------|
+| --- | --- | --- |
 | `none` | N/A | **SKIP** - No app to validate |
 | Any | `installed` | **RUN** - Validate production |
 | Any | `installed-not-running` | **RUN** - Check why not running |
@@ -213,7 +222,7 @@ Phase number = execution order. Same-number sub-phases (a/b/c/d) run in parallel
 ### Phase 9c Conditional Execution
 
 | Discovery: Dockerfile | Discovery: Registry Package | Phase 9c Action |
-|-----------------------|----------------------------|----------------|
+| --- | --- | --- |
 | `none` | N/A | **SKIP** - No Docker to validate |
 | exists | `not-found` | **SKIP** - No registry package to validate |
 | exists | `found` | **RUN** - Validate image and registry package |
@@ -222,7 +231,7 @@ Phase number = execution order. Same-number sub-phases (a/b/c/d) run in parallel
 ### Phase 9d Conditional Execution
 
 | Discovery: GitHub Remote | Discovery: gh CLI Auth | Phase 9d Action |
-|--------------------------|------------------------|----------------|
+| --- | --- | --- |
 | `none` | N/A | **SKIP** - No GitHub remote to audit |
 | exists | `not-authenticated` | **SKIP** - Cannot audit without gh CLI auth |
 | exists | `authenticated` | **RUN** - Full GitHub repository audit |
@@ -234,7 +243,7 @@ A skipped sub-phase passes to the next (9b → 9c → 9d → phase 10 VM → pha
 Depends on Discovery (Phase 3) isolation level, staged release detection, AND Pre-Flight (Phase 2) VM availability:
 
 | Discovery: Isolation Level | Staged Release | Pre-Flight: VM Available | Phase 10a Action |
-|---------------------------|----------------|-------------------------|----------------|
+| --- | --- | --- | --- |
 | `sandbox` | `none` | Any | **SKIP** - Sandbox sufficient |
 | `sandbox` | `valid` | `true` | **RUN** - Staged release lifecycle test |
 | `sandbox` | `valid` | `false` | **WARN** - Cannot test staged release without VM |
@@ -251,7 +260,8 @@ Two independent triggers, either activates Phase 10a when a VM is available: (1)
 - **VM Availability** (Pre-Flight): libvirt/virsh installed and libvirtd running; lists VMs (especially `*-test`, `*-dev`); detects ISO library for new VMs; checks SSH to running test VMs; optionally detects physical test hardware (Raspberry Pi, spare systems)
 
 **Critical Safety Rule** — if `ISOLATION_LEVEL == "vm-required"` and `VM_AVAILABLE == false`:
-```
+
+```text
 ⛔ CRITICAL: This project modifies system authentication, kernel, or boot configuration.
 ⛔ Testing these changes requires VM isolation to prevent bricking the host system.
 ⛔ No VM available. Aborting audit to protect host integrity.
@@ -262,6 +272,7 @@ To proceed:
 ```
 
 **Isolation gate, applied right after Discovery completes:**
+
 - `vm-required`, no VM → abort as above (include danger score and indicators; `virsh start <vm-name>` also satisfies it)
 - `vm-required` or `vm-recommended`, VM available → `start_test_vm()`, use the VM
 - `vm-recommended`, no VM → warn, proceed in sandbox with caution
@@ -272,7 +283,7 @@ To proceed:
 ### Sandbox vs Phase 10a Selection
 
 | Isolation Level | Sandbox (Phase 2) | Phase 10a (VM) |
-|-----------------|-------------------|--------------|
+| --- | --- | --- |
 | `sandbox` | ✅ Used | ⚪ Skipped |
 | `sandbox-warn` | ✅ Used (monitoring) | ⚪ Skipped |
 | `vm-recommended` | ⚠️ Fallback if no VM | ✅ Preferred |
@@ -283,7 +294,7 @@ To proceed:
 **CRITICAL**: dependencies MUST be respected. Unmet dependencies cause wrong results, races (Fix editing lines Security is reporting), or invalid rollback points (snapshot of a mid-modification tree).
 
 | Phase | Depends On | Parallel? | Gate |
-|-------|------------|-----------|------|
+| --- | --- | --- | --- |
 | 1 | None | ❌ single | SNAPSHOT: Snapshot Ready |
 | 2, 3 | 1 (3 also on 2) | ❌ sequential | DISCOVERY: Project Known (GATE) |
 | 4a, 4b | 3 | ✅ with each other | TESTS: Tests Complete |
@@ -314,7 +325,7 @@ Gate failure: SNAPSHOT or DISCOVERY → abort the audit; any other gate → warn
 Three tiers. Two are fixed names; **judgement** is resolved from the session model once per run, before any phase is spawned.
 
 | Tier | Phases | Model passed to Task | Rationale |
-|------|--------|----------------------|-----------|
+| --- | --- | --- | --- |
 | **judgement** | 3, 5a, 5c, 6, 9a, 9b, 9c, 9d, ST | `JUDGEMENT_MODEL` (resolved below) | Finding and fixing defects — reasoning depth decides the result |
 | **sonnet** | 2, 4a, 4b, 5b, 7, 8, 5d, 10a, 10b | `sonnet` | Test execution, dependency checks, verification |
 | **haiku** | 1, 11 | `haiku` | Snapshots, cleanup |
@@ -324,7 +335,7 @@ Three tiers. Two are fixed names; **judgement** is resolved from the session mod
 Capability order: `fable` > `opus` > `sonnet` > `haiku`. Identify the dispatcher's own model from its system context, then:
 
 | Session model | Default | With `--budget` |
-|---------------|---------|-----------------|
+| --- | --- | --- |
 | `fable` | `fable` | `fable` |
 | `opus` | `opus` | `opus` |
 | `sonnet` | `opus` | `sonnet` |
@@ -346,7 +357,7 @@ At audit start, TaskCreate one task per phase being run. `pending` → `in_progr
 
 Spawn a Task subagent for each phase:
 
-```
+```text
 For each requested phase:
   1. Read the phase file from ~/.claude/skills/test-phases/phase-{X}.md
   2. If file exists, execute the phase instructions via Task tool with appropriate model
@@ -361,6 +372,7 @@ For each requested phase:
 Only when phase files are missing:
 
 **Phase 1 (Snapshot)**:
+
 ```bash
 # Check if BTRFS and create read-only snapshot
 PROJECT_DIR="$(pwd)"
@@ -378,7 +390,8 @@ fi
 **Phase 4a (Execute Tests & Analyze)**: run `pytest` / `npm test` / `go test` / `cargo test`; check actual output, not just exit codes; coverage with 85% minimum (configurable); summarize results and analyze failures.
 
 **Phase 9a (App Testing)** - Sandbox Installation:
-```
+
+```text
 Read ~/.claude/skills/test-phases/phase-9a-app-testing.md for full instructions.
 Key steps:
 1. Detect deployable app (install.sh, setup.py, package.json bin, etc.)
@@ -390,7 +403,8 @@ Key steps:
 ```
 
 **Phase 9b (Production Validation)** - Live System:
-```
+
+```text
 Read ~/.claude/skills/test-phases/phase-9b-production.md for full instructions.
 Key steps:
 1. Load install-manifest.json (or infer from install.sh)
@@ -412,7 +426,7 @@ Key steps:
 
 Each phase returns:
 
-```
+```text
 ═══════════════════════════════════════════════════════════════════
   PHASE X: [NAME]
 ═══════════════════════════════════════════════════════════════════
@@ -465,7 +479,7 @@ When `/test` is invoked:
    - All other flags behave the same in both modes
 2. If `help` or `--list-phases`: output this block **verbatim** (no summarizing or rephrasing) and exit:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  /test — Modular Project Audit                                              │
 │  Autonomous, context-efficient project testing — 20 phases, sequential      │
@@ -551,22 +565,26 @@ For `qaapp`, `qadocker`, or `qaall`:
 1. **Map shortcut to file suffix:** `qaapp` → `app`, `qadocker` → `docker`, `qaall` → `all`
 
 2. **Find module file in project root:**
+
    ```bash
    SUFFIX={app|docker|all}  # based on shortcut
    MODULE_FILE=$(ls ${PROJECT_DIR}/test-*-qa-${SUFFIX}.md 2>/dev/null | head -1)
    ```
 
 3. **No file found** → print and **ABORT** (never fall back to a built-in phase):
-     ```
+
+     ```text
      ERROR: No QA ${SUFFIX} module found in project root.
      Expected: test-*-qa-${SUFFIX}.md
      Create a project-specific QA test module to use this shortcut.
      ```
 
 4. **Read vm-test-manifest.json QA config:**
+
    ```bash
    QA_CONFIG=$(python3 -c "import json; print(json.dumps(json.load(open('${PROJECT_DIR}/vm-test-manifest.json')).get('qa_vm', {})))" 2>/dev/null)
    ```
+
    No `qa_vm` section → WARN and continue (module may have inline config).
 
 5. **Execute as one standalone Task subagent** with `model=JUDGEMENT_MODEL` (judgement tier), the module contents as its instructions, plus context `PROJECT_DIR`, the manifest's QA VM config, and SSH config. QA modules are **STANDALONE**: no phase prerequisites, **no other phases run**, and they bypass the tier/gate system; the module handles its own VM connectivity, version checks, upgrades, DB sync.
@@ -575,7 +593,7 @@ For `qaapp`, `qadocker`, or `qaall`:
 
 ### Mode-Specific Behavior
 
-```
+```text
 # THE GOVERNING LAW APPLIES IN BOTH MODES:
 # All errors, warnings, and issues must be fixed. None may be skipped or deferred.
 
@@ -595,7 +613,7 @@ ELSE (Autonomous - DEFAULT):
 
 5. **Execute by tier (respecting dependencies):**
 
-   ```
+   ```text
    Phase 1: Snapshot — SEQUENTIAL → GATE: Snapshot Ready
      --skip-snapshot: exclude phase 1
 
@@ -678,7 +696,7 @@ ELSE (Autonomous - DEFAULT):
 ## MCP Server Integration
 
 | MCP Server | Used By | Enhancement |
-|------------|---------|-------------|
+| --- | --- | --- |
 | **playwright** | Phase 9a, 4b | E2E browser testing for web UIs |
 | **pyright-lsp** | Phase 5c | Project-aware Python type checking |
 | **typescript-lsp** | Phase 5c | TypeScript diagnostics with full context |
@@ -698,4 +716,5 @@ ELSE (Autonomous - DEFAULT):
 
 ---
 
+<!-- markdownlint-disable-next-line MD036 -->
 *Document Version: 5.0.0 — unified sequential phase numbering (phase number = execution order)*

@@ -43,7 +43,7 @@ detect_web_ui() {
 
 Check availability dynamically by calling a Playwright tool; if unavailable (MCP not connected), fall back to standard functional testing.
 
-```
+```text
 # E2E Test Flow (requires Playwright MCP to be connected):
 # Detection: Try calling browser_navigate — if it fails with "tool not found",
 # Playwright MCP is not available. Skip to standard functional tests.
@@ -84,6 +84,7 @@ Playwright is optional; if not connected, use standard functional testing (curl/
 ## When to Run This Phase
 
 Run when the project has:
+
 - Install script (`install.sh`, `setup.py install`, `npm install -g`, etc.)
 - Deploy script (`deploy.sh`)
 - Systemd service files

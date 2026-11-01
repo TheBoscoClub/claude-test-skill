@@ -772,7 +772,8 @@ detect_physical_test_hardware
 ```
 
 **Physical Hosts Configuration Format** (`~/.config/test-skill/physical-hosts.conf`):
-```
+
+```text
 # Test Hardware Configuration
 # Format: name=user@hostname_or_ip
 
@@ -782,7 +783,7 @@ spare-desktop=user@testbox.example
 
 ## Report Format
 
-```
+```text
 ## Pre-Flight Check Results
 
 | Check | Status | Details |

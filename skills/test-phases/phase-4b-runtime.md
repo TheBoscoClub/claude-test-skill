@@ -406,7 +406,7 @@ fi
 
 Structured summary; prefix every issue with `FINDING:` (Phase 6 parses it).
 
-```
+```text
 RUNTIME HEALTH CHECK
 ────────────────────
 Services Discovered: 3 (from docker-compose.yml)

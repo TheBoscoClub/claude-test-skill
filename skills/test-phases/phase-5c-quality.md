@@ -434,7 +434,7 @@ fi
 ## Pass/Fail Criteria
 
 | Category | PASS | FAIL |
-|----------|------|------|
+| --- | --- | --- |
 | Linting (ruff/pylint/eslint/clippy) | 0 errors (warnings OK) | Any error |
 | Type checking (mypy/tsc) | 0 errors | Any error |
 | Formatting (black/prettier/gofmt/shfmt/rustfmt) | 0 files | Any file |
@@ -870,7 +870,8 @@ fi
 ```
 
 Report each finding as:
-```
+
+```text
 FINDING: AI self-promotion in [file]:[line] — [pattern matched]
 ```
 
