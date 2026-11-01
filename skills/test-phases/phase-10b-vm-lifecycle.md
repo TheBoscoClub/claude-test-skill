@@ -32,7 +32,7 @@ Precedence, first non-empty wins:
 2. the project's `vm-test-manifest.json` `vm_testing.default_vm`
 3. the map's `default.vm`
 
-It refuses (returns 1, reason on stderr) when nothing is configured; when the map is missing, unreadable, or not a JSON object; when the chosen VM is not a key of the map's `vms` (a tracked manifest can choose among the VMs the installation lists, never add one); when the chosen VM is `exclusive_to` another project; or when the project has an exclusive VM of its own and the chosen VM is not one of them (`exclusive_to` is a bidirectional lock). `check_test_vm PROJECT_DIR VM` applies the same `vms`/exclusivity checks to a VM named some other way (Phase 10a cross-distro testing).
+It refuses (returns 1, reason on stderr) when nothing is configured; when the map is missing, unreadable, or not a JSON object; when any VM's `exclusive_to` is neither a string nor null (an unreadable lock never reads as "no lock"); when the chosen VM is not a key of the map's `vms` (a tracked manifest can choose among the VMs the installation lists, never add one); when the chosen VM is `exclusive_to` another project; or when the project has an exclusive VM of its own and the chosen VM is not one of them (`exclusive_to` is a bidirectional lock). `check_test_vm PROJECT_DIR VM` applies the same `vms`/exclusivity checks to a VM named some other way (Phase 10a cross-distro testing).
 
 Load the helpers before calling any of them, and tell "not loaded" apart from "not configured":
 

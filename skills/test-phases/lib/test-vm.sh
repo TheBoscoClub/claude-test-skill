@@ -19,7 +19,8 @@
 # A VM is usable only when the installation lists it: it must be a key of `vms` in
 # ~/.claude/config/project-vm-map.json. A project's tracked vm-test-manifest.json can choose among the
 # listed VMs but can never introduce one. `exclusive_to` is a bidirectional lock: only the named project
-# uses that VM, and that project uses only its own exclusive VM(s). There is no built-in default VM.
+# uses that VM, and that project uses only its own exclusive VM(s); an exclusive_to that is neither a
+# string nor null makes every lookup refuse. There is no built-in default VM.
 
 # _test_vm_select MODE PROJECT_DIR [VM] — MODE resolve: print the chosen VM; MODE check: validate VM.
 _test_vm_select() {
@@ -75,6 +76,11 @@ else:
     die(f"unknown mode {mode}")
 
 vms = sub(vm_map, "vms")
+# An exclusivity lock that is not a string cannot be read, so it must not read as "no lock".
+bad = sorted(n for n in vms if sub(vms, n).get("exclusive_to") is not None
+             and not isinstance(sub(vms, n).get("exclusive_to"), str))
+if bad:
+    die(f"exclusive_to of {', '.join(bad)} in {map_path} is not a string or null; fix the map")
 if vm not in vms:
     die(f"{vm} is not listed under vms in {map_path}; only VMs the installation lists may be used")
 owner = text(sub(vms, vm).get("exclusive_to"))

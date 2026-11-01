@@ -172,6 +172,9 @@ resolve manifest-names-other-exclusive P1 "$MAP" '{"vm_testing":{"default_vm":"e
 resolve exclusive-project-other-vm "Excl Proj" '{"default":{"vm":"shared-vm"},"vms":{"shared-vm":{},"excl-vm":{"exclusive_to":"Excl Proj"}}}' '{"vm_testing":{"default_vm":"shared-vm"}}' FAIL
 resolve manifest-names-listed P1 "$MAP" '{"vm_testing":{"default_vm":"shared-vm"}}' shared-vm
 resolve nothing-configured P1 '{"vms":{"shared-vm":{}}}' MISSING FAIL
+resolve exclusive-to-a-list P1 '{"default":{"vm":"excl-vm"},"vms":{"excl-vm":{"exclusive_to":["Excl Proj"]}}}' MISSING FAIL
+resolve other-vm-exclusive-to-a-number P1 '{"default":{"vm":"shared-vm"},"vms":{"shared-vm":{},"excl-vm":{"exclusive_to":7}}}' MISSING FAIL
+resolve exclusive-to-null P1 '{"default":{"vm":"shared-vm"},"vms":{"shared-vm":{"exclusive_to":null}}}' MISSING shared-vm
 
 case_env cross-none P1 "$MAP" MISSING
 out=$(run 10a 'run_cross_distro_tests')
