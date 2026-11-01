@@ -102,10 +102,35 @@ fi
 
 ### Step 3: Sweep Leftover VM Pre-Test Snapshots (MANDATORY)
 
-`~/.claude/scripts/vm-pretest-sweep.sh` is the single sweep (also run by `/close` in `--list` mode). It resolves the VM exactly as Phase 10b does (`vm-test-manifest.json` `vm_testing.default_vm`, overridden by `~/.claude/config/project-vm-map.json` `projects.<name>.vm`, default `example-test-vm`), deletes every snapshot named `pre-test-YYYYMMDD-HHMMSS`, and touches no other name. A pre-test snapshot protects nothing once its run has ended, so none is ever kept. Internal snapshots of a pflash VM delete only while it is shut off; a running VM is reported and left for the next sweep.
+The sweep resolves the VM exactly as Phase 10b does — it calls the same `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection; load that function first) — deletes every snapshot of that VM named `pre-test-YYYYMMDD-HHMMSS`, and touches no other name and no other VM. No VM configured, or the configured VM exclusive to another project: nothing is swept. A pre-test snapshot protects nothing once its run has ended, so none is ever kept. Internal snapshots of a pflash VM delete only while it is shut off; a running VM is reported and left for the next sweep.
 
 ```bash
-~/.claude/scripts/vm-pretest-sweep.sh --project "$PROJECT_DIR"
+sweep_pretest_snapshots() {
+    local PROJECT_DIR="${PROJECT_DIR:-$(pwd)}" vm state s left=0
+    local snaps=()
+    command -v virsh >/dev/null 2>&1 || { echo "  virsh not installed — no VM sweep"; return 0; }
+    vm=$(resolve_test_vm "$PROJECT_DIR") || { echo "  No usable test VM configured — nothing swept"; return 0; }
+    sudo virsh dominfo "$vm" >/dev/null 2>&1 || { echo "  $vm: not defined — skipped"; return 0; }
+    mapfile -t snaps < <(sudo virsh snapshot-list "$vm" --name 2>/dev/null | grep -E '^pre-test-[0-9]{8}-[0-9]{6}$')
+    ((${#snaps[@]})) || { echo "  $vm: no pre-test snapshots"; return 0; }
+    state=$(sudo virsh domstate "$vm" 2>/dev/null)
+    if [[ "$state" != "shut off" ]]; then
+        echo "  $vm: ${#snaps[@]} leftover pre-test snapshot(s) — VM is $state; delete needs it shut off"
+        printf '    %s\n' "${snaps[@]}"
+        return 1
+    fi
+    for s in "${snaps[@]}"; do
+        if sudo virsh snapshot-delete "$vm" "$s" >/dev/null 2>&1; then
+            echo "  $vm: deleted $s"
+        else
+            echo "  $vm: FAILED to delete $s"
+            left=$((left + 1))
+        fi
+    done
+    ((left == 0))
+}
+
+sweep_pretest_snapshots
 # exit 0: nothing left; 1: leftovers remain (VM running) — report them, do not fail the phase
 ```
 
@@ -130,8 +155,8 @@ The pre-test snapshot for the current run is created by Phase 10b and named in `
 sudo virsh snapshot-revert $VM_NAME "$(grep ^pre_test_snapshot= .test-vm-state | cut -d= -f2)"
 
 # For projects with post_test_restore=true in vm-test-manifest.json,
-# the Phase 11 cleanup automatically restores the VM to its pristine
-# snapshot (e.g., pristine) after testing completes.
+# Phase 11 only shuts the VM down; the next run's Phase 10b startup
+# reverts it to its pristine snapshot (the manifest's pristine_snapshot).
 ```
 
 ## Snapshot Naming Convention

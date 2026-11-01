@@ -17,14 +17,72 @@ Automatic VM startup/shutdown for isolated testing.
 
 | When | post_test_restore=true VM | Shared VM |
 | --- | --- | --- |
-| Before `/test` | **Shut down + pristine** | Running or shut down |
+| Before `/test` | **Shut down (dirty from the last run, or pristine)** | Running or shut down |
+| Startup (this phase) | **Reverted to pristine, then started** — a running VM is force-stopped first | Running or shut down |
 | During `/test` | Running (started by /test) | Running |
 | After Phase 11 | **Shut down (dirty)** | Restored to original state |
-| Before next `/test` | **Reverted to pristine at startup** | Running or shut down |
 
-## Default Test VM
+## Test VM Selection
 
-`example-test-vm`: an existing libvirt VM, VNC 127.0.0.1:5900.
+The test VM is always one the user configured, never one guessed from `virsh list` (a name match would pick a VM reserved for another project). `resolve_test_vm` below is the only place it is chosen; Phase 1 (pre-test snapshot sweep) and Phase 10a call the same function. There is no built-in default VM.
+
+Precedence, first non-empty wins:
+
+1. `~/.claude/config/project-vm-map.json` `projects.<project>.vm`
+2. the project's `vm-test-manifest.json` `vm_testing.default_vm`
+3. the map's `default.vm`
+
+It refuses (returns 1, reason on stderr) when nothing is configured, when the chosen VM is `exclusive_to` another project in the map's `vms` entry, or when the project has an exclusive VM of its own and the chosen VM is not one of them (`exclusive_to` is a bidirectional lock).
+
+```bash
+resolve_test_vm() {
+    local PROJECT_DIR="${1:-${PROJECT_DIR:-$(pwd)}}"
+    python3 - "$PROJECT_DIR" "$HOME/.claude/config/project-vm-map.json" <<'PYEOF'
+import json, os, sys
+
+proj_dir, map_path = sys.argv[1], sys.argv[2]
+project = os.path.basename(proj_dir.rstrip("/"))
+
+
+def load(path):
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as e:
+        sys.exit(f"resolve_test_vm: cannot read {path}: {e}")
+    return data if isinstance(data, dict) else {}
+
+
+def sub(d, key):
+    v = d.get(key) if isinstance(d, dict) else None
+    return v if isinstance(v, dict) else {}
+
+
+def text(v):
+    return v.strip() if isinstance(v, str) else ""
+
+
+vm_map = load(map_path)
+manifest = load(os.path.join(proj_dir, "vm-test-manifest.json"))
+vm = (text(sub(sub(vm_map, "projects"), project).get("vm"))
+      or text(sub(manifest, "vm_testing").get("default_vm"))
+      or text(sub(vm_map, "default").get("vm")))
+if not vm:
+    sys.exit(f"resolve_test_vm: no test VM configured for {project} — set projects.<project>.vm "
+             f"or default.vm in {map_path}, or vm_testing.default_vm in vm-test-manifest.json")
+vms = sub(vm_map, "vms")
+owner = text(sub(vms, vm).get("exclusive_to"))
+if owner and owner != project:
+    sys.exit(f"resolve_test_vm: {vm} is exclusive_to {owner}; {project} may not use it")
+own = sorted(n for n in vms if text(sub(vms, n).get("exclusive_to")) == project)
+if own and vm not in own:
+    sys.exit(f"resolve_test_vm: {project} has exclusive VM(s) {', '.join(own)}; it may not use {vm}")
+print(vm)
+PYEOF
+}
+```
 
 ## VM Lifecycle State File
 
@@ -38,18 +96,7 @@ start_test_vm() {
     local ISOLATION_LEVEL="${ISOLATION_LEVEL:-sandbox}"
     local STATE_FILE="${PROJECT_DIR}/.test-vm-state"
 
-    # Read project-specific VM from manifest or project-vm-map, fall back to generic
-    local DEFAULT_VM="example-test-vm"
-    if [[ -f "${PROJECT_DIR}/vm-test-manifest.json" ]]; then
-        local MANIFEST_VM=$(python3 -c "import json; d=json.load(open('${PROJECT_DIR}/vm-test-manifest.json')); print(d.get('vm_testing',{}).get('default_vm',''))" 2>/dev/null)
-        [[ -n "$MANIFEST_VM" ]] && DEFAULT_VM="$MANIFEST_VM"
-    fi
     local VM_MAP="$HOME/.claude/config/project-vm-map.json"
-    if [[ -f "$VM_MAP" ]]; then
-        local PROJECT_NAME=$(basename "$PROJECT_DIR")
-        local MAP_VM=$(python3 -c "import json; d=json.load(open('$VM_MAP')); print(d.get('projects',{}).get('$PROJECT_NAME',{}).get('vm',''))" 2>/dev/null)
-        [[ -n "$MAP_VM" ]] && DEFAULT_VM="$MAP_VM"
-    fi
 
     echo ""
     echo "═══════════════════════════════════════════════════════════════════"
@@ -86,26 +133,23 @@ start_test_vm() {
         sleep 2
     fi
 
-    # Find a suitable test VM
+    # The test VM: only the one the user configured (resolve_test_vm, § Test VM Selection).
+    # No fallback to a name taken from `virsh list` — it could be another project's exclusive VM.
     local VM_NAME=""
-    local TEST_VMS=$(virsh list --all --name 2>/dev/null | grep -E "test|dev" | head -5)
-
-    # Prefer default test VM if it exists
-    if virsh dominfo "$DEFAULT_VM" &>/dev/null 2>&1; then
-        VM_NAME="$DEFAULT_VM"
-    elif [[ -n "$TEST_VMS" ]]; then
-        VM_NAME=$(echo "$TEST_VMS" | head -1)
+    if ! VM_NAME=$(resolve_test_vm "$PROJECT_DIR"); then
+        echo "  ⛔ ABORT: no usable test VM is configured (reason above)"
+        return 1
     fi
 
-    if [[ -z "$VM_NAME" ]]; then
-        echo "  ❌ No test VM found"
+    if ! virsh dominfo "$VM_NAME" &>/dev/null; then
+        echo "  ❌ Configured test VM is not defined in libvirt: $VM_NAME"
         if [[ "$ISOLATION_LEVEL" == "vm-required" ]]; then
             echo "  ⛔ ABORT: VM isolation required but no VM available"
             echo ""
             echo "  To create a test VM:"
-            echo "    1. Ensure ISO exists: /path/to/isos/cachyos-*.iso"
-            echo "    2. Use virt-manager or virt-install"
-            echo "    3. Name it with 'test' in the name (e.g., example-test-vm)"
+            echo "    1. Put an install ISO in the directory named by paths.iso_dir in $VM_MAP"
+            echo "    2. Create the VM with virt-install or virt-manager"
+            echo "    3. Name it in $VM_MAP (default.vm, or projects.<project>.vm)"
             return 1
         fi
         echo "  ⚠️ Falling back to sandbox (caution advised)"
@@ -210,11 +254,17 @@ print(p)" 2>/dev/null)
                 # Ensure VM XML points to the active disk (not some stale overlay)
                 sudo virt-xml "$VM_NAME" --edit target=vda --disk path="$ACTIVE_DISK" 2>/dev/null
 
-                # Clean up stale overlay files
-                for overlay_candidate in \
-                    "/path/to/vm-images/${VM_NAME}.${PRISTINE_SNAP}" \
-                    "/path/to/vm-images/${VM_NAME}.${PRISTINE_SNAP}"; do
-                    [[ -f "$overlay_candidate" ]] && sudo rm -f "$overlay_candidate"
+                # Clean up stale flat-layout overlay files, only under the storage roots the user
+                # listed in paths.vm_storage_dirs. No default: with the key absent nothing is deleted.
+                local STORAGE_DIRS=()
+                mapfile -t STORAGE_DIRS < <(jq -r '.paths.vm_storage_dirs[]? | strings | select(startswith("/"))' "$VM_MAP" 2>/dev/null)
+                if [[ ${#STORAGE_DIRS[@]} -eq 0 ]]; then
+                    echo "  ℹ️  paths.vm_storage_dirs not set in $VM_MAP — stale overlay cleanup skipped"
+                fi
+                local storage_dir overlay_candidate
+                for storage_dir in "${STORAGE_DIRS[@]}"; do
+                    overlay_candidate="${storage_dir%/}/${VM_NAME}.${PRISTINE_SNAP}"
+                    [[ -f "$overlay_candidate" ]] && sudo rm -f "${overlay_candidate:?}"
                 done
 
                 # Delete any stale libvirt snapshot metadata
@@ -253,7 +303,7 @@ tree.write('/tmp/vm-fix.xml', xml_declaration=True)
     local STARTED_BY_TEST="false"
 
     if [[ "$CURRENT_STATE" == "running" ]]; then
-        # Only reached for non-post_test_restore VMs (e.g., shared example-test-vm)
+        # Only reached for non-post_test_restore VMs (e.g., a shared default VM)
         echo "  ✅ VM already running"
         STARTED_BY_TEST="false"
     else
@@ -358,7 +408,7 @@ No test VM may have LIVE ACCESS to production storage.
 
 - **NEVER** configure NFS, CIFS, virtiofs, or virtio-9p mounts from host production paths into the VM
 - Copying data *into* the VM (scp, rsync) is fine
-- Test VM data libraries must fit on the VM's own disk on the VM's own disk
+- Test VM data libraries live on the VM's own disk and must fit within it
 
 ## Install on Pristine VM (Called after VM boots)
 
@@ -385,9 +435,16 @@ install_on_pristine_vm() {
         return 0
     fi
 
-    # Read SSH config from manifest or use defaults
-    local SSH_USER=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('ssh_config',{}).get('user','claude'))" 2>/dev/null)
-    local SSH_KEY=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('ssh_config',{}).get('key','~/.ssh/id_ed25519'))" 2>/dev/null)
+    # SSH identity: the manifest's ssh_config, else the map's vms.<vm> entry. No built-in default.
+    local VM_MAP="$HOME/.claude/config/project-vm-map.json"
+    local SSH_USER=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('ssh_config',{}).get('user',''))" 2>/dev/null)
+    local SSH_KEY=$(python3 -c "import json; d=json.load(open('$MANIFEST')); print(d.get('ssh_config',{}).get('key',''))" 2>/dev/null)
+    [[ -z "$SSH_USER" ]] && SSH_USER=$(jq -r --arg vm "$VM_NAME" '.vms[$vm].ssh_user // empty' "$VM_MAP" 2>/dev/null)
+    [[ -z "$SSH_KEY" ]] && SSH_KEY=$(jq -r --arg vm "$VM_NAME" '.vms[$vm].ssh_key // empty' "$VM_MAP" 2>/dev/null)
+    if [[ -z "$SSH_USER" || -z "$SSH_KEY" ]]; then
+        echo "  ❌ No SSH user/key for $VM_NAME: set ssh_config in vm-test-manifest.json, or vms.<vm>.ssh_user and ssh_key in $VM_MAP"
+        return 1
+    fi
     SSH_KEY="${SSH_KEY/#\~/$HOME}"
 
     local SSH_CMD="ssh -i $SSH_KEY -o ConnectTimeout=10 -o StrictHostKeyChecking=no $SSH_USER@$VM_IP"
@@ -449,8 +506,8 @@ install_on_pristine_vm() {
     fi
 
     # Verify: every enabled timer matching the manifest's unit_pattern is also
-    # active. Catches the "enable without --now" class of upgrade bug
-    # (example-project-hp2): a new release adds a timer, install/upgrade
+    # active. Catches the "enable without --now" class of upgrade bug:
+    # a new release adds a timer, install/upgrade
     # creates the .wants/ symlink, but the unit never gets started in the
     # current boot — so the feature is silently broken until the next reboot.
     # `is-enabled` alone passes; we need is-active too.
@@ -458,7 +515,7 @@ install_on_pristine_vm() {
     # Manifest opt-in (vm-test-manifest.json):
     #   "vm_testing": { "install": {
     #     "assert_enabled_timers_active": {
-    #         "unit_pattern": "exampleapp-*"   # systemctl glob; matches install scope
+    #         "unit_pattern": "myapp-*"   # systemctl glob; matches install scope
     #     }
     #   }}
     #
@@ -498,8 +555,7 @@ REMOTE_PROBE
             echo "  ❌ One or more enabled timers are NOT active (see above)"
             echo "$TIMER_RESULT"
             echo "     This is the 'enable without --now' bug class."
-            echo "     Fix: install/upgrade scripts must use 'enable --now' for runtime units"
-            echo "     (example-project-hp2 is the canonical example)."
+            echo "     Fix: install/upgrade scripts must use 'enable --now' for runtime units."
             return 1
         fi
     fi

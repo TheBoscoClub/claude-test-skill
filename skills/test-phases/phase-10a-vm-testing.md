@@ -26,11 +26,11 @@ Test VMs MUST NOT live-mount production storage (no NFS, CIFS, virtiofs, virtio-
 
 ## VM Configuration
 
-**Storage locations:**
+**Storage locations** come from the installation, never from this skill: `paths.iso_dir` (ISO library for new VMs) and `paths.vm_storage_dirs` (a list of directories holding VM disk images) in `~/.claude/config/project-vm-map.json`. Neither has a built-in default. Without `paths.iso_dir`, `create_test_vm` refuses; without `paths.vm_storage_dirs`, `create_test_vm` refuses and `reset_vm_to_pristine` skips its external-overlay branch (snapshot reverts still run). Example:
 
-- `/path/to/vm-images/` — primary VM storage
-- `~/.local/share/libvirt/images/` — user libvirt
-- `/path/to/isos/` — ISO library for new VMs
+```json
+{ "paths": { "iso_dir": "/srv/isos", "vm_storage_dirs": ["/srv/vm-images"] } }
+```
 
 ### VM Test Manifest: `vm-test-manifest.json`
 
@@ -38,12 +38,12 @@ Test VMs MUST NOT live-mount production storage (no NFS, CIFS, virtiofs, virtio-
 {
   "vm_testing": {
     "enabled": true,
-    "default_vm": "cachyos-test",
+    "default_vm": "example-test-vm",
     "dangerous_operations": ["pam_modification", "systemd_service_install", "kernel_params"],
     "pristine_snapshot": "pristine",
     "post_test_restore": true,
     "test_environments": [
-      { "name": "cachyos-test", "type": "existing", "vm_name": "example-test-vm", "snapshot": "pristine" },
+      { "name": "example-test-vm", "type": "existing", "vm_name": "example-test-vm", "snapshot": "pristine" },
       { "name": "ubuntu-lts", "type": "create", "iso_pattern": "ubuntu-*-desktop-amd64.iso", "memory_mb": 4096, "disk_gb": 40 }
     ],
     "ssh_config": { "user": "testuser", "key": "~/.ssh/vm_test_key", "port": 22 },
@@ -78,8 +78,13 @@ detect_vm_environment() {
 ```bash
 create_test_vm() {
     local VM_NAME="$1" ISO_PATTERN="$2" MEMORY_MB="${3:-4096}" DISK_GB="${4:-40}" UEFI="${5:-false}"
-    local ISO_DIR="/path/to/isos"
-    local VM_DISK="/path/to/vm-images/${VM_NAME}.qcow2"
+    # Locations from the installation (§ VM Configuration); no built-in default, refuse before touching anything
+    local VM_MAP="$HOME/.claude/config/project-vm-map.json" ISO_DIR VM_STORAGE
+    ISO_DIR=$(jq -r '.paths.iso_dir // empty | strings | select(startswith("/"))' "$VM_MAP" 2>/dev/null)
+    VM_STORAGE=$(jq -r '[.paths.vm_storage_dirs[]? | strings | select(startswith("/"))][0] // empty' "$VM_MAP" 2>/dev/null)
+    [[ -n "$ISO_DIR" ]] || { echo "ERROR: set paths.iso_dir in $VM_MAP"; return 1; }
+    [[ -n "$VM_STORAGE" ]] || { echo "ERROR: set paths.vm_storage_dirs in $VM_MAP"; return 1; }
+    local VM_DISK="${VM_STORAGE%/}/${VM_NAME}.qcow2"
 
     local ISO_PATH=$(ls "$ISO_DIR"/$ISO_PATTERN 2>/dev/null | head -1)
     [[ -z "$ISO_PATH" ]] && { echo "No ISO matching: $ISO_PATTERN"; return 1; }
@@ -124,15 +129,23 @@ reset_vm_to_pristine() {
     [[ -f "${PROJECT_DIR}/vm-test-manifest.json" ]] && \
         PRISTINE_SNAP=$(python3 -c "import json; d=json.load(open('${PROJECT_DIR}/vm-test-manifest.json')); print(d.get('vm_testing',{}).get('pristine_snapshot',''))" 2>/dev/null)
 
-    # External snapshot: discard overlay and recreate
-    local OVERLAY="/path/to/vm-images/${VM_NAME}.${PRISTINE_SNAP}"
-    local BASE="/path/to/vm-images/${VM_NAME}.qcow2"
+    # External snapshot: discard overlay and recreate. Flat layout under the first directory in
+    # paths.vm_storage_dirs only; no default — with the key absent this branch is skipped.
+    local VM_STORAGE OVERLAY="" BASE=""
+    VM_STORAGE=$(jq -r '[.paths.vm_storage_dirs[]? | strings | select(startswith("/"))][0] // empty' \
+        "$HOME/.claude/config/project-vm-map.json" 2>/dev/null)
+    if [[ -n "$VM_STORAGE" ]]; then
+        OVERLAY="${VM_STORAGE%/}/${VM_NAME}.${PRISTINE_SNAP}"
+        BASE="${VM_STORAGE%/}/${VM_NAME}.qcow2"
+    elif [[ -n "$PRISTINE_SNAP" ]]; then
+        echo "paths.vm_storage_dirs not set — external-overlay reset skipped, trying snapshots"
+    fi
 
-    if [[ -n "$PRISTINE_SNAP" && -f "$OVERLAY" ]]; then
+    if [[ -n "$PRISTINE_SNAP" && -n "$OVERLAY" && -f "$OVERLAY" ]]; then
         virsh destroy "$VM_NAME" 2>/dev/null
         sudo virsh snapshot-delete "$VM_NAME" "$PRISTINE_SNAP" --metadata 2>/dev/null
         sudo virt-xml "$VM_NAME" --edit target=vda --disk path="$BASE"
-        sudo rm -f "$OVERLAY"
+        sudo rm -f "${OVERLAY:?}"
         sudo virsh snapshot-create-as "$VM_NAME" "$PRISTINE_SNAP" \
             "Pristine OS with dependencies. No application installed." --disk-only
     elif [[ -n "$PRISTINE_SNAP" ]] && virsh snapshot-list "$VM_NAME" --name 2>/dev/null | grep -q "$PRISTINE_SNAP"; then
@@ -412,39 +425,37 @@ run_phase_V() {
     > "$ISSUES_FILE"
 
     local MANIFEST="$PROJECT_DIR/vm-test-manifest.json"
-    local DEFAULT_VM="" VM_IP="" SSH_USER="claude" SSH_KEY="~/.ssh/id_ed25519"
+    local DEFAULT_VM="" VM_IP="" SSH_USER="" SSH_KEY=""
     local INSTALL_SCRIPT="" UPGRADE_SCRIPT="" DEPLOY_SCRIPT="" API_PORT="" WEB_PORT=""
 
     # Project-VM routing via project-vm-map.json
     local VM_MAP="$HOME/.claude/config/project-vm-map.json"
     local PROJECT_NAME=$(basename "$PROJECT_DIR")
 
+    # The VM: resolve_test_vm (phase-10b-vm-lifecycle.md § Test VM Selection; Phase 10 loads 10a and
+    # 10b together). Configured VMs only — no name guessed from `virsh list`, no built-in default.
+    DEFAULT_VM=$(resolve_test_vm "$PROJECT_DIR") || { echo "ERROR: no usable test VM is configured (reason above)"; return 1; }
+
     if [[ -f "$VM_MAP" ]]; then
-        local MAPPED_VM=$(jq -r ".projects.\"$PROJECT_NAME\".vm // empty" "$VM_MAP")
         INSTALL_SCRIPT=$(jq -r ".projects.\"$PROJECT_NAME\".install_script // empty" "$VM_MAP")
         UPGRADE_SCRIPT=$(jq -r ".projects.\"$PROJECT_NAME\".upgrade_script // empty" "$VM_MAP")
         DEPLOY_SCRIPT=$(jq -r ".projects.\"$PROJECT_NAME\".deploy_script // empty" "$VM_MAP")
         API_PORT=$(jq -r ".projects.\"$PROJECT_NAME\".api_port // empty" "$VM_MAP")
-
-        if [[ -n "$MAPPED_VM" ]]; then
-            DEFAULT_VM="$MAPPED_VM"
-        else
-            DEFAULT_VM=$(jq -r '.default.vm // "example-test-vm"' "$VM_MAP")
-            local EXCL=$(jq -r ".vms.\"$DEFAULT_VM\".exclusive_to // empty" "$VM_MAP")
-            [[ -n "$EXCL" && "$EXCL" != "$PROJECT_NAME" ]] && { echo "ERROR: $DEFAULT_VM exclusive to $EXCL"; return 1; }
-        fi
         VM_IP=$(jq -r ".vms.\"$DEFAULT_VM\".ip // empty" "$VM_MAP")
-        SSH_USER=$(jq -r ".vms.\"$DEFAULT_VM\".ssh_user // \"claude\"" "$VM_MAP")
-        SSH_KEY=$(jq -r ".vms.\"$DEFAULT_VM\".ssh_key // \"~/.ssh/id_ed25519\"" "$VM_MAP")
-    elif [[ -f "$MANIFEST" ]]; then
-        DEFAULT_VM=$(jq -r '.vm_testing.default_vm // empty' "$MANIFEST")
+        SSH_USER=$(jq -r ".vms.\"$DEFAULT_VM\".ssh_user // empty" "$VM_MAP")
+        SSH_KEY=$(jq -r ".vms.\"$DEFAULT_VM\".ssh_key // empty" "$VM_MAP")
     fi
+    # SSH identity: the map's vms.<vm> entry, else the manifest's ssh_config. No built-in default.
+    if [[ -f "$MANIFEST" ]]; then
+        [[ -z "$SSH_USER" ]] && SSH_USER=$(jq -r '.vm_testing.ssh_config.user // .ssh_config.user // empty' "$MANIFEST")
+        [[ -z "$SSH_KEY" ]] && SSH_KEY=$(jq -r '.vm_testing.ssh_config.key // .ssh_config.key // empty' "$MANIFEST")
+    fi
+    [[ -n "$SSH_USER" && -n "$SSH_KEY" ]] || {
+        echo "ERROR: no SSH user/key for $DEFAULT_VM: set vms.<vm>.ssh_user and ssh_key in $VM_MAP, or ssh_config in vm-test-manifest.json"
+        return 1
+    }
 
     detect_vm_environment
-
-    # Auto-detect if no VM configured
-    [[ -z "$DEFAULT_VM" ]] && DEFAULT_VM=$(virsh list --all --name 2>/dev/null | grep -iE "test|dev" | head -1)
-    [[ -z "$DEFAULT_VM" ]] && { echo "No test VM found"; return 0; }
 
     SSH_KEY="${SSH_KEY/#\~/$HOME}"
 
@@ -505,13 +516,15 @@ run_phase_V() {
 
 ## Project-VM Routing
 
-Phase 10a reads `~/.claude/config/project-vm-map.json`:
+Phase 10a chooses the VM with `resolve_test_vm` (`phase-10b-vm-lifecycle.md` § Test VM Selection), which reads `~/.claude/config/project-vm-map.json` and the project's `vm-test-manifest.json`:
 
 | Scenario | VM Used |
 | --- | --- |
 | Project has dedicated VM | `projects.<name>.vm` |
-| No entry | `default.vm` (example-test-vm) |
-| Default VM exclusive to another project | ERROR |
+| No map entry, manifest names one | manifest `vm_testing.default_vm` |
+| Neither | `default.vm` |
+| Nothing configured | ERROR (no built-in default, no name guessed from `virsh list`) |
+| Chosen VM exclusive to another project | ERROR |
 
 **Exclusivity:** `exclusive_to` is bidirectional: only that project uses the VM, and it uses only that VM.
 
