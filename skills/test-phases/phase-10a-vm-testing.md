@@ -540,7 +540,7 @@ run_phase_V() {
     if [[ -s "$ISSUES_FILE" ]]; then
         echo "Issues found:"; cat "$ISSUES_FILE"; return 1
     else
-        echo "All VM tests passed"; rm -f "$ISSUES_FILE"; return 0
+        echo "All VM tests passed"; rm -f "${ISSUES_FILE:?}"; return 0
     fi
 }
 ```

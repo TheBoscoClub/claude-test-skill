@@ -586,7 +586,7 @@ shutdown_test_vm() {
         fi
 
         echo "  ✅ VM shut down. Will revert to pristine at start of next test run."
-        rm -f "$STATE_FILE"
+        rm -f "${STATE_FILE:?}"
         echo "  📝 Removed state file: $STATE_FILE"
         echo ""
         return 0
@@ -617,7 +617,7 @@ shutdown_test_vm() {
     if [[ "$STARTED_BY_TEST" != "true" ]]; then
         echo "  ✓ VM was already running - leaving it running"
         echo "    (VM was not started by /test)"
-        rm -f "$STATE_FILE"
+        rm -f "${STATE_FILE:?}"
         return 0
     fi
 
@@ -626,7 +626,7 @@ shutdown_test_vm() {
 
     if [[ "$CURRENT_STATE" != "running" ]]; then
         echo "  ✓ VM already stopped"
-        rm -f "$STATE_FILE"
+        rm -f "${STATE_FILE:?}"
         return 0
     fi
 
@@ -643,7 +643,7 @@ shutdown_test_vm() {
         CURRENT_STATE=$(virsh domstate "$VM_NAME" 2>/dev/null | tr -d '[:space:]')
         if [[ "$CURRENT_STATE" != "running" ]]; then
             echo "  ✅ VM shut down gracefully"
-            rm -f "$STATE_FILE"
+            rm -f "${STATE_FILE:?}"
             return 0
         fi
         ((WAIT_COUNT++))
@@ -662,7 +662,7 @@ shutdown_test_vm() {
     fi
 
     # Clean up state file
-    rm -f "$STATE_FILE"
+    rm -f "${STATE_FILE:?}"
     echo ""
     echo "  📝 Removed state file: $STATE_FILE"
     echo ""

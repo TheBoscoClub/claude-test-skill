@@ -147,7 +147,7 @@ except Exception:
 
     if [[ -z "$VM_NAME" ]]; then
         echo "  ⚠️ State file missing vm_name — removing stale state file"
-        rm -f "$STATE_FILE"
+        rm -f "${STATE_FILE:?}"
         return 0
     fi
 
@@ -164,7 +164,7 @@ except Exception:
     # Check for override to keep VM running
     if [[ "$TEST_KEEP_VM_RUNNING" == "true" ]]; then
         echo "  ⚠️ TEST_KEEP_VM_RUNNING=true - leaving VM running"
-        rm -f "$STATE_FILE"
+        rm -f "${STATE_FILE:?}"
         return 0
     fi
 
@@ -193,7 +193,7 @@ except Exception:
     if [[ "$STARTED_BY_TEST" != "true" && "$POST_TEST_RESTORE" != "true" ]]; then
         echo "  ✓ VM was already running and is not project-exclusive — leaving it running"
         echo "    (VM was not started by /test; post_test_restore=false)"
-        rm -f "$STATE_FILE"
+        rm -f "${STATE_FILE:?}"
         return 0
     fi
 
@@ -207,7 +207,7 @@ except Exception:
 
     if [[ "$CURRENT_STATE" != "running" ]]; then
         echo "  ✓ VM already stopped"
-        rm -f "$STATE_FILE"
+        rm -f "${STATE_FILE:?}"
         return 0
     fi
 
@@ -224,7 +224,7 @@ except Exception:
         CURRENT_STATE=$(virsh domstate "$VM_NAME" 2>/dev/null | tr -d '[:space:]')
         if [[ "$CURRENT_STATE" != "running" ]]; then
             echo "  ✅ VM shut down gracefully"
-            rm -f "$STATE_FILE"
+            rm -f "${STATE_FILE:?}"
             return 0
         fi
         ((WAIT_COUNT++))
@@ -243,7 +243,7 @@ except Exception:
     fi
 
     # Clean up state file
-    rm -f "$STATE_FILE"
+    rm -f "${STATE_FILE:?}"
     echo ""
     echo "  📝 Removed state file: $STATE_FILE"
 
