@@ -16,11 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- **Phase 5a's private-key search never ran** — its pattern began with `-`, so `grep` stopped with a usage error, which
-  `2>/dev/null` hid, and the phase reported no secrets
-
 ### Added
 
 - **Regression test `tests/test-vm-lib.sh`** — exercises the shipping VM code (Phase 1 sweep, Phase 10a create/reset/snapshot/cross-distro/`run_phase_V`, Phase 10b start/shutdown, Phase 11 shutdown) with logging stubs for `virsh` and `sudo`, one phase per shell as in a real run: helpers missing, unlisted or exclusive VMs, every destructive branch and the deploy identity. No VM is touched. 99/99 against this tree; 24 of the first 36 cases fail against the tree before the VM fix, 8 of the 13 shutdown cases before the shutdown check, 2 of the 3 `exclusive_to` type cases before that check and 7 of the 9 Phase 10a direct-action cases before `manage_vm_snapshot`/`deploy_to_vm` checked the VM
@@ -54,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Phase 5a's private-key search never ran** — its pattern began with `-`, so `grep` stopped with a usage error, which
+  `2>/dev/null` hid, and the phase reported no secrets
 - **Phase ST runs the regression tests bounded**: `tests/test-*.sh` ran as plain `bash`; they now run under `bounded-test` when the host has it (own PID namespace, memory and task caps) and under `timeout 600` otherwise
 - **The shared-VM snapshot workflow in `.claude/rules/vm-testing.md` can no longer delete a pristine snapshot** — steps 3 and 4 ran `snapshot-revert`/`snapshot-delete` on any `$VM` and a typed-in `<snapshot-name>`, so filling in `pristine` deleted it; the snippet now resolves the VM with `resolve_test_vm`, names the run's snapshot once (`SNAP=pre-test-…`), reverts only to it and deletes only through `check_test_vm` + `delete_pretest_snapshot`
 - **Phase 10a deploys with the configured SSH identity** — `run_phase_V` resolved the user and key from the map or manifest but never exported them, so `deploy_to_vm` and `run_vm_tests` fell back to `testuser` and `~/.ssh/vm_test_key`; it now exports `VM_SSH_USER` / `VM_SSH_KEY` (case in `tests/test-vm-lib.sh`)
