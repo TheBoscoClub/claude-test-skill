@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Phase 5a's private-key search never ran** — its pattern began with `-`, so `grep` stopped with a usage error, which
+  `2>/dev/null` hid, and the phase reported no secrets
+
 ### Added
 
 - **Regression test `tests/test-vm-lib.sh`** — exercises the shipping VM code (Phase 1 sweep, Phase 10a create/reset/snapshot/cross-distro/`run_phase_V`, Phase 10b start/shutdown, Phase 11 shutdown) with logging stubs for `virsh` and `sudo`, one phase per shell as in a real run: helpers missing, unlisted or exclusive VMs, every destructive branch and the deploy identity. No VM is touched. 99/99 against this tree; 24 of the first 36 cases fail against the tree before the VM fix, 8 of the 13 shutdown cases before the shutdown check, 2 of the 3 `exclusive_to` type cases before that check and 7 of the 9 Phase 10a direct-action cases before `manage_vm_snapshot`/`deploy_to_vm` checked the VM

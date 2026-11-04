@@ -291,7 +291,7 @@ if [[ -n "$AWS_KEYS_TEST" ]]; then
 fi
 
 # Private keys
-PRIVATE_KEYS=$(grep -rE $SECRET_EXCLUDE "-----BEGIN.*PRIVATE KEY-----" "$PROJECT_ROOT" 2>/dev/null | head -5)
+PRIVATE_KEYS=$(grep -rE $SECRET_EXCLUDE -e "-----BEGIN.*PRIVATE KEY-----" "$PROJECT_ROOT" 2>/dev/null | head -5)
 if [[ -n "$PRIVATE_KEYS" ]]; then
     echo "  🚨 Private key(s) found in source code!"
     echo "$PRIVATE_KEYS" | head -3
