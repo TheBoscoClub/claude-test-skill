@@ -727,6 +727,6 @@ echo "════════════════════════�
 | semgrep | `pipx install semgrep` |
 | codeql | `yay -S codeql` |
 | trivy | `pacman -S trivy` |
-| grype | `yay -S grype-bin` |
+| grype | upstream release: `install.sh -v` from github.com/anchore/grype (needs `cosign`) |
 | pip-audit | `pipx install pip-audit` |
 | checkov | `pipx install checkov` |

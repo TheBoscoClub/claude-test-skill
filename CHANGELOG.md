@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **grype install hint no longer points at AUR** (`README.md`, `phase-5a-security.md`) — grype is in neither the Arch nor the CachyOS repositories, but upstream publishes signed release builds, so the hint now names upstream's `install.sh -v` rather than `yay -S grype-bin`
 - **Phase 5a's private-key search never ran** — its pattern began with `-`, so `grep` stopped with a usage error, which
   `2>/dev/null` hid, and the phase reported no secrets
 - **Phase ST runs the regression tests bounded**: `tests/test-*.sh` ran as plain `bash`; they now run under `bounded-test` when the host has it (own PID namespace, memory and task caps) and under `timeout 600` otherwise

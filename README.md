@@ -213,7 +213,7 @@ Phase 3 (Discovery) automatically detects which tools are installed on your syst
 | npm audit | Node.js CVE scanning | (built-in) |
 | cargo audit | Rust CVE scanning | `cargo install cargo-audit` |
 | trivy | Container/filesystem scanning | OS package manager |
-| grype | SBOM vulnerability scanning | OS package manager (AUR: grype-bin) |
+| grype | SBOM vulnerability scanning | Upstream release (`install.sh -v`, needs `cosign`) |
 | checkov | Infrastructure-as-Code security | `pipx install checkov` |
 | CodeQL | Advanced static analysis | GitHub Actions / Local install |
 
