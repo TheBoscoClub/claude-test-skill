@@ -399,7 +399,7 @@ Key steps:
 3. Test install/upgrade/migration scripts
 4. Test functionality, performance, race conditions
 5. Record issues to app-test-issues.log
-6. Repeat until clean
+6. Fix what it finds, re-run what failed once (`proportionate-proof.md`)
 ```
 
 **Phase 9b (Production Validation)** - Live System:
@@ -537,7 +537,7 @@ When `/test` is invoked:
 │  • Autonomous mode (default): fixes ALL issues, no prompts, loops           │
 │  • Interactive mode (--interactive): may prompt, still fixes ALL issues     │
 │  • All audits are holistic — every analysis phase includes cross-component  │
-│  • All audits iterate until clean — re-run after fixes until zero issues    │
+│  • One pass: fix blockers, re-run what failed once (proportionate-proof.md) │
 │  • Phase 9b/9c/9d: auto-skipped when not applicable (no prompts)            │
 │  • Phase 10a: auto-triggered when isolation level is vm-required            │
 │  • Phase ST: NEVER runs in normal /test — explicit --phase=ST only          │
@@ -646,8 +646,8 @@ ELSE (Autonomous - DEFAULT):
      ⛔ Wait for ALL phase 5 sub-phases; nothing else runs meanwhile
 
    Phase 7: Verification — SEQUENTIAL → GATE: Verified
-     Failures → loop back to phase 6 until clean
-     After all fixes committed → re-run entire audit until clean pass
+     Failures → back to phase 6, then re-run what failed; a failure repeated twice is reported
+     Not re-run in full after fixes (`proportionate-proof.md`); a red test still gets fixed
 
    Phase 8: Documentation — ALWAYS RUNS → GATE: Docs Complete
      Fixes ALL doc issues: versions, paths, obsolete content
